@@ -1,0 +1,1248 @@
+{
+  "bun": "pinned toolchain-home/bin/bun",
+  "checks": [
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:10.025Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 76.66934300000003
+      },
+      "name": "A-miss-compile-exit-0",
+      "pass": true
+    },
+    {
+      "detail": "",
+      "name": "A-artifact-nonempty",
+      "pass": true
+    },
+    {
+      "detail": {
+        "artifact_bytes": 83433,
+        "artifact_sha256": "225fda9629f3ddf26423e792665b1f21ff29f95e46f16973057417905a25bbbc",
+        "compiler_invoked": false,
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "manifest": {
+          "k1_compiler": [
+            {
+              "bytes": 196139,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/comp.ts",
+              "sha256": "1956f2e238e4d0cda91cd694c82d05ea06d5edd6b4eed12604c730012a69610a"
+            },
+            {
+              "bytes": 135926,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/bend.ts",
+              "sha256": "93c2a43deeb82c15683e4e25bbc5dec5ac3edff9f54e09acc0975e290fcaeb85"
+            },
+            {
+              "bytes": 24616,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/main.ts",
+              "sha256": "8519a17a6bcfd79898d6d9abe5c432ec4b8765f1f643fcb21fe352afd12196d1"
+            },
+            {
+              "bytes": 15367,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/cache.ts",
+              "sha256": "dec8dca9a836e12f40264a342b46695b42d7f3176d6a6a38ee9c88dd5d4895db"
+            },
+            {
+              "bytes": 66363,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/base.bend",
+              "sha256": "e5639663177f2de93ef34867c029698aa4e68a98d46629f0b15452b67b99d798"
+            }
+          ],
+          "k2_toolchain": {
+            "bun_version": "1.3.14"
+          },
+          "k3_closure_files": [
+            {
+              "bytes": 66363,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/base.bend",
+              "sha256": "e5639663177f2de93ef34867c029698aa4e68a98d46629f0b15452b67b99d798"
+            },
+            {
+              "bytes": 164,
+              "path": "/tmp/cgen-ts-ywdejftf/fx/fx.bend",
+              "sha256": "c492e629bd29964f443fd74341179cf44549bec470f5688255583ef40dca0691"
+            }
+          ],
+          "k3_closure_ordered": [
+            "Empty",
+            "Unit",
+            "Bool",
+            "Cmp",
+            "Either",
+            "Sigma",
+            "Nat",
+            "Maybe",
+            "Result",
+            "List",
+            "Word",
+            "Word.Nil",
+            "Word.Con",
+            "U32",
+            "F32",
+            "Char",
+            "String",
+            "Array",
+            "Image",
+            "Event",
+            "Map",
+            "File",
+            "Socket",
+            "Listener",
+            "Window",
+            "Audio",
+            "Chan",
+            "IO.OP",
+            "Pair",
+            "IO",
+            "App",
+            "Word",
+            "Pair",
+            "Exists",
+            "Or",
+            "Pair.fst",
+            "Pair.snd",
+            "IO",
+            "IO.pure",
+            "IO.bind",
+            "IO.print",
+            "IO.write",
+            "IO.print_err",
+            "IO.get_env",
+            "IO.args",
+            "IO.die",
+            "IO.pass",
+            "IO.try",
+            "IO.random_u32",
+            "IO.spawn",
+            "IO.sleep",
+            "IO.now",
+            "Chan.new",
+            "Chan.send",
+            "Chan.recv",
+            "Chan.close",
+            "IO.fork.go",
+            "IO.fork",
+            "IO.join.go",
+            "IO.join",
+            "File.open",
+            "File.read",
+            "File.read_bytes",
+            "File.read_at",
+            "File.size",
+            "File.write",
+            "File.write_bytes",
+            "File.close",
+            "TCP.listen",
+            "TCP.accept",
+            "TCP.connect",
+            "TCP.send",
+            "TCP.recv",
+            "TCP.poll",
+            "UDP.bind",
+            "UDP.send_to",
+            "UDP.recv_from",
+            "UDP.poll",
+            "Socket.close",
+            "Listener.close",
+            "Window.open",
+            "Window.frame",
+            "Window.set_title",
+            "Window.close",
+            "Audio.open",
+            "Audio.write",
+            "Audio.close",
+            "Equal.cong",
+            "Equal.cong",
+            "Equal.sym",
+            "Equal.sym",
+            "Equal.trans",
+            "Equal.trans",
+            "Empty.absurd",
+            "Bool.not",
+            "Bool.and",
+            "Bool.or",
+            "Bool.xor",
+            "Bool.cmp",
+            "Bool.full_add",
+            "Bool.pick",
+            "Bool.to_u32",
+            "Cmp.is_lt",
+            "Cmp.is_eq",
+            "Cmp.is_gt",
+            "Cmp.is_le",
+            "Cmp.is_ge",
+            "Nat.double",
+            "Nat.add",
+            "Nat.sub",
+            "Nat.mul",
+            "Nat.divmod.go",
+            "Nat.divmod",
+            "Nat.cmp",
+            "Nat.is_lt",
+            "Nat.is_eq",
+            "Nat.is_ne",
+            "Nat.is_le",
+            "Nat.is_gt",
+            "Nat.is_ge",
+            "Nat.min",
+            "Nat.max",
+            "Nat.ge_refl",
+            "Nat.ge_refl",
+            "Nat.max_ge_l",
+            "Nat.max_ge_l",
+            "Nat.max_ge_r",
+            "Nat.max_ge_r",
+            "Nat.div.fin",
+            "Nat.div",
+            "Nat.mod.fin",
+            "Nat.mod",
+            "Nat.pow",
+            "Maybe.pure",
+            "Maybe.bind",
+            "Maybe.default",
+            "Maybe.is_some",
+            "Maybe.is_none",
+            "Maybe.map",
+            "Maybe.or",
+            "Result.pure",
+            "Result.bind",
+            "Result.default",
+            "Result.is_done",
+            "Result.is_fail",
+            "Result.map",
+            "List.map",
+            "List.length",
+            "List.append",
+            "List.concat",
+            "List.reverse.go",
+            "List.reverse",
+            "List.is_empty",
+            "List.head",
+            "List.tail",
+            "List.last.go",
+            "List.last",
+            "List.get",
+            "List.set",
+            "List.take",
+            "List.drop",
+            "List.zip",
+            "List.range.go",
+            "List.range",
+            "List.replicate",
+            "List.filter.put",
+            "List.filter",
+            "List.foldl",
+            "List.foldr",
+            "List.any",
+            "List.all",
+            "List.find.put",
+            "List.find",
+            "List.contains",
+            "List.merge.step",
+            "List.merge.go",
+            "List.sort.runs",
+            "List.sort.pass",
+            "List.sort.go",
+            "List.sort",
+            "List.for_each",
+            "Word.zero",
+            "Word.not",
+            "Word.and",
+            "Word.or",
+            "Word.xor",
+            "Word.shl.put",
+            "Word.shl",
+            "Word.shl.out.con",
+            "Word.shl.out",
+            "Word.shr.pad",
+            "Word.shr",
+            "Word.cmp.fin",
+            "Word.cmp",
+            "Word.inc",
+            "Word.adc",
+            "Word.adc.con",
+            "Word.adc",
+            "Word.add",
+            "Word.sub",
+            "Word.add_comm.arm",
+            "Word.add_comm.go",
+            "Word.add_comm.arm",
+            "Word.add_comm.go",
+            "Word.add_comm",
+            "Word.add_comm",
+            "Word.to_nat",
+            "Word.mul.go",
+            "Word.mul",
+            "U32.inc",
+            "U32.add",
+            "U32.add_comm",
+            "U32.add_comm",
+            "U32.sub",
+            "U32.mul",
+            "U32.not",
+            "U32.and",
+            "U32.or",
+            "U32.xor",
+            "U32.shl",
+            "U32.shr",
+            "U32.shln",
+            "U32.shrn",
+            "U32.cmp",
+            "U32.is_eq",
+            "U32.is_ne",
+            "U32.is_lt",
+            "U32.is_le",
+            "U32.is_gt",
+            "U32.is_ge",
+            "U32.is_zero",
+            "U32.to_nat",
+            "U32.from_nat",
+            "U32.log2.go",
+            "U32.log2",
+            "U32.divmod.go.fin",
+            "U32.divmod.go.shl",
+            "U32.divmod.go.rec",
+            "U32.divmod.go",
+            "U32.div.fin",
+            "U32.div.if",
+            "U32.div",
+            "U32.mod.fin",
+            "U32.mod.if",
+            "U32.mod",
+            "U32.min",
+            "U32.max",
+            "U32.clamp",
+            "U32.pow",
+            "U32.is_even",
+            "U32.to_f32",
+            "F32.to_u32",
+            "F32.add",
+            "F32.sub",
+            "F32.mul",
+            "F32.div",
+            "F32.mod",
+            "F32.pow",
+            "F32.atan2",
+            "F32.neg",
+            "F32.abs",
+            "F32.sqrt",
+            "F32.exp",
+            "F32.log",
+            "F32.log2",
+            "F32.log10",
+            "F32.sin",
+            "F32.cos",
+            "F32.tan",
+            "F32.asin",
+            "F32.acos",
+            "F32.atan",
+            "F32.sinh",
+            "F32.cosh",
+            "F32.tanh",
+            "F32.floor",
+            "F32.ceil",
+            "F32.trunc",
+            "F32.is_eq",
+            "F32.is_ne",
+            "F32.is_lt",
+            "F32.is_le",
+            "F32.is_gt",
+            "F32.is_ge",
+            "F32.show",
+            "F32.bits",
+            "F32.read",
+            "F32.min",
+            "F32.max",
+            "F32.clamp",
+            "F32.lerp",
+            "F32.square",
+            "F32.hypot",
+            "F32.round",
+            "F32.pi",
+            "F32.from_nat",
+            "F32.to_nat",
+            "Char.cmp",
+            "Char.to_u32",
+            "Char.from_u32",
+            "Char.is_eq",
+            "Char.is_digit",
+            "Char.is_upper",
+            "Char.is_lower",
+            "Char.is_alpha",
+            "Char.is_space",
+            "Char.to_upper",
+            "Char.to_lower",
+            "String.append",
+            "String.cmp.rec",
+            "String.cmp",
+            "String.cmp.fin",
+            "String.cmp",
+            "String.eq.fin",
+            "String.eq",
+            "String.length",
+            "String.is_empty",
+            "String.reverse.go",
+            "String.reverse",
+            "String.order.fin",
+            "String.order",
+            "String.is_lt",
+            "String.is_le",
+            "String.is_gt",
+            "String.is_ge",
+            "String.starts_with",
+            "String.starts_with.if",
+            "String.starts_with",
+            "String.ends_with",
+            "String.contains",
+            "String.contains.if",
+            "String.contains",
+            "String.take",
+            "String.drop",
+            "String.get",
+            "String.to_list",
+            "String.from_list",
+            "String.concat",
+            "String.join.go",
+            "String.join",
+            "String.split.push",
+            "String.split.fin",
+            "String.split",
+            "String.lines",
+            "String.repeat",
+            "String.to_upper",
+            "String.to_lower",
+            "String.trim_start",
+            "String.trim_start.if",
+            "String.trim_start",
+            "String.trim_end",
+            "String.trim",
+            "Nat.show.put",
+            "Nat.show.go",
+            "Nat.show.fin",
+            "Nat.show.go",
+            "Nat.show",
+            "Nat.read.go",
+            "Nat.read.max",
+            "Nat.read.fit",
+            "Nat.read.if",
+            "Nat.read.go",
+            "Nat.read",
+            "U32.show.go",
+            "U32.show.fin",
+            "U32.show.go",
+            "U32.show.if",
+            "U32.show",
+            "U32.read.go",
+            "U32.read.if",
+            "U32.read.go",
+            "U32.read",
+            "Bool.show",
+            "Char.show",
+            "Maybe.show",
+            "List.show.go",
+            "List.show",
+            "Array.size.node",
+            "Array.size",
+            "Array.swap.lo",
+            "Array.swap.hi",
+            "Array.swap.go",
+            "Array.swap.if",
+            "Array.swap.go",
+            "Array.swap.at",
+            "Array.swap",
+            "Array.clone.node",
+            "Array.clone",
+            "Array.fork",
+            "Array.join",
+            "Array.atomic.add",
+            "Array.atomic.min",
+            "Array.atomic.max",
+            "Array.atomic.and",
+            "Array.atomic.or",
+            "Array.atomic.xor",
+            "Array.atomic.exch",
+            "Array.atomic.cas",
+            "Array.atomic.fadd",
+            "Array.new",
+            "Array.set.fin",
+            "Array.set",
+            "Array.get.go",
+            "Array.get.if",
+            "Array.get.go",
+            "Array.get.at",
+            "Array.get",
+            "Array.to_list.go",
+            "Array.to_list",
+            "Array.map.go",
+            "Array.map.at",
+            "Array.map.seed",
+            "Array.map",
+            "Map.bit.u",
+            "Map.bit.chr",
+            "Map.bit.go.chr",
+            "Map.bit.go.rec",
+            "Map.bit.go",
+            "Map.bit.at",
+            "Map.bit",
+            "Map.msb.u",
+            "Map.msb.u.if",
+            "Map.msb.u",
+            "Map.diff.chr",
+            "Map.diff.step",
+            "Map.diff",
+            "Map.diff.fin",
+            "Map.diff",
+            "Map.new",
+            "Map.put",
+            "Map.put.bit",
+            "Map.put",
+            "Map.ins.splice.bit",
+            "Map.ins.splice",
+            "Map.ins",
+            "Map.ins.deep",
+            "Map.ins.if",
+            "Map.ins",
+            "Map.lo",
+            "Map.hi",
+            "Map.seek",
+            "Map.seek.bit",
+            "Map.seek",
+            "Map.set.fin.go",
+            "Map.set.fin",
+            "Map.set.go",
+            "Map.set",
+            "Map.has.leaf",
+            "Map.has",
+            "Map.has.bit",
+            "Map.has",
+            "Map.get.leaf",
+            "Map.get",
+            "Map.get.bit",
+            "Map.get",
+            "Map.pop.lo",
+            "Map.pop.hi",
+            "Map.pop.leaf",
+            "Map.pop",
+            "Map.pop.bit",
+            "Map.pop",
+            "Map.del.fin",
+            "Map.del",
+            "Map.to_list.go",
+            "Map.to_list",
+            "Map.keys.go",
+            "Map.keys",
+            "Map.from_list.go",
+            "Map.from_list",
+            "Map.union",
+            "Map.size",
+            "Map.values.go",
+            "Map.values",
+            "Set",
+            "Set.new",
+            "Set.add",
+            "Set.has",
+            "Set.del",
+            "Set.size",
+            "Set.to_list",
+            "Set.from_list.go",
+            "Set.from_list",
+            "Image.sink",
+            "Image.drop.join",
+            "Image.free",
+            "Image.drop",
+            "App.next",
+            "App.turn",
+            "App.draw",
+            "App.step",
+            "App.loop",
+            "App.run",
+            "App.more",
+            "App.fold",
+            "App.play",
+            "Fx.tag",
+            "main"
+          ],
+          "k3_entry": "/tmp/cgen-ts-ywdejftf/fx/fx.bend",
+          "k3_namespaces": [
+            [
+              "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/base.bend",
+              ""
+            ],
+            [
+              "/tmp/cgen-ts-ywdejftf/fx/fx.bend",
+              ""
+            ]
+          ],
+          "k4_laws_proof": false,
+          "k5_effs": [
+            {
+              "bytes": 351,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/args.c",
+              "sha256": "7209a5fa11396fa8b0667a6738c913c40f554797e442c847a25e13a5f69676e0"
+            },
+            {
+              "bytes": 183,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/args.js",
+              "sha256": "c0ab157ffd8c7cf8a64c04b209a9933613a7de4e4cf3985d79368734f5ee05d3"
+            },
+            {
+              "bytes": 6696,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/audio.c",
+              "sha256": "19f953b0a422fbabd450d7ceef6ff76dcdf7f432d154b6d72bfb639931b4213d"
+            },
+            {
+              "bytes": 75,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/audio_close.js",
+              "sha256": "a405efc23dc9ee40d042e0eb990a2ba35ed3d24e604f86b06c342fc8b88f0ba1"
+            },
+            {
+              "bytes": 228,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/audio_open.js",
+              "sha256": "955ee7459117cace471ba49daba1f830df626de1f25ce3e1196344cabfa6a6ad"
+            },
+            {
+              "bytes": 379,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/audio_write.js",
+              "sha256": "4d7d448c013e54e0b88b7d956fe9a3ecab5ca993ed07e1def384c142e2691f7c"
+            },
+            {
+              "bytes": 306,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_close.c",
+              "sha256": "d88e91ca179bfcdbf8580e75f1dbea4c5f240d3fbdb980a2ee24d1e662ff478a"
+            },
+            {
+              "bytes": 138,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_close.js",
+              "sha256": "6d499aff10ef4bc31f6cbf1498d72d5e0459713b01ff71a7d0b81a1d72f22864"
+            },
+            {
+              "bytes": 203,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_new.c",
+              "sha256": "41d722added898f3a9eae186be969a7ca7f01bc3235331663b13319d14fb7ff2"
+            },
+            {
+              "bytes": 111,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_new.js",
+              "sha256": "c492de059560a6508f8abe0f76a61190afe3c09cdbff3ca0fcf325a54a5dc407"
+            },
+            {
+              "bytes": 665,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_recv.c",
+              "sha256": "7baa193d4adb09865a9397e84d41ec4fe7097cdd46150ed44513c76da126d0d1"
+            },
+            {
+              "bytes": 382,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_recv.js",
+              "sha256": "bdb08d281e4e6c79ff9d8f155a2a831957a945e4bc20e40ab298251475e94330"
+            },
+            {
+              "bytes": 616,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_send.c",
+              "sha256": "f12ade43cc52af51e13d35a93221b129db11fbfa7470f38557b1c0c9ef22caa4"
+            },
+            {
+              "bytes": 389,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/chan_send.js",
+              "sha256": "2fd3cccca3c6b5969be94abc41b04fcb4b897704b599ad0d9c049cae445b33fa"
+            },
+            {
+              "bytes": 243,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_close.c",
+              "sha256": "befd465a31b88936d772222d26b1019ea7330e59e6327d8ba90584c85e8b2fb3"
+            },
+            {
+              "bytes": 151,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_close.js",
+              "sha256": "23614d511e30900127c359da5cc9c1ea96642da564813866f062be67cbfbc618"
+            },
+            {
+              "bytes": 1113,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_open.c",
+              "sha256": "f42a8bcc142b9003c7f6ca99287ca09c14f9efcbe15dea929c90c2fa062746e7"
+            },
+            {
+              "bytes": 426,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_open.js",
+              "sha256": "c5eef502a0a05b961685a6ef057fe22e1afe2fddbcce52b5813dac595948e956"
+            },
+            {
+              "bytes": 2249,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_read.c",
+              "sha256": "fba9dac9eedf80428c1893b33d3b7318dc724b24b0b08a7ccc80cb301c4f5831"
+            },
+            {
+              "bytes": 834,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_read.js",
+              "sha256": "47594cbcec9a231cda04668114166d12dfcdef477676fe2e146cbbd05abdccf6"
+            },
+            {
+              "bytes": 771,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_size.c",
+              "sha256": "09906f3839f0f0fba1eea944c948e35f8e03627dc2b78e8debb43e0556f5d5d8"
+            },
+            {
+              "bytes": 319,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_size.js",
+              "sha256": "3aaf57fb49127c71d19d975c243a415b0b957775b54b5c4093feadd0e4e84c5e"
+            },
+            {
+              "bytes": 1656,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_write.c",
+              "sha256": "c225a6e0bf8f8ef987735e767fa4049bbd5fb7be5462db14018ff20a78b3ee98"
+            },
+            {
+              "bytes": 714,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/file_write.js",
+              "sha256": "0b5e07643d202c828fea188863f175b242687d13ec894f248f8ad250adbb71d9"
+            },
+            {
+              "bytes": 646,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/get_env.c",
+              "sha256": "62255e46c7e0c43baea62366830c4a5badb11cba517c0aa17f952f432f46d4a3"
+            },
+            {
+              "bytes": 185,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/get_env.js",
+              "sha256": "f03f63c193653571742e843081caa14ff2f1246d4ac8edf1ad70082965ff6654"
+            },
+            {
+              "bytes": 267,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/listener_close.c",
+              "sha256": "11247352a8311b066fff27ed85958598214ece80f23a7ac59ee981ea569351ec"
+            },
+            {
+              "bytes": 134,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/listener_close.js",
+              "sha256": "a0fa00784e073fc31f86eee2e975ddf3fede1ce9bdce71dd6ca7e9d66f798b68"
+            },
+            {
+              "bytes": 198,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/now.c",
+              "sha256": "da5fde65701c4fadc7560625c9615b4d60b2eefbd7b6bbe1aedda61887b825b9"
+            },
+            {
+              "bytes": 83,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/now.js",
+              "sha256": "c1b04cf21a8f4a32fc28a6340ebf0646ec0c4486494a5278ba1986308a878d2d"
+            },
+            {
+              "bytes": 397,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/print.c",
+              "sha256": "709500d2ace6e2eaeec0f5f1e4373d4ec5e402b3c1e289bd70dfef7e2a635b26"
+            },
+            {
+              "bytes": 101,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/print.js",
+              "sha256": "d189cf8d2734f85aeacf6872f3eb49fb10caa0568f66c81cc4a814c3269953ff"
+            },
+            {
+              "bytes": 236,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/print_err.c",
+              "sha256": "72781d2adc88a4791d5530c9deff20824c38d5aa1ba43fb05aaa6a697e19f4b6"
+            },
+            {
+              "bytes": 105,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/print_err.js",
+              "sha256": "7b8cb3bc48101ce5e2ecaf98a478cc6d5abaa46e74df6b43dc822bce891eb26c"
+            },
+            {
+              "bytes": 741,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/random_u32.c",
+              "sha256": "10ef9045dcd539bc0ff609e61c77d585fb998ceb48656944d62727716263ee2d"
+            },
+            {
+              "bytes": 107,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/random_u32.js",
+              "sha256": "82c9f51cac5dddc9664b0547232325b2c11653c75275bea87c67da9eb6364417"
+            },
+            {
+              "bytes": 206,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/sleep.c",
+              "sha256": "77e212d3baeec0b3dc0a9c7f630b43094986e433c049049d354a9681719e2ecd"
+            },
+            {
+              "bytes": 118,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/sleep.js",
+              "sha256": "6515ad28d914f204c09526c7b35aaea15d0e0df27cf10170a4a690fc584c8668"
+            },
+            {
+              "bytes": 255,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/socket_close.c",
+              "sha256": "6e2fd1717a2fab133813af88fc0f5b5a8ce44c23bf411f269e71aac38671562e"
+            },
+            {
+              "bytes": 124,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/socket_close.js",
+              "sha256": "bc0575a4afa9afdf0de06b93866369d52c7fa01769a535bf01770bee7b45fafb"
+            },
+            {
+              "bytes": 218,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/spawn.c",
+              "sha256": "fb3dac6efa993c51f9d7a668cf8da2cac1148380b72cc18a558cba9ba70c01f3"
+            },
+            {
+              "bytes": 120,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/spawn.js",
+              "sha256": "91659ebeeba7fb688218a7450ab6b0eb20ccf010741153a117a40f8a5182b6a9"
+            },
+            {
+              "bytes": 909,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_accept.c",
+              "sha256": "e0f0cf4199c278aec722e3c9b81ff879fcec31ec96ebaf66a954db673cf535f8"
+            },
+            {
+              "bytes": 884,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_accept.js",
+              "sha256": "3f1723685ed07a51192e916c0c8816c38a30e03b0428d953adb4ed2629b96e3f"
+            },
+            {
+              "bytes": 1294,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_connect.c",
+              "sha256": "ae1515d0ff57215b03888e76cfe4ee485750ec226c28eed05d56e417f0f84f58"
+            },
+            {
+              "bytes": 1082,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_connect.js",
+              "sha256": "f964afcd8687305aebe3edfac2c49d756fe1e15d405ea3c1372fc7f0d695dec4"
+            },
+            {
+              "bytes": 916,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_listen.c",
+              "sha256": "2f206b54e6698df529f6c669755cf84e92f51736db4d38e224dd5eb3fcd0a3ed"
+            },
+            {
+              "bytes": 650,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_listen.js",
+              "sha256": "36342dfb4f5bd050924757dd5354cee4c17a6c7319d5f0a91b697b57d5d74924"
+            },
+            {
+              "bytes": 1301,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_poll.c",
+              "sha256": "9f4adfe0f4b8e025783b07fa4ba9fec619a5938135dc5f4bb8c9cf7079e82b37"
+            },
+            {
+              "bytes": 930,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_poll.js",
+              "sha256": "38c950ed71f4c2d5fbee0541197fd77bfe26e2f8d7f3b9957c067fc006062650"
+            },
+            {
+              "bytes": 934,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_recv.c",
+              "sha256": "3a105d82f4e786b992e27bec66c407caa9efbda67a63c03d95805231a21d9ba1"
+            },
+            {
+              "bytes": 736,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_recv.js",
+              "sha256": "f8c539f57f6a8f3ac02e8a66c58ca7474ab426be6cda103c1b39d5a6f40e14b0"
+            },
+            {
+              "bytes": 940,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_send.c",
+              "sha256": "70a5eba01d09e2cda7a9f3b22d976f4c8ba3fb7a8c8083abddd8d12c85d8a2a4"
+            },
+            {
+              "bytes": 779,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/tcp_send.js",
+              "sha256": "7d6ddf588d92ecba06aa2857dbc354cea0ea52a7e970c3aa2e79eb876d7208d7"
+            },
+            {
+              "bytes": 782,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_bind.c",
+              "sha256": "fe405175c1890c2d19a2f6d94b2672259b47a1e6dc8f62f8e9ff540bef7a2245"
+            },
+            {
+              "bytes": 486,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_bind.js",
+              "sha256": "ef2c6d2d228a64c6e506c78ecfe2252740e2802aaf7682843a7f6dc234c8a95b"
+            },
+            {
+              "bytes": 913,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_poll.c",
+              "sha256": "66504dbbc09ab346e04cca7a22c60aacc8866555ac143088603cb4b568a64f71"
+            },
+            {
+              "bytes": 724,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_poll.js",
+              "sha256": "d2d0729d603486624e8431ff110959f55b73d20418ca3c959daffb252f22079c"
+            },
+            {
+              "bytes": 1165,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_recv_from.c",
+              "sha256": "140a281bca2348566030e092f3c27591893b5d945e57e2965863d02c2e6c0a65"
+            },
+            {
+              "bytes": 998,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_recv_from.js",
+              "sha256": "49ec389b36a8c07cca995a18d659e5febff9e770f0101d397d9697e67208651e"
+            },
+            {
+              "bytes": 1214,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_send_to.c",
+              "sha256": "8704fe7e5770af7e4dcbe24f0fecf4cfbfe61a0a69a77b129df9965e306fae8f"
+            },
+            {
+              "bytes": 779,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/udp_send_to.js",
+              "sha256": "85579f72782dd5d9491efd6cffe2c7fafa50f3d2e262c5b76172333df0fa7b5e"
+            },
+            {
+              "bytes": 916,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_close.c",
+              "sha256": "655afbdf8a5f7fa80963bad64b43c8dfe7ec1f80896db381792d0d6933f3be2d"
+            },
+            {
+              "bytes": 79,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_close.js",
+              "sha256": "62212c5388b793452a3b587274f09303e9af88610ccdbce390992b62dd872662"
+            },
+            {
+              "bytes": 11055,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_frame.c",
+              "sha256": "01dc840b2145efb8c91b4ffe7360e3520753f59c42e122703c3a6190c50e1aa4"
+            },
+            {
+              "bytes": 156,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_frame.js",
+              "sha256": "c6874e758829d6901d244ef5b56dd9ec49939dca074258c08f05e34e199ac598"
+            },
+            {
+              "bytes": 6927,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_open.c",
+              "sha256": "1be9c669b47a44716b9cef1aafaafa1ed2a2268730fab475efa762cf368fc21d"
+            },
+            {
+              "bytes": 319,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_open.js",
+              "sha256": "26532181f772fb8cea4e4fc4a76b42b281a789b5acefb4d60b98dafec51c1f72"
+            },
+            {
+              "bytes": 1141,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_set_title.c",
+              "sha256": "cd60a39ca4084794f3e7aef939de8c7e02ef0ae2158bf52a69f93c21a59ebba5"
+            },
+            {
+              "bytes": 83,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/window_set_title.js",
+              "sha256": "9e9cd28c96867a9cc4d9603afc4c14c9de61d17963ebeb63b21c9c9c247838e2"
+            },
+            {
+              "bytes": 370,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/write.c",
+              "sha256": "c1bcd80d50c4901027c801cdd8d7464ea3029361115ac47044c992ce2235a8ac"
+            },
+            {
+              "bytes": 94,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/luna-cgen-cache-integrity-20261017/compiler/effs/write.js",
+              "sha256": "09ba117d9de2520f284b4ad5f5657b74b5105ab78c55fbd774a552bd2ebdc420"
+            },
+            {
+              "bytes": 221,
+              "path": "/tmp/cgen-ts-ywdejftf/fx/host.c",
+              "sha256": "fb46acf73279510d8ec297d7fe9c06a521db6a6b3cb887f8111b9dcb18be3a9f"
+            },
+            {
+              "bytes": 51,
+              "path": "/tmp/cgen-ts-ywdejftf/fx/host.js",
+              "sha256": "ee3bb658cee084ec1cacd123200f0064175ca0e8e3d02e2f7ba483ba2e7e7805"
+            }
+          ],
+          "k6_emit_kind": "c",
+          "k7_lib_hub": [],
+          "k8_diagnostics": "",
+          "k9_host": {
+            "arch": "x64",
+            "cc": "",
+            "no_telemetry": "1",
+            "platform": "linux"
+          },
+          "schema": "cgen-ts-cache-key-v1"
+        },
+        "schema": "cgen-ts-cache-receipt-v1"
+      },
+      "name": "A-receipt-counts-utf8-bytes",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:10.304Z",
+        "event": "hit",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 9.89067700000001
+      },
+      "name": "B-hit-exit-0",
+      "pass": true
+    },
+    {
+      "detail": "225fda9629f3 vs 225fda9629f3",
+      "name": "B-byte-identical",
+      "pass": true
+    },
+    {
+      "detail": "hit 9.9ms < compile 76.7ms (tool log)",
+      "name": "B-hit-skips-generation",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:10.643Z",
+        "event": "compile",
+        "key": "40aaa1f2b243631bbf24de4bb74894070f93134bab0fa2c9399920f1d961695b",
+        "ms": 58.370795999999984
+      },
+      "name": "C-bend-mutation-miss",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:10.943Z",
+        "event": "rebuild-uncertain",
+        "key": null,
+        "ms": 30.325054000000023
+      },
+      "name": "F-diagnostics-env-miss",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:11.259Z",
+        "event": "rebuild-uncertain",
+        "key": null,
+        "ms": 33.23595599999999
+      },
+      "name": "G-diagnostics-bypass-same-key",
+      "pass": true
+    },
+    {
+      "detail": "225fda9629f3 vs 225fda9629f3",
+      "name": "G-diagnostics-byte-identical",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:11.579Z",
+        "event": "refresh",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 29.50324200000003
+      },
+      "name": "D-foreign-refresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:11.946Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 64.47457599999996
+      },
+      "name": "E-fresh-compile",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "E-refresh-byte-identical-to-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:12.305Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 60.840779999999995
+      },
+      "name": "artifact-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:12.676Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 60.28502400000002
+      },
+      "name": "artifact-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "artifact-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:13.343Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 49.695918999999975
+      },
+      "name": "receipt-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:13.694Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 53.065393
+      },
+      "name": "receipt-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "receipt-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:14.482Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 132.798118
+      },
+      "name": "null-manifest-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:14.856Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 67.42208799999997
+      },
+      "name": "null-manifest-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "null-manifest-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:15.563Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 51.07989900000001
+      },
+      "name": "missing-manifest-key-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:15.898Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 55.445937999999984
+      },
+      "name": "missing-manifest-key-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "missing-manifest-key-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:16.608Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 56.011472
+      },
+      "name": "null-foreign-rows-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:16.964Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 56.28784699999997
+      },
+      "name": "null-foreign-rows-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "null-foreign-rows-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:17.667Z",
+        "event": "compile",
+        "key": "fbd3a0728217ab356f8b813f673efa0ff4f68b612cacfc194f64ea3a61cd7d47",
+        "ms": 116.99500399999997
+      },
+      "name": "malformed-foreign-row-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:00:18.031Z",
+        "event": "compile",
+        "key": "0128c786aec92e402b8277cb54f18aabbbf51a769c2f8d1ddbe9d1607ecd7148",
+        "ms": 55.005900999999966
+      },
+      "name": "malformed-foreign-row-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "55d43578d801 vs 55d43578d801",
+      "name": "malformed-foreign-row-repair-equals-fresh",
+      "pass": true
+    }
+  ],
+  "clang_invoked": false,
+  "compiler_invoked": true,
+  "failed": 0,
+  "main_artifacts_used": false,
+  "network_used": false,
+  "note": "compiler_invoked=true ONLY for bounded synthetic fixtures through the instrumented default path; no Main build, no release impact. Event log proves compile() skipped on hit. No generation-time saving claimed beyond observed per-event ms.",
+  "passed": 31,
+  "runs": [
+    {
+      "event": "compile",
+      "event_ms": 76.66934300000003,
+      "exit": 0,
+      "rss_kib": 114540,
+      "step": "A-first-build",
+      "wall_s": 0.36281455300013477
+    },
+    {
+      "event": "hit",
+      "event_ms": 9.89067700000001,
+      "exit": 0,
+      "rss_kib": 112832,
+      "step": "B-rebuild",
+      "wall_s": 0.27944485599982727
+    },
+    {
+      "event": "compile",
+      "event_ms": 58.370795999999984,
+      "exit": 0,
+      "rss_kib": 117692,
+      "step": "C-bend-mutation",
+      "wall_s": 0.35197509200042987
+    },
+    {
+      "event": "refresh",
+      "event_ms": 29.50324200000003,
+      "exit": 0,
+      "rss_kib": 113588,
+      "step": "D-foreign-refresh",
+      "wall_s": 0.3234055550001358
+    },
+    {
+      "event": "compile",
+      "event_ms": 64.47457599999996,
+      "exit": 0,
+      "rss_kib": 117072,
+      "step": "E-fresh-of-changed-tree",
+      "wall_s": 0.37509601500096323
+    }
+  ],
+  "tool": "compiler/cache.ts via compiler/main.ts default path"
+}
