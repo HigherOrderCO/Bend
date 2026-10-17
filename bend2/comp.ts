@@ -690,6 +690,7 @@ function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
   const l = Bend.Let(ps.map((p) => p.k), ps.map(() => 0), vs,
     () => die("a pre-opened let")) as Of<"Let">;
   FL.memo.opens.set(l, { ps, b });
+  OPEN_LET.add(l);
   return l;
 }
 
@@ -1959,8 +1960,19 @@ function memo<K, V>(m: Map<K, V>, k: K, f: (k: K) => V): V {
   return v;
 }
 
+// A pre-opened let's key is fresh and definition-lived: no later definition
+// or pass can hit it, so it is evicted at each definition boundary instead of
+// being retained. The three structural memos are pure over the frozen book.
+const OPEN_LET = new Set<Of<"Let">>();
+
 function memo_gc(): void {
-  Object.values(FL.memo).forEach((m) => m.clear());
+  Object.values(FL.memo).forEach((m) => {
+    if (m !== FL.memo.opens && m !== FL.memo.uses && m !== FL.memo.spines) {
+      m.clear();
+    }
+  });
+  OPEN_LET.forEach((l) => FL.memo.opens.delete(l));
+  OPEN_LET.clear();
 }
 
 // Show
@@ -2884,7 +2896,6 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
-      PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {
