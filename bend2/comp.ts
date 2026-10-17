@@ -2081,6 +2081,24 @@ function unit_new(name: string, emit: () => void): Unit {
   return u;
 }
 
+// The units, each after those its segments name, so that a callee's facts
+// are in before its callers emit again.
+function unit_order(): Unit[] {
+  const at = new Map<string, Unit>();
+  FL.units.forEach((u) => u.segs.forEach((s) => at.set(s.fid, u)));
+  const seen = new Set<Unit>();
+  const out: Unit[] = [];
+  const visit = (u: Unit | undefined) => {
+    if (u !== undefined && !seen.has(u)) {
+      seen.add(u);
+      u.segs.forEach((s) => s.refs.forEach((r) => visit(at.get(r))));
+      out.push(u);
+    }
+  };
+  FL.units.forEach(visit);
+  return out;
+}
+
 function unit_emit(u: Unit): void {
   const up = FL.unit;
   FL.stale.delete(u);
@@ -3061,11 +3079,14 @@ export function compile_book(book: Bend.Book): string {
       unit();
     }
   }
-  // after a sweep, a boxed parameter that no caller lends is owned
+  // a sweep emits the stale units callee-first, then the units it made as
+  // they come; after it, a boxed parameter that no caller lends is owned
   let us: Unit[] = [];
   while (FL.stale.size > 0) {
+    let made = -FL.units.size;
+    unit_order().forEach((u) => FL.stale.has(u) && unit_emit(u));
     for (const u of FL.units.values()) {
-      if (FL.stale.has(u)) {
+      if (made++ >= 0 && FL.stale.has(u)) {
         unit_emit(u);
       }
     }
