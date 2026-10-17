@@ -377,6 +377,33 @@ try {
     + " with no crash banner: " + page.err, page.code === 1
     && page.err.includes("Could not resolve: \"./none.ts\"")
     && page.err.includes("page.ts:1:") && !page.err.includes("Bun v"));
+  const input_page = path.join(TMP, "input.html");
+  const input_html = '<script type="module">console.log(42);</script>\n';
+  fs.writeFileSync(input_page, input_html);
+  const inplace = await bend([input_page, "-o", TMP]);
+  check("a page cannot overwrite its input: " + inplace.err,
+    inplace.code === 1 && inplace.err.includes("would overwrite the input page")
+    && fs.readFileSync(input_page, "utf8") === input_html);
+  const input_link = path.join(TMP, "input-link.html");
+  const linked_out = path.join(TMP, "linked-out");
+  fs.symlinkSync(input_page, input_link);
+  fs.mkdirSync(linked_out);
+  fs.symlinkSync(input_page, path.join(linked_out, "input.html"));
+  const linked = await bend([input_link, "-o", linked_out]);
+  check("a page symlink cannot overwrite its target: " + linked.err,
+    linked.code === 1 && linked.err.includes("would overwrite the input page")
+    && fs.readFileSync(input_page, "utf8") === input_html
+    && fs.readdirSync(linked_out).length === 1);
+  const safe_page = path.join(TMP, "safe.html");
+  const page_links = path.join(TMP, "page-links");
+  const safe_link = path.join(page_links, "alias.html");
+  fs.writeFileSync(safe_page, input_html);
+  fs.mkdirSync(page_links);
+  fs.symlinkSync(safe_page, safe_link);
+  const safe_page_out = await bend([safe_link, "-o", page_links]);
+  check("a page symlink can bundle beside its link: " + safe_page_out.err,
+    safe_page_out.code === 0 && fs.readFileSync(safe_page, "utf8") === input_html
+    && fs.existsSync(path.join(page_links, "_.._", "safe.html")));
   const bad_file = path.join(TMP, "bad.bend");
   const sum_file = path.join(TMP, "sum.bend");
   const unsafe_file = path.join(TMP, "unsafe.bend");
