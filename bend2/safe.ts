@@ -769,7 +769,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   // equation bend2 closes by η must be a λ
   if (x.$ !== "Lam" && x.$ !== "Mat" && x.$ !== "Efq") {
     if (all !== null) {
-      return tree(e, s, eta(t, all), fs);
+      return tree(e, s, eta(t, all, s.d), fs);
     }
     return top === undefined ? term(e, s, t, true) : oos("a match arm with no known type");
   }
@@ -876,7 +876,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const q = quant(all.q);
       const [lt, la] = [s.D, s.D + 1];
       const s2 = scope_hide(scope_hide(s));
-      const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
+      const f = x.$ === "Lam" ? x : open(eta(t, all, s.d))[0] as Extract<HTerm, { $: "Lam" }>;
       // the default's binder is the pair of the tag and the fields
       const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
@@ -949,9 +949,11 @@ function all_of(e: Safe, T: HTerm | null): Extract<HTerm, { $: "All" }> | null {
   return G?.$ === "All" ? G : null;
 }
 
-// λy => t(y), at t's type ∀y:A -> B
-function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
-  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(t, y), all.B(y))), all);
+// Reopen inner binders and annotations before λy => t(y).
+function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>, d: number): HTerm {
+  const u = subst(t, d, (o) => o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < d
+    ? B.Var(o.k as Name, o.i as number) : undefined);
+  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(u, y), all.B(y))), all);
 }
 
 // whether a lowered term mentions a variable at a level p holds for
@@ -1323,18 +1325,14 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
   return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
 }
 
-// an argument at its domain A: an untyped λ or match (in a type) takes
-// A as its goal. Any other argument of a function type goes η-long at A
-// (a tree leaf does): the kernel converts without η, and an argument may
-// reach a type, as a side of an equation whose carrier only the call
-// knows. A live self-call's argument stays whole, as the live check
-// reads it, unless its binders differ from A's
+// Type trees at A; eta-expand functions for kernel conversion.
+// Live self-calls stay whole when their binders fit A.
 function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
   const [y, T] = open(x);
   const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
   const all = tree || y.$ === "Ctr" ? null : all_of(e, A);
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
-    return term(e, s, eta(x, all), live);
+    return term(e, s, eta(x, all, s.d), live);
   }
   return term(e, s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
 }
