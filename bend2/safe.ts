@@ -769,7 +769,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   // equation bend2 closes by η must be a λ
   if (x.$ !== "Lam" && x.$ !== "Mat" && x.$ !== "Efq") {
     if (all !== null) {
-      return tree(e, s, eta(t, all), fs);
+      return tree(e, s, eta(t, all, s.d), fs);
     }
     return top === undefined ? term(e, s, t, true) : oos("a match arm with no known type");
   }
@@ -876,7 +876,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const q = quant(all.q);
       const [lt, la] = [s.D, s.D + 1];
       const s2 = scope_hide(scope_hide(s));
-      const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
+      const f = x.$ === "Lam" ? x : open(eta(t, all, s.d))[0] as Extract<HTerm, { $: "Lam" }>;
       // the default's binder is the pair of the tag and the fields
       const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
@@ -949,9 +949,13 @@ function all_of(e: Safe, T: HTerm | null): Extract<HTerm, { $: "All" }> | null {
   return G?.$ === "All" ? G : null;
 }
 
-// λy => t(y), at t's type ∀y:A -> B
-function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
-  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(t, y), all.B(y))), all);
+// λy => t(y), at t's type ∀y:A -> B, for t at depth d: y takes level d,
+// and t's binders the levels after it. bend2's annotations name a
+// variable by its level, so t goes in through its lowered form, where an
+// annotation names t's binder as t's own uses do
+function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>, d: number): HTerm {
+  const u = subst(t, d, (o) => o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < d ? B.Var(o.k as Name, o.i as number) : undefined);
+  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(u, y), all.B(y))), all);
 }
 
 // whether a lowered term mentions a variable at a level p holds for
@@ -1334,7 +1338,7 @@ function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
   const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
   const all = tree || y.$ === "Ctr" ? null : all_of(e, A);
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
-    return term(e, s, eta(x, all), live);
+    return term(e, s, eta(x, all, s.d), live);
   }
   return term(e, s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
 }
