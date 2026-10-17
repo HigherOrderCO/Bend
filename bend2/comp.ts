@@ -529,6 +529,10 @@ function char_code(s) {
 }
 
 function string_contains(s, p) {
+  // Without a packed-Char marker, native substring search respects boundaries.
+  if (!s.includes("\uDC00")) {
+    return s.includes(p);
+  }
   // A match must start at a Char boundary, not inside a packed U32 code.
   for (let at = 0; at <= s.length; at += char_len(s, at)) {
     if (s.startsWith(p, at)) {
