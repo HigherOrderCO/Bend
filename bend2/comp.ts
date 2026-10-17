@@ -787,8 +787,9 @@ function term_each(t: HTerm, f: (s: HTerm, tail: boolean) => void): void {
   });
 }
 
-// t with each node f answers replaced by the answer, read lazily under
-// binders; a constant is left as is.
+// t with each node f answers replaced by the answer; t itself where no node
+// changes, so a mapped term shares what it leaves. A binder maps its opened
+// body (term_open), which the new binder opens to; applied, it maps lazily.
 function term_map(t: HTerm, f: (s: HTerm) => HTerm | null): HTerm {
   const s = Bend.term_force(t);
   const go = (x: HTerm) => term_map(x, f);
@@ -796,28 +797,42 @@ function term_map(t: HTerm, f: (s: HTerm) => HTerm | null): HTerm {
   if (got !== null) {
     return got;
   }
+  const same = (xs: HTerm[], ys: HTerm[]) => xs.every((x, j) => x === ys[j]);
   switch (s.$) {
     case "Ann": {
-      return Bend.Ann(go(s.x), s.T, s.s);
+      const x = go(s.x);
+      return x === s.x ? s : Bend.Ann(x, s.T, s.s);
     }
-    case "Lam": {
-      return Bend.Lam(s.k, s.i, (y: HTerm) => go(s.f(y)), s.s, s.q) as HTerm;
-    }
+    case "Lam":
     case "Let": {
-      return Bend.Let(s.k, s.i, s.v.map(go), (ys: HTerm[]) => go(s.f(ys)), s.s,
-        s.q);
+      const o = term_open(s);
+      const b = go(o.b);
+      const vs = s.$ === "Let" ? s.v.map(go) : [];
+      if (b === o.b && same(vs, s.$ === "Let" ? s.v : [])) {
+        return s;
+      }
+      const l = (s.$ === "Lam"
+        ? Bend.Lam(s.k, s.i, (y: HTerm) => go(s.f(y)), s.s, s.q)
+        : Bend.Let(s.k, s.i, vs, (ys: HTerm[]) => go(s.f(ys)), s.s, s.q)) as
+        Of<"Lam"> | Of<"Let">;
+      FL.opens.set(l, { ps: o.ps, b });
+      return l;
     }
     case "App": {
-      return Bend.App(go(s.f), go(s.x), s.s);
+      const xs = [go(s.f), go(s.x)];
+      return same(xs, [s.f, s.x]) ? s : Bend.App(xs[0], xs[1], s.s);
     }
     case "Ctr": {
-      return Bend.Ctr(s.k, s.x.map(go), s.s);
+      const xs = s.x.map(go);
+      return same(xs, s.x) ? s : Bend.Ctr(s.k, xs, s.s);
     }
     case "Mat": {
-      return Bend.Mat(s.k, go(s.h), go(s.m), s.s);
+      const xs = [go(s.h), go(s.m)];
+      return same(xs, [s.h, s.m]) ? s : Bend.Mat(s.k, xs[0], xs[1], s.s);
     }
     case "Rwt": {
-      return Bend.Rwt(s.e, s.p, go(s.f), s.s);
+      const x = go(s.f);
+      return x === s.f ? s : Bend.Rwt(s.e, s.p, x, s.s);
     }
     default: {
       return s;
@@ -1268,17 +1283,21 @@ function mat_lits(x: HTerm, k: Name, self: HTerm): Row[] {
 // the arm; and the fields it binds.
 function arm_self(arm: HTerm, n: number, self: HTerm,
   back: (c: Of<"Ctr">, ps: HTerm[]) => boolean): [HTerm, number] {
-  const go = (t: HTerm, ps: HTerm[]): HTerm => {
-    const s = Bend.term_force(t);
-    return s.$ === "Ann" ? Bend.Ann(go(s.x, ps), s.T, s.s)
-      : ps.length === n || s.$ !== "Lam" ? term_map(s, (c) =>
-        c.$ === "Ctr" && back(c, ps) ? self : null)
-      : Bend.Lam(s.k, s.i, (y: HTerm) => go(s.f(y), [...ps, y]), s.s,
-        s.q) as HTerm;
-  };
-  const out = go(arm, []);
-  const ps = [probe("b"), probe("t")].slice(2 - n);
-  const b = ps.reduce((f, p) => Bend.term_apply(f, p), out);
+  const ps: Of<"Var">[] = [];
+  let open = true;
+  const out = term_map(arm, (s) => {
+    if (open && ps.length < n && s.$ === "Lam") {
+      ps.push(term_open(s).ps[0]);
+      return null;
+    }
+    open &&= s.$ === "Ann";
+    return s.$ === "Ctr" && back(s, ps) ? self : null;
+  });
+  if (ps.length < n) {
+    return [out, n];
+  }
+  const b = ps.reduce((t) => term_open(Bend.term_strip(t) as Of<"Lam">).b,
+    out);
   const u = term_uses(b);
   return ps.some((p) => term_use(u, p) > 0) ? [out, n] : [b, 0];
 }
