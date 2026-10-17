@@ -1082,7 +1082,8 @@ function src_add(k: Name): void {
   memo(FL.srcs, k, () => null);
 }
 
-function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
+function ctr_build(sc: Scope, k: Name, exprs: string[],
+  stat = false, shr = true): string {
   if (FL.book.ctrs[k]) {
     src_add(Bend.book_fam(FL.book, k));
   }
@@ -1103,7 +1104,7 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
   const got = s === null ? alloc
     : s.z ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}` : s.name;
   return `term_ctr(${cid}, ${node_fill(sc, "nd", got, exprs,
-    FL.hot.has(k))})`;
+    shr && FL.hot.has(k))})`;
 }
 
 function facts_packed(t: HTerm): boolean {
@@ -2407,8 +2408,10 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     ...vs.flatMap((f, j) => val_to(sc, f, lay.arms![x.k][j]).ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
     vs.every((f) => f.stat));
+  const g = ty_wnf((ty_wnf(tele_fill(FL.book.tlds[adt.k].T, adt.x)) as Of<"Typ">).g)!;
   const out = lay === pos ? v
-    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, v.stat);
+    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat,
+      g.$ !== "Qua" || g.q.$ !== "Lone")], BOX, v.stat);
   if (out.stat) {
     seen.set(x, out);
   }
