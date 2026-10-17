@@ -479,6 +479,14 @@ def Window.grab(window: Window, on: Bool) -> IO(Window):
   import "./effs/window.c"
   import "./effs/window_grab.js"
 
+# Request fullscreen without changing the logical drawing resolution or
+# pointer coordinates. The desktop applies the request asynchronously;
+# an unsupported window manager returns ENOTSUP and preserves the handle.
+def Window.fullscreen(window: Window, on: Bool) ->
+  IO(Window & Result<&1, &1, U32 & String, Unit>):
+  import "./effs/window.c"
+  import "./effs/window_fullscreen.js"
+
 def Window.close(window: Window) -> IO(Unit):
   import "./effs/window.c"
   import "./effs/window_close.js"
