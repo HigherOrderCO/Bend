@@ -3235,16 +3235,8 @@ export function compile_book(book: Bend.Book): string {
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? clos : []]);
   const segs = all.filter((s) => !s.native && live.has(s.fid));
   // a spin is declared before its callers (spins call no cycle: flat_of)
-  const natives = new Map(all.flatMap((s) => s.native && live.has(s.fid)
-    ? [[s.fid, s]] : []));
-  const spins: Seg[] = [];
-  const visit = (s: Seg | undefined) => {
-    if (s !== undefined && natives.delete(s.fid)) {
-      s.refs.forEach((r) => visit(natives.get(r)));
-      spins.push(s);
-    }
-  };
-  [...natives.values()].forEach(visit);
+  const spins = unit_order().flatMap((u) => u.segs)
+    .filter((s) => s.native && live.has(s.fid));
   const desc = show === null ? [] : ["#if !DEVICE",
     `static const u32 SHOW_DESC[] = { ${show.map((c) =>
       typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
