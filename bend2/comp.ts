@@ -555,6 +555,12 @@ export const PROBES: Of<"Var">[] = [];
 
 const DUMMY = probe("~");
 
+// A pre-opened let's key is fresh and definition-lived: no later definition or
+// pass can hit one. memo_gc evicts them at each definition boundary, and
+// file_new drops them outright when a new book replaces the memo maps, so a
+// sequential compile in one process cannot retain the previous book's keys.
+const OPEN_LET = new Set<Of<"Let">>();
+
 let FUEL = 0;
 
 let FL: File;
@@ -690,6 +696,7 @@ function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
   const l = Bend.Let(ps.map((p) => p.k), ps.map(() => 0), vs,
     () => die("a pre-opened let")) as Of<"Let">;
   FL.memo.opens.set(l, { ps, b });
+  OPEN_LET.add(l);
   return l;
 }
 
@@ -1416,6 +1423,7 @@ export function io_run(book: Bend.Book, args: string[]): number {
 
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
+  OPEN_LET.clear();
   return {
     book,
     js,
@@ -1959,8 +1967,16 @@ function memo<K, V>(m: Map<K, V>, k: K, f: (k: K) => V): V {
   return v;
 }
 
+// The three structural memos are pure over the frozen book, so they survive a
+// definition; folds is not, and folds-only clearing stays the default here.
 function memo_gc(): void {
-  Object.values(FL.memo).forEach((m) => m.clear());
+  Object.values(FL.memo).forEach((m) => {
+    if (m !== FL.memo.opens && m !== FL.memo.uses && m !== FL.memo.spines) {
+      m.clear();
+    }
+  });
+  OPEN_LET.forEach((l) => FL.memo.opens.delete(l));
+  OPEN_LET.clear();
 }
 
 // Show
@@ -2884,7 +2900,6 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
-      PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {

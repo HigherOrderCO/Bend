@@ -1,0 +1,1302 @@
+{
+  "bun": "pinned toolchain-home/bin/bun",
+  "checks": [
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:34.862Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 58.07412199999999
+      },
+      "name": "A-miss-compile-exit-0",
+      "pass": true
+    },
+    {
+      "detail": "",
+      "name": "A-artifact-nonempty",
+      "pass": true
+    },
+    {
+      "detail": {
+        "artifact_bytes": 79755,
+        "artifact_sha256": "4ebfd0c5a4b5bacd2bea8fdb3fbf572b0422b0f2c09acec54059119e861e3e5a",
+        "compiler_invoked": false,
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "manifest": {
+          "k1_compiler": [
+            {
+              "bytes": 186866,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/comp.ts",
+              "sha256": "069aa86248b326de7f4c658d278ea458fdbd644de61ac7b1266ba9bbed0643ee"
+            },
+            {
+              "bytes": 138252,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/bend.ts",
+              "sha256": "22b5915cd7cccd23b6aa28849b23a7f1e3549333cdd0954ab48103ddd0777e9e"
+            },
+            {
+              "bytes": 42442,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/main.ts",
+              "sha256": "08565579081dd996ddadd0e492fa870120a2c0b5d63cf5577bd6a0d03855abff"
+            },
+            {
+              "bytes": 18322,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/cache.ts",
+              "sha256": "78823e4f72324b8e2dce8077eb43b1ad3a19fc85cf871c3bc66bc5a2ab55e1d0"
+            },
+            {
+              "bytes": 76669,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/base.bend",
+              "sha256": "6bfcfa4f10afdd4767a4fc7a0100b6360098701b31be34ff48546a46ae7b6f41"
+            }
+          ],
+          "k2_toolchain": {
+            "bun_version": "1.3.14"
+          },
+          "k3_closure_files": [
+            {
+              "bytes": 76669,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/base.bend",
+              "sha256": "6bfcfa4f10afdd4767a4fc7a0100b6360098701b31be34ff48546a46ae7b6f41"
+            },
+            {
+              "bytes": 164,
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
+              "sha256": "c492e629bd29964f443fd74341179cf44549bec470f5688255583ef40dca0691"
+            }
+          ],
+          "k3_closure_ordered": [
+            "Empty",
+            "Unit",
+            "Bool",
+            "Cmp",
+            "Either",
+            "Sigma",
+            "Nat",
+            "Maybe",
+            "Result",
+            "Poll",
+            "List",
+            "Word.Nil",
+            "Word.Con",
+            "Word",
+            "U32",
+            "F32",
+            "Char",
+            "String",
+            "Array",
+            "Image",
+            "Event",
+            "Map",
+            "File",
+            "Socket",
+            "Listener",
+            "Window",
+            "Audio",
+            "Chan",
+            "IO.OP",
+            "App",
+            "Pair",
+            "Exists",
+            "Or",
+            "Pair.fst",
+            "Pair.snd",
+            "IO",
+            "IO.pure",
+            "IO.bind",
+            "IO.print",
+            "IO.write",
+            "IO.print_err",
+            "IO.get_env",
+            "IO.args",
+            "Process.run",
+            "IO.die",
+            "IO.exit",
+            "IO.pass",
+            "IO.try",
+            "IO.random_u32",
+            "IO.spawn",
+            "IO.sleep",
+            "IO.now",
+            "IO.thread_count",
+            "Chan.new",
+            "Chan.send",
+            "Chan.recv",
+            "Chan.try_send",
+            "Chan.try_recv",
+            "Chan.close",
+            "IO.fork.go",
+            "IO.fork",
+            "IO.join.go",
+            "IO.join",
+            "IO.within",
+            "File.open",
+            "File.read",
+            "File.read_bytes",
+            "File.read_at",
+            "File.size",
+            "File.write",
+            "File.write_bytes",
+            "File.close",
+            "TCP.listen",
+            "TCP.accept",
+            "TCP.try_accept",
+            "TCP.connect",
+            "TCP.send",
+            "TCP.try_send",
+            "TCP.recv",
+            "TCP.try_recv",
+            "TCP.send_bytes",
+            "TCP.try_send_bytes",
+            "TCP.recv_bytes",
+            "TCP.try_recv_bytes",
+            "UDP.bind",
+            "UDP.send_to",
+            "UDP.try_send_to",
+            "UDP.send_bytes_to",
+            "UDP.try_send_bytes_to",
+            "UDP.recv_from",
+            "UDP.try_recv_from",
+            "UDP.recv_bytes_from",
+            "UDP.try_recv_bytes_from",
+            "Socket.close",
+            "Listener.close",
+            "Window.open",
+            "Window.frame",
+            "Window.set_title",
+            "Window.grab",
+            "Window.close",
+            "Audio.open",
+            "Audio.write",
+            "Audio.close",
+            "Equal.cong",
+            "Equal.cong",
+            "Equal.sym",
+            "Equal.sym",
+            "Equal.trans",
+            "Equal.trans",
+            "Empty.absurd",
+            "Bool.not",
+            "Bool.and",
+            "Bool.or",
+            "Bool.xor",
+            "Bool.cmp",
+            "Bool.full_add",
+            "Bool.pick",
+            "Bool.to_u32",
+            "Cmp.is_lt",
+            "Cmp.is_eq",
+            "Cmp.is_gt",
+            "Cmp.is_le",
+            "Cmp.is_ge",
+            "Nat.double",
+            "Nat.add",
+            "Nat.sub",
+            "Nat.mul",
+            "Nat.divmod.go",
+            "Nat.divmod",
+            "Nat.cmp",
+            "Nat.is_lt",
+            "Nat.is_eq",
+            "Nat.is_ne",
+            "Nat.is_le",
+            "Nat.is_gt",
+            "Nat.is_ge",
+            "Nat.min",
+            "Nat.max",
+            "Nat.ge_refl",
+            "Nat.ge_refl",
+            "Nat.max_ge_l",
+            "Nat.max_ge_l",
+            "Nat.max_ge_r",
+            "Nat.max_ge_r",
+            "Nat.div",
+            "Nat.mod",
+            "Nat.pow",
+            "Maybe.pure",
+            "Maybe.bind",
+            "Maybe.default",
+            "Maybe.is_some",
+            "Maybe.is_none",
+            "Maybe.map",
+            "Maybe.or",
+            "Result.pure",
+            "Result.bind",
+            "Result.default",
+            "Result.is_done",
+            "Result.is_fail",
+            "Result.map",
+            "List.map",
+            "List.length",
+            "List.append",
+            "List.concat",
+            "List.reverse.go",
+            "List.reverse",
+            "List.is_empty",
+            "List.head",
+            "List.tail",
+            "List.last.go",
+            "List.last",
+            "List.get",
+            "List.set",
+            "List.take",
+            "List.drop",
+            "List.zip",
+            "List.range.go",
+            "List.range",
+            "List.replicate",
+            "List.filter.put",
+            "List.filter",
+            "List.foldl",
+            "List.foldr",
+            "List.any",
+            "List.all",
+            "List.find.put",
+            "List.find",
+            "List.contains",
+            "List.merge.step",
+            "List.merge.go",
+            "List.sort.runs",
+            "List.sort.pass",
+            "List.sort.go",
+            "List.sort",
+            "List.for_each",
+            "Word.zero",
+            "Word.not",
+            "Word.and",
+            "Word.or",
+            "Word.xor",
+            "Word.shl.put",
+            "Word.shl",
+            "Word.shl.out.con",
+            "Word.shl.out",
+            "Word.shr.pad",
+            "Word.shr",
+            "Word.cmp.fin",
+            "Word.cmp",
+            "Word.inc",
+            "Word.adc",
+            "Word.adc.con",
+            "Word.adc",
+            "Word.add",
+            "Word.sub",
+            "Word.add_comm.arm",
+            "Word.add_comm.go",
+            "Word.add_comm.arm",
+            "Word.add_comm.go",
+            "Word.add_comm",
+            "Word.add_comm",
+            "Word.to_nat",
+            "Word.mul.go",
+            "Word.mul",
+            "U32.inc",
+            "U32.add",
+            "U32.add_comm",
+            "U32.add_comm",
+            "U32.sub",
+            "U32.mul",
+            "U32.not",
+            "U32.and",
+            "U32.or",
+            "U32.xor",
+            "U32.shl",
+            "U32.shr",
+            "U32.shln",
+            "U32.shrn",
+            "U32.cmp",
+            "U32.is_eq",
+            "U32.is_ne",
+            "U32.is_lt",
+            "U32.is_le",
+            "U32.is_gt",
+            "U32.is_ge",
+            "U32.is_zero",
+            "U32.to_nat",
+            "U32.from_nat",
+            "U32.log2.go",
+            "U32.log2",
+            "U32.divmod.go.fin",
+            "U32.divmod.go.shl",
+            "U32.divmod.go.rec",
+            "U32.divmod.go",
+            "U32.div.fin",
+            "U32.div.if",
+            "U32.div",
+            "U32.mod.fin",
+            "U32.mod.if",
+            "U32.mod",
+            "U32.min",
+            "U32.max",
+            "U32.clamp",
+            "U32.pow",
+            "U32.is_even",
+            "U32.to_f32",
+            "F32.to_u32",
+            "F32.add",
+            "F32.sub",
+            "F32.mul",
+            "F32.div",
+            "F32.mod",
+            "F32.pow",
+            "F32.atan2",
+            "F32.neg",
+            "F32.abs",
+            "F32.sqrt",
+            "F32.exp",
+            "F32.log",
+            "F32.log2",
+            "F32.log10",
+            "F32.sin",
+            "F32.cos",
+            "F32.tan",
+            "F32.asin",
+            "F32.acos",
+            "F32.atan",
+            "F32.sinh",
+            "F32.cosh",
+            "F32.tanh",
+            "F32.floor",
+            "F32.ceil",
+            "F32.trunc",
+            "F32.is_eq",
+            "F32.is_ne",
+            "F32.is_lt",
+            "F32.is_le",
+            "F32.is_gt",
+            "F32.is_ge",
+            "F32.show",
+            "F32.bits",
+            "F32.read",
+            "F32.min",
+            "F32.max",
+            "F32.clamp",
+            "F32.lerp",
+            "F32.square",
+            "F32.hypot",
+            "F32.round.zero",
+            "F32.round",
+            "F32.pi",
+            "F32.from_nat",
+            "F32.to_nat",
+            "Char.cmp",
+            "Char.to_u32",
+            "Char.from_u32",
+            "Char.is_eq",
+            "Char.is_digit",
+            "Char.is_upper",
+            "Char.is_lower",
+            "Char.is_alpha",
+            "Char.is_space",
+            "Char.to_upper",
+            "Char.to_lower",
+            "String.append",
+            "String.cmp.rec",
+            "String.cmp",
+            "String.cmp.fin",
+            "String.cmp",
+            "String.eq",
+            "String.length",
+            "String.is_empty",
+            "String.reverse.go",
+            "String.reverse",
+            "String.order.go",
+            "String.order",
+            "String.is_lt",
+            "String.is_le",
+            "String.is_gt",
+            "String.is_ge",
+            "String.starts_with",
+            "String.starts_with.if",
+            "String.starts_with",
+            "String.ends_with",
+            "String.contains",
+            "String.contains.if",
+            "String.contains",
+            "String.take",
+            "String.drop",
+            "String.get",
+            "String.to_list",
+            "String.from_list",
+            "String.concat",
+            "String.join.go",
+            "String.join",
+            "String.split.push",
+            "String.split.fin",
+            "String.split",
+            "String.lines",
+            "String.repeat",
+            "String.to_upper",
+            "String.to_lower",
+            "String.trim_start",
+            "String.trim_start.if",
+            "String.trim_start",
+            "String.trim_end",
+            "String.trim",
+            "Nat.show.put",
+            "Nat.show.go",
+            "Nat.show.fin",
+            "Nat.show.go",
+            "Nat.show",
+            "Nat.read.go",
+            "Nat.read.if",
+            "Nat.read.go",
+            "Nat.read.trim",
+            "Nat.read.fits",
+            "Nat.read.gate",
+            "Nat.read",
+            "U32.show.go",
+            "U32.show.fin",
+            "U32.show.go",
+            "U32.show.if",
+            "U32.show",
+            "U32.read.go",
+            "U32.read.if",
+            "U32.read.go",
+            "U32.read",
+            "Bool.show",
+            "Char.show",
+            "Maybe.show",
+            "List.show.go",
+            "List.show",
+            "Array.size.node",
+            "Array.size",
+            "Array.swap.lo",
+            "Array.swap.hi",
+            "Array.swap.go",
+            "Array.swap.at",
+            "Array.swap",
+            "Array.clone.node",
+            "Array.clone",
+            "Array.fork",
+            "Array.join",
+            "Array.atomic.add",
+            "Array.atomic.min",
+            "Array.atomic.max",
+            "Array.atomic.and",
+            "Array.atomic.or",
+            "Array.atomic.xor",
+            "Array.atomic.exch",
+            "Array.atomic.cas",
+            "Array.atomic.fadd",
+            "Array.new",
+            "Array.set.fin",
+            "Array.set",
+            "Array.get.go",
+            "Array.get.at",
+            "Array.get",
+            "Array.to_list.go",
+            "Array.to_list",
+            "Array.map.go",
+            "Array.map.at",
+            "Array.map.seed",
+            "Array.map",
+            "Map.bit.u",
+            "Map.bit.chr",
+            "Map.bit.go.chr",
+            "Map.bit.go.rec",
+            "Map.bit.go",
+            "Map.bit.at",
+            "Map.bit",
+            "Map.msb.u",
+            "Map.msb.u.if",
+            "Map.msb.u",
+            "Map.diff.chr",
+            "Map.diff.step",
+            "Map.diff",
+            "Map.diff.fin",
+            "Map.diff",
+            "Map.new",
+            "Map.put.go",
+            "Map.put",
+            "Map.ins.splice.bit",
+            "Map.ins.splice",
+            "Map.ins.go",
+            "Map.ins",
+            "Map.lo",
+            "Map.hi",
+            "Map.seek.go",
+            "Map.seek",
+            "Map.set.fin.go",
+            "Map.set.fin",
+            "Map.set.go",
+            "Map.set",
+            "Map.has.leaf",
+            "Map.has.go",
+            "Map.has",
+            "Map.get.leaf",
+            "Map.get.go",
+            "Map.get",
+            "Map.pop.lo",
+            "Map.pop.hi",
+            "Map.pop.leaf",
+            "Map.pop.go",
+            "Map.pop",
+            "Map.del.fin",
+            "Map.del",
+            "Map.to_list.go",
+            "Map.to_list",
+            "Map.keys.go",
+            "Map.keys",
+            "Map.from_list.go",
+            "Map.from_list",
+            "Map.union",
+            "Map.size",
+            "Map.values.go",
+            "Map.values",
+            "Set",
+            "Set.new",
+            "Set.add",
+            "Set.has",
+            "Set.del",
+            "Set.size",
+            "Set.to_list",
+            "Set.from_list.go",
+            "Set.from_list",
+            "Image.sink",
+            "Image.drop.join",
+            "Image.free",
+            "Image.drop",
+            "App.next",
+            "App.turn",
+            "App.draw",
+            "App.step",
+            "App.loop",
+            "App.run",
+            "App.more",
+            "App.fold",
+            "App.play",
+            "Fx.tag",
+            "main"
+          ],
+          "k3_entry": "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
+          "k3_namespaces": [
+            [
+              "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/base.bend",
+              ""
+            ],
+            [
+              "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
+              ""
+            ]
+          ],
+          "k4_laws_proof": false,
+          "k5_effs": [
+            {
+              "bytes": 351,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/args.c",
+              "sha256": "84e12702f78e7cce5d350a3ccc6cfbda66f812496c39f025afe02bdf090880cf"
+            },
+            {
+              "bytes": 221,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/args.js",
+              "sha256": "ed1a7e7b73ae7fe58ac6d428d2762b66f223f4c70a165570fc5d68dc874ddc0b"
+            },
+            {
+              "bytes": 6953,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/audio.c",
+              "sha256": "f0fac2bee02918b4958ad1e7508945824fcd98ce9a2e7ede657304c4f8905b85"
+            },
+            {
+              "bytes": 118,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/audio_close.js",
+              "sha256": "c700e2fc0eda1f9a67afd317184999d9283912817aaec00637af41b135b84c62"
+            },
+            {
+              "bytes": 273,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/audio_open.js",
+              "sha256": "f5a19b5f0efcd3300c27f18315bfbfeb189a2764ad0430d9aeb31dd16d495cbe"
+            },
+            {
+              "bytes": 446,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/audio_write.js",
+              "sha256": "facb9aae3951a6b9133d58c796533ea436e05322cf35c86e558eec6194c48eb2"
+            },
+            {
+              "bytes": 7342,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/chan.c",
+              "sha256": "551025649b6c154b3d06deb902fd780eba23c62ac6aa9b9197b32cd1a9cac21a"
+            },
+            {
+              "bytes": 3636,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/chan.js",
+              "sha256": "d3e9e0551966dbd4f7cefaafaca4c10557ddebafb91edf62f8e947c78c555862"
+            },
+            {
+              "bytes": 242,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_close.c",
+              "sha256": "033da9beb0b484fbc8784044193bf69004f858f6ad86e0c31b4beb89df1349ca"
+            },
+            {
+              "bytes": 192,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_close.js",
+              "sha256": "2b83f900113776ab875fa3afd29f31000a191fe48645abe78b1d7b34cb12a7fe"
+            },
+            {
+              "bytes": 1066,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_open.c",
+              "sha256": "2f5923e325a22eb384edb3fbb023f04ca842d5acd22654983608b575fa7617fa"
+            },
+            {
+              "bytes": 462,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_open.js",
+              "sha256": "dd549f5f05eb896aef9a3a02ffecf2ee902e653f5463be72781edab1cd1180ae"
+            },
+            {
+              "bytes": 1913,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_read.c",
+              "sha256": "ab577225fa98a034c09d7eb6326b74808756dc6203b0e2599a459876382f090d"
+            },
+            {
+              "bytes": 783,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_read.js",
+              "sha256": "7aa8a95a0b02f3c8db1167da5a936958a90c64e7df3e327ba5c66766d5e57da7"
+            },
+            {
+              "bytes": 719,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_size.c",
+              "sha256": "ed0d74fd6b9f14ea471bfe5dd80ecbb2c5abb6a8406519fb2c7e1a1acf3dd5af"
+            },
+            {
+              "bytes": 734,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_size.js",
+              "sha256": "508a931334016f725f0446d9c63f91d7e9de79b9fb347d0e148777dba834ef0b"
+            },
+            {
+              "bytes": 1348,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_write.c",
+              "sha256": "da810ad9aa76ad1431622292529fa3edebabc4b6a7ee20ae833097b71bb595e5"
+            },
+            {
+              "bytes": 793,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/file_write.js",
+              "sha256": "fbb706714fe6724e12658ad638d8b7aa2228f6297791bf74bd4894af361776f0"
+            },
+            {
+              "bytes": 397,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/get_env.c",
+              "sha256": "508a4aaca91e37b2a0a97770f172100fdbaf4a676aba54623b1cd5d1634805ce"
+            },
+            {
+              "bytes": 359,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/get_env.js",
+              "sha256": "ea68796090fbfabcc3fb4a915a5b3ffa5b1df8620b1dcdea37fffa109af13e74"
+            },
+            {
+              "bytes": 266,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/listener_close.c",
+              "sha256": "11f6bac6342a37e97b9656e96bdca7d052ed0a7a0cab3b05ea87657020cfb7a2"
+            },
+            {
+              "bytes": 164,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/listener_close.js",
+              "sha256": "1b87fb43c373b1a8a54b5afaf0cf8e3ec2f8d39bdfde131e49527caa19ac0cb8"
+            },
+            {
+              "bytes": 196,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/now.c",
+              "sha256": "fc4c1d87a4fb2ace7d5b6c57b434cc3d953a15bdf213020912df6c17aa2352d6"
+            },
+            {
+              "bytes": 105,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/now.js",
+              "sha256": "f41624aba3f07d56b671f41691b5cb833b4d018266668f5f48329290fc41b2d9"
+            },
+            {
+              "bytes": 322,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/print.c",
+              "sha256": "2693b48e0ad8bba77c2babb1cfe00b4adfd63e68b0688229d7efd3a261af3c46"
+            },
+            {
+              "bytes": 138,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/print.js",
+              "sha256": "814ceba4efbaa291b7b6a9ff29aa20e3a23c06eb4fa165c69ee0bd22878adaa9"
+            },
+            {
+              "bytes": 235,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/print_err.c",
+              "sha256": "f84aa11c8d0d6af6fa2fee28411f95714d6744ad97156990e43e55c292c9c6fb"
+            },
+            {
+              "bytes": 131,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/print_err.js",
+              "sha256": "a7a00612edfe98af1a351e8f7b912af4ee33f4bb888c36f119f7712d72a9394e"
+            },
+            {
+              "bytes": 8189,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/process_run.c",
+              "sha256": "554cfbdf9a6de163f00fc1b23dc8f3df10821cfce336caa1cb5db439b8a55e1f"
+            },
+            {
+              "bytes": 2904,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/process_run.js",
+              "sha256": "7d1ae7a37960d574aa3e4b57214b4f4046e5a20ce8a3a48f8ee48d7ea712ce4f"
+            },
+            {
+              "bytes": 703,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/random_u32.c",
+              "sha256": "75429b2b42e00562177fe33a5e18d2730478847f58c4038b048e78131e1b8c0a"
+            },
+            {
+              "bytes": 581,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/random_u32.js",
+              "sha256": "ab0b37cb6055ad08573d1263aa380c339c3fe7417530cfa63264629dce7744c2"
+            },
+            {
+              "bytes": 381,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/sleep.c",
+              "sha256": "1dde3701026517d5272d2ff5344d3a8643bec264dbad9f266fdae1c4aaf7601c"
+            },
+            {
+              "bytes": 214,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/sleep.js",
+              "sha256": "6711ccd804dcaede381da9ff0283b4640feb440e1d413381101f22bfed65a934"
+            },
+            {
+              "bytes": 254,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/socket_close.c",
+              "sha256": "abea115d2928d4942a9d89898d2022c0f1b19c52db48d0b060c2356d261bfa77"
+            },
+            {
+              "bytes": 150,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/socket_close.js",
+              "sha256": "dc4bf1fa95692c91528d4eb855506dde8dfc9164a90de2c43cd1bd6916e0c380"
+            },
+            {
+              "bytes": 217,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/spawn.c",
+              "sha256": "05e11ae3f1461d9c72440af3b1786c076b418d2faff45639ac25ba464ee73cd5"
+            },
+            {
+              "bytes": 160,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/spawn.js",
+              "sha256": "8a14c7a7a5ff80b049f0659f9e58d43bf0f3b1a6724d35a199c3f864b3242e4b"
+            },
+            {
+              "bytes": 1409,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_accept.c",
+              "sha256": "bf7ca1685ed388ce97827ea8379881fbdf5359c7c663ad03eeb8da34bd8584ef"
+            },
+            {
+              "bytes": 1413,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_accept.js",
+              "sha256": "26406cce42c497994e597a7a032629fab65f43ec14f06ee69aace2b353afe28d"
+            },
+            {
+              "bytes": 1292,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_connect.c",
+              "sha256": "8d17c097138709d71e9d9e1fbc4255007c5e80c93ee384c4a3510b6ac8d10da3"
+            },
+            {
+              "bytes": 1122,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_connect.js",
+              "sha256": "c51c4b55ffbc4a520f01082a1307498801a17e5123bdffbd01077fb42730f1cb"
+            },
+            {
+              "bytes": 875,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_listen.c",
+              "sha256": "efc7528de96abd9f62f299833c1ac7b0e86528292c746b114d2684b5bac52899"
+            },
+            {
+              "bytes": 671,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_listen.js",
+              "sha256": "0da4cfafaa24ba5e17d9fda5e6a5b207b2b36031b2c888944f67b85842d76399"
+            },
+            {
+              "bytes": 2508,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_recv.c",
+              "sha256": "249c8789cd2f541ad00068882de16a00870c2f81a8168b0ac7a59db1e3cb0c6f"
+            },
+            {
+              "bytes": 1680,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_recv.js",
+              "sha256": "e8c54490445cb71a4328c07be8c40a49cee3e643cbf74f42dc73d31ab95890d7"
+            },
+            {
+              "bytes": 3042,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_send.c",
+              "sha256": "ed724ef8ce712b113eaac478164802509b41fac4e92435e3df0837d6a8c75632"
+            },
+            {
+              "bytes": 1976,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/tcp_send.js",
+              "sha256": "ea68cc521fa9b5603c3fccebbf19ecebcd26bf1a8af644ff1f13cd14ba9fe733"
+            },
+            {
+              "bytes": 343,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/thread_count.c",
+              "sha256": "d4889ed7757dccce03729c9568b88188128f2c1576166a3dc184a8707ed44568"
+            },
+            {
+              "bytes": 137,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/thread_count.js",
+              "sha256": "f4ef6d8ded95fe3114e50b7d2b6eb873e693419b85150f681b4a54a5043c2de9"
+            },
+            {
+              "bytes": 744,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_bind.c",
+              "sha256": "a1be1bc5c03d430fc6eb43982651073e144872956fadaee98c3700be59352ee3"
+            },
+            {
+              "bytes": 502,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_bind.js",
+              "sha256": "e3afae5bf246184e76703efbcf41cb35bf5289e746cc40dc0300eef98753dfb5"
+            },
+            {
+              "bytes": 3005,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_recv_from.c",
+              "sha256": "607085b34605af6c888e1de5c3f5cd8f689f221c71a3ef9e2c50f9ac880b1bae"
+            },
+            {
+              "bytes": 2094,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_recv_from.js",
+              "sha256": "d6f88b08f578f088b4ff257a7e544e4fbbf46f375aee3881ba4d44e25ed890d8"
+            },
+            {
+              "bytes": 3484,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_send_to.c",
+              "sha256": "b3a87e56958d8071a368da2edb4748e9496b3eed58b93d6cb4f8af398dd1011a"
+            },
+            {
+              "bytes": 2168,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/udp_send_to.js",
+              "sha256": "40c835c4d73eb15d089a41b425968d04931d02820cb901aadb8eb3dd4905f247"
+            },
+            {
+              "bytes": 32131,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window.c",
+              "sha256": "bf8d5779775ba9566d4bbeb8706a9ec993efb724dae7af8a76c38501ab4092c2"
+            },
+            {
+              "bytes": 124,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window_close.js",
+              "sha256": "be4ef11e9ac57c59aa4aee847f15ece18034ca9fe1c4a68c6e0b0d7bbd7c3590"
+            },
+            {
+              "bytes": 153,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window_frame.js",
+              "sha256": "78baa53aa46e02165c0c94da68d1f6362386ebcfb97dbb36fffb82792a03d34f"
+            },
+            {
+              "bytes": 115,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window_grab.js",
+              "sha256": "55cfc1925114f2d1f177137fad24d6252fe28707d26a1aae18a98ad97060a668"
+            },
+            {
+              "bytes": 344,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window_open.js",
+              "sha256": "cd716864b8dfb27ca955c8aa58643c7d693ce76eb56472bd8255ff7ac0656e8d"
+            },
+            {
+              "bytes": 133,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/window_set_title.js",
+              "sha256": "eee0bf26b7f381f8800364e22e8c735e47dd6db3f58e23ff3dda8478a8411513"
+            },
+            {
+              "bytes": 295,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/write.c",
+              "sha256": "8807a5f655db452c1d846354560c26fe1e94289e5dc0be231d0b71ecc876d02f"
+            },
+            {
+              "bytes": 131,
+              "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/effs/write.js",
+              "sha256": "e3495066a5d8c53fe1c46cfd2bb32577e3bd7dcae9797808801599073504dacb"
+            },
+            {
+              "bytes": 221,
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/host.c",
+              "sha256": "fb46acf73279510d8ec297d7fe9c06a521db6a6b3cb887f8111b9dcb18be3a9f"
+            },
+            {
+              "bytes": 51,
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/host.js",
+              "sha256": "ee3bb658cee084ec1cacd123200f0064175ca0e8e3d02e2f7ba483ba2e7e7805"
+            }
+          ],
+          "k6_emit_kind": "c",
+          "k7_lib_hub": [],
+          "k8_diagnostics": "",
+          "k9_host": {
+            "arch": "x64",
+            "cc": "",
+            "no_telemetry": "1",
+            "platform": "linux"
+          },
+          "schema": "cgen-ts-cache-key-v1"
+        },
+        "schema": "cgen-ts-cache-receipt-v1"
+      },
+      "name": "A-receipt-counts-utf8-bytes",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:35.208Z",
+        "event": "hit",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 10.493516999999997
+      },
+      "name": "B-hit-exit-0",
+      "pass": true
+    },
+    {
+      "detail": "4ebfd0c5a4b5 vs 4ebfd0c5a4b5",
+      "name": "B-byte-identical",
+      "pass": true
+    },
+    {
+      "detail": "hit 10.5ms < compile 58.1ms (tool log)",
+      "name": "B-hit-skips-generation",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:35.656Z",
+        "event": "compile",
+        "key": "229e3182ae88a8dca18ca1aa2f560be602f13ae178c891ea3c734009e6690332",
+        "ms": 129.968883
+      },
+      "name": "C-bend-mutation-miss",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:35.991Z",
+        "event": "rebuild-uncertain",
+        "key": null,
+        "ms": 26.462030999999968
+      },
+      "name": "F-diagnostics-env-miss",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:36.301Z",
+        "event": "rebuild-uncertain",
+        "key": null,
+        "ms": 25.852926000000025
+      },
+      "name": "G-diagnostics-bypass-same-key",
+      "pass": true
+    },
+    {
+      "detail": "4ebfd0c5a4b5 vs 4ebfd0c5a4b5",
+      "name": "G-diagnostics-byte-identical",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:36.642Z",
+        "event": "refresh",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 31.19836600000002
+      },
+      "name": "D-foreign-refresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:36.971Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 45.07010199999999
+      },
+      "name": "E-fresh-compile",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "E-refresh-byte-identical-to-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:37.345Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 56.270992000000035
+      },
+      "name": "artifact-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:37.755Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 59.920375999999976
+      },
+      "name": "artifact-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "artifact-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:38.473Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 58.20810799999998
+      },
+      "name": "receipt-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:39.560Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 736.260775
+      },
+      "name": "receipt-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "receipt-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:40.482Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 129.86825700000003
+      },
+      "name": "null-manifest-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:40.956Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 96.14610199999998
+      },
+      "name": "null-manifest-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "null-manifest-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:41.871Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 115.486042
+      },
+      "name": "missing-manifest-key-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:42.364Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 119.992773
+      },
+      "name": "missing-manifest-key-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "missing-manifest-key-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:43.276Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 78.28144200000003
+      },
+      "name": "null-foreign-rows-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:44.488Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 904.317843
+      },
+      "name": "null-foreign-rows-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "null-foreign-rows-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:45.465Z",
+        "event": "compile",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 220.92069100000003
+      },
+      "name": "malformed-foreign-row-origin-compiled",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:45.835Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 71.55967000000001
+      },
+      "name": "malformed-foreign-row-malformed-origin-rebuilds",
+      "pass": true
+    },
+    {
+      "detail": "bf3550464bc8 vs bf3550464bc8",
+      "name": "malformed-foreign-row-repair-equals-fresh",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:47.156Z",
+        "event": "compile",
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 142.12701799999996
+      },
+      "name": "I-setup-compile",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:47.567Z",
+        "event": "compile",
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 88.83771999999999
+      },
+      "name": "I-cid-decline-compiles",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:48.026Z",
+        "event": "compile",
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 121.36231399999997
+      },
+      "name": "I-fresh-compile",
+      "pass": true
+    },
+    {
+      "detail": "928d38965095 vs 928d38965095",
+      "name": "I-decline-parity",
+      "pass": true
+    },
+    {
+      "detail": {
+        "at": "2026-10-17T06:41:48.519Z",
+        "event": "compile",
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 179.71180399999997
+      },
+      "name": "J-fresh-compile",
+      "pass": true
+    },
+    {
+      "detail": [],
+      "name": "J-open-mode-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-open-mode-dir-unchanged",
+      "pass": true
+    },
+    {
+      "detail": "928d38965095 vs 928d38965095",
+      "name": "J-open-mode-fresh-parity",
+      "pass": true
+    },
+    {
+      "detail": [],
+      "name": "J-symlink-dir-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-symlink-dir-dir-unchanged",
+      "pass": true
+    },
+    {
+      "detail": "928d38965095 vs 928d38965095",
+      "name": "J-symlink-dir-fresh-parity",
+      "pass": true
+    },
+    {
+      "detail": [],
+      "name": "J-ancestor-symlink-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-ancestor-symlink-dir-unchanged",
+      "pass": true
+    },
+    {
+      "detail": "928d38965095 vs 928d38965095",
+      "name": "J-ancestor-symlink-fresh-parity",
+      "pass": true
+    }
+  ],
+  "clang_invoked": false,
+  "compiler_invoked": true,
+  "failed": 0,
+  "main_artifacts_used": false,
+  "network_used": false,
+  "note": "compiler_invoked=true ONLY for bounded synthetic fixtures through the instrumented default path; no Main build, no release impact. Event log proves compile() skipped on hit. No generation-time saving claimed beyond observed per-event ms.",
+  "passed": 45,
+  "runs": [
+    {
+      "event": "compile",
+      "event_ms": 58.07412199999999,
+      "exit": 0,
+      "rss_kib": 123940,
+      "step": "A-first-build",
+      "wall_s": 0.39855027699741186
+    },
+    {
+      "event": "hit",
+      "event_ms": 10.493516999999997,
+      "exit": 0,
+      "rss_kib": 115332,
+      "step": "B-rebuild",
+      "wall_s": 0.34681968099903315
+    },
+    {
+      "event": "compile",
+      "event_ms": 129.968883,
+      "exit": 0,
+      "rss_kib": 121340,
+      "step": "C-bend-mutation",
+      "wall_s": 0.45611875299800886
+    },
+    {
+      "event": "refresh",
+      "event_ms": 31.19836600000002,
+      "exit": 0,
+      "rss_kib": 121268,
+      "step": "D-foreign-refresh",
+      "wall_s": 0.32361053400018136
+    },
+    {
+      "event": "compile",
+      "event_ms": 45.07010199999999,
+      "exit": 0,
+      "rss_kib": 118172,
+      "step": "E-fresh-of-changed-tree",
+      "wall_s": 0.32941351200133795
+    }
+  ],
+  "tool": "compiler/cache.ts via compiler/main.ts default path"
+}

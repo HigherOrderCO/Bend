@@ -21,6 +21,7 @@ import * as thr from "node:worker_threads";
 import type { BunPlugin } from "bun";
 
 import * as Bend from "./bend.ts";
+import * as CgenCache from "./cache.ts";
 import * as Comp from "./comp.ts";
 import * as Safe from "./safe.ts";
 
@@ -319,7 +320,7 @@ async function cli_file(args: string[]): Promise<void> {
       if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
-      cli_emit(book, out);
+      cli_emit(book, out, file, seen);
     }
   } catch (e) {
     cli_say(2, book_err(e) + "\n");
@@ -370,13 +371,15 @@ function path_real(p: string): string {
   return fs.existsSync(p) ? fs.realpathSync(p) : path.resolve(p);
 }
 
-function cli_emit(book: Bend.Book, out: string): void {
+function cli_emit(book: Bend.Book, out: string, entry: string,
+  seen: Map<string, string | null>): void {
   if (out.endsWith(".mjs")) {
     fs.writeFileSync(out, Comp.js_lib(book, true));
   } else if (/\.c?js$/.test(out)) {
     fs.writeFileSync(out, Comp.js_book(book));
   } else if (out.endsWith(".c")) {
-    fs.writeFileSync(out, Comp.compile_book(book));
+    fs.writeFileSync(out, CgenCache.emit_c_cached(book, seen, entry,
+      () => Comp.compile_book(book)).c);
   } else if (out.endsWith(".bendtt")) {
     const oos = Safe.safe_emit(book, out);
     if (oos.length !== 0) {
@@ -386,7 +389,8 @@ function cli_emit(book: Bend.Book, out: string): void {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bend-"));
     try {
       const c = path.join(dir, path.basename(out) + ".c");
-      fs.writeFileSync(c, Comp.compile_book(book));
+      fs.writeFileSync(c, CgenCache.emit_c_cached(book, seen, entry,
+        () => Comp.compile_book(book)).c);
       Bun.gc(true);
       cli_build(out, c);
     } finally {
@@ -862,7 +866,7 @@ function book_promises(book: Bend.Book): Array<[string, string[]]> {
     if (t !== undefined) {
       const rs = new Set<string>();
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
-        term_refs(Bend.term_lower(c.T), rs);
+        term_refs_higher(c.T, rs);
       }
       if (t.$ === "Def" && t.e !== undefined) {
         term_refs(t.e, rs);
@@ -881,6 +885,101 @@ function book_promises(book: Bend.Book): Array<[string, string[]]> {
     const out = own.filter((k) => bad.has(k));
     return out.length === 0 ? [] : [[on, out]];
   });
+}
+
+// term_refs_higher follows HTerm directly, opening binder bodies with the
+// same fresh variables as term_lower while avoiding a full lowered-tree copy.
+function term_refs_higher(tm: Bend.HTerm, out: Set<string>, depth = 0): void {
+  const t = Bend.term_force(tm);
+  switch (t.$) {
+    case "Var": {
+      const v = t.v;
+      if (v !== undefined && v.$ !== "PVar" && v.$ !== "PCtr") {
+        term_refs_higher(v as Bend.HTerm, out, depth);
+      }
+      return;
+    }
+    case "Ref": {
+      out.add(t.k);
+      return;
+    }
+    case "Sub": {
+      const v = t.v;
+      if (v.$ !== "PVar" && v.$ !== "PCtr") {
+        term_refs_higher(v as Bend.HTerm, out, depth);
+      }
+      term_refs_higher(t.f, out, depth);
+      return;
+    }
+    case "Let": {
+      for (const v of t.v) term_refs_higher(v, out, depth);
+      const xs = t.k.map((k, j) => Bend.Var<Bend.HBody>(k, depth + j));
+      term_refs_higher(t.f(xs), out, depth + t.k.length);
+      return;
+    }
+    case "Typ": {
+      term_refs_higher(t.g, out, depth);
+      return;
+    }
+    case "Qnt":
+    case "Qua":
+    case "Lit":
+    case "Efq":
+    case "Rfl":
+    case "Hol": {
+      return;
+    }
+    case "Min": {
+      term_refs_higher(t.a, out, depth);
+      term_refs_higher(t.b, out, depth);
+      return;
+    }
+    case "All": {
+      term_refs_higher(t.A, out, depth);
+      term_refs_higher(t.B(Bend.Var<Bend.HBody>(t.k, depth)), out, depth + 1);
+      return;
+    }
+    case "Lam": {
+      term_refs_higher(t.f(Bend.Var<Bend.HBody>(t.k, depth)), out, depth + 1);
+      return;
+    }
+    case "App": {
+      term_refs_higher(t.f, out, depth);
+      term_refs_higher(t.x, out, depth);
+      return;
+    }
+    case "ADT": {
+      out.add(t.k);
+      for (const x of t.x) term_refs_higher(x, out, depth);
+      return;
+    }
+    case "Ctr": {
+      for (const x of t.x) term_refs_higher(x, out, depth);
+      return;
+    }
+    case "Mat": {
+      term_refs_higher(t.h, out, depth);
+      term_refs_higher(t.m, out, depth);
+      return;
+    }
+    case "Eql": {
+      term_refs_higher(t.a, out, depth);
+      term_refs_higher(t.b, out, depth);
+      term_refs_higher(t.T, out, depth);
+      return;
+    }
+    case "Rwt": {
+      term_refs_higher(t.e, out, depth);
+      term_refs_higher(t.p, out, depth);
+      term_refs_higher(t.f, out, depth);
+      return;
+    }
+    case "Ann": {
+      term_refs_higher(t.x, out, depth);
+      term_refs_higher(t.T, out, depth);
+      return;
+    }
+  }
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
