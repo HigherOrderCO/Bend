@@ -1265,7 +1265,8 @@ function mat_lits(x: HTerm, k: Name, self: HTerm): Row[] {
     const { arms, end } = mat_arms(h ?? t);
     const [arm, flds] = arms.length < 2
       ? arm_self(end, h ? 2 : 1, self, back(bits, val)) : [end, 0];
-    const own = arms.length < 2 && !(flds === 0 && cov && key(cov) === key(arm));
+    const own = arms.length < 2
+      && !(flds === 0 && cov && key(cov) === key(arm));
     for (const [c, a] of arms) {
       walk(a, bits + 1, val + (c === "True" ? 2 ** bits : 0),
         !own ? cov : flds === 0 ? arm : null);
