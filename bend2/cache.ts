@@ -274,6 +274,19 @@ export function store(dir: string, keyed: KeyResult,
   }
 }
 
+
+// Conservative detector for compiler-owned foreign-fragment identifier
+// transforms: CID(...)/FID(...) call syntax in code spans, with comments
+// and strings skipped by the compiler's own skip pattern. A hit declines
+// raw refresh; the full rebuild then applies (or reports) the real
+// transform. Absence is exact: without such syntax the rewrite is the
+// identity, so verbatim substitution holds.
+function has_id_transform(src: string): boolean {
+  const code = src.split(
+    /\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`/g).join("\n");
+  return /\b[CF]ID\(/.test(code);
+}
+
 // Exact foreign-fragment refresh: find one origin entry whose manifest
 // differs from current in exactly one foreign file's bytes (same paths,
 // same Bend closure, compiler, kind, env), then substitute exactly once.
@@ -367,6 +380,14 @@ export function try_refresh(dir: string, keyed: KeyResult,
     return null;
   }
   const oldText = match.oldBytes.toString("utf8");
+  const newText = newBytes.toString("utf8");
+  // Raw substitution is exact only for transform-free fragments: the
+  // compiler rewrites CID()/FID() call syntax on generation, so any
+  // identifier marker in the changed old or new bytes fails closed to a
+  // full rebuild, which emits (or errors on) the resolved identifiers.
+  if (has_id_transform(oldText) || has_id_transform(newText)) {
+    return null;
+  }
   const first = originC.indexOf(oldText);
   if (first < 0 || originC.indexOf(oldText, first + 1) >= 0) {
     return null;
@@ -382,6 +403,48 @@ function log_event(dir: string, event: Record<string, unknown>): void {
       JSON.stringify(event) + "\n");
   } catch {
     // Logging is audit-only; never break the build on it.
+  }
+}
+
+// Cache-directory authority: the leaf directory must be a real directory
+// (never a symlink), owned by the current user, and private to that user,
+// and every ancestor up to the filesystem root must be a real directory,
+// never a symlink (a symlinked ancestor would redirect the whole subtree).
+// Anything else fails closed: the caller rebuilds without reading,
+// writing, or logging into the directory, so a shared, planted, or
+// misconfigured cache path can neither serve nor poison output. Missing
+// directories are created private (0700). Without a uid API ownership
+// cannot be checked, so nothing is trusted either. Residual: rename or
+// mount races between this check and later use are not closed here; the
+// manifest, receipt, and artifact digests still gate every served byte.
+export function cache_authority_ok(dir: string): boolean {
+  try {
+    fs.mkdirSync(dir, { mode: 0o700, recursive: true });
+    const leaf = path.resolve(dir);
+    let at = leaf;
+    for (;;) {
+      const st = fs.lstatSync(at);
+      if (!st.isDirectory() || st.isSymbolicLink()) {
+        return false;
+      }
+      if (at === leaf) {
+        if ((st.mode & 0o077) !== 0) {
+          return false;
+        }
+        const me = typeof process.getuid === "function" ? process.getuid()
+          : -1;
+        if (me < 0 || st.uid !== me) {
+          return false;
+        }
+      }
+      const parent = path.dirname(at);
+      if (parent === at) {
+        return true;
+      }
+      at = parent;
+    }
+  } catch {
+    return false;
   }
 }
 
@@ -405,6 +468,12 @@ export function emit_c_cached(book: Bend.Book,
     log_event(dir, { at: new Date().toISOString(), event, key, ms });
     return { c, event, ms, key };
   };
+  // An untrusted cache directory gets zero cache I/O: no read, no store,
+  // not even the audit log. The ordinary compiler path runs instead.
+  if (!cache_authority_ok(dir)) {
+    return { c: compile(), event: "rebuild-uncertain",
+      ms: performance.now() - began, key: null };
+  }
   // Diagnostics are observable compiler output. A cache hit skips the
   // compiler traversal that produces them, so diagnostic requests always
   // execute the ordinary compiler path.

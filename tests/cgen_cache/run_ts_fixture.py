@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Bounded TS-flow fixture for compiler/cache.ts (no Main artifacts).
 
-Runs the pinned Bun against THIS worktree's compiler/main.ts on a tiny
+Runs the pinned Bun against THIS worktree's bend2/main.ts on a tiny
 foreign-effect fixture (pure temp dirs): miss+compile+store, rebuild hit with
 byte-identity and skipped generation, Bend-mutation miss, diagnostics-env
-miss/bypass parity, foreign-only refresh, and refresh-vs-fresh byte-identity.
+miss/bypass parity, foreign-only refresh, and refresh-vs-fresh byte-identity,
+CID-introducing foreign edit declining raw refresh with fresh parity,
+untrusted cache directories (open mode, symlink) rebuilding with zero cache I/O.
 Records wall/RSS per bun invocation via /usr/bin/time -v plus the tool's own
 log.jsonl event/ms evidence (the event log is what proves compile() was or
 was not invoked). Writes tests/results/fixture-ts-result.json.
@@ -26,7 +28,7 @@ import tempfile
 
 WORKTREE = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-MAIN_TS = os.path.join(WORKTREE, "compiler", "main.ts")
+MAIN_TS = os.path.join(WORKTREE, "bend2", "main.ts")
 BUN = ("/run/baton2-native-homelab/retained/baton2-compiler-741-20261015"
        "/postrelease-751-761-20261015-11/toolchain-home/bin/bun")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -61,6 +63,18 @@ HOST_JS = """// IO
 
 function io_fx_tag() {
   return 7n;
+}
+"""
+HOST_CID = """// IO
+// ==
+
+Term io_fx_tag_run(Env e, Term* f, IoWork* w) {
+  return (Term)%d;
+}
+
+static void __attribute__((constructor)) io_fx_tag_use(void) {
+  io_eff(CID(Fx.tag), io_fx_tag_run, 0);
+  io_eff(CID_FX_TAG, io_fx_tag_run, 0);
 }
 """
 
@@ -293,6 +307,44 @@ def main():
             check(label + "-repair-equals-fresh",
                   code == 0 and sha(repaired) == sha(fresh),
                   "%s vs %s" % (sha(repaired)[:12], sha(fresh)[:12]))
+
+        i_cache = os.path.join(tmp, "i-cache")
+        code, i1, _, _, events = build(fx, i_cache, "i1.c")
+        check("I-setup-compile", code == 0
+              and events[-1]["event"] == "compile", events[-1])
+        with open(os.path.join(fx, "host.c"), "w") as handle:
+            handle.write(HOST_CID % 8)
+        code, i2, _, _, events = build(fx, i_cache, "i2.c")
+        check("I-cid-decline-compiles", code == 0
+              and events[-1]["event"] == "compile", events[-1])
+        i_fresh = os.path.join(tmp, "i-fresh")
+        code, i3, _, _, events = build(fx, i_fresh, "i3.c")
+        check("I-fresh-compile", code == 0
+              and events[-1]["event"] == "compile", events[-1])
+        check("I-decline-parity", code == 0
+              and sha(i2) == sha(i3),
+              "%s vs %s" % (sha(i2)[:12], sha(i3)[:12]))
+
+        for jlabel, jsetup in (("J-open-mode", "mode"),
+                               ("J-symlink-dir", "link")):
+            j_cache = os.path.join(tmp, "j-" + jlabel)
+            if jsetup == "mode":
+                os.makedirs(j_cache)
+                os.chmod(j_cache, 0o777)
+            else:
+                real = os.path.join(tmp, "j-" + jlabel + "-real")
+                os.makedirs(real)
+                os.symlink(real, j_cache)
+            code, j1, _, _, events1 = build(fx, j_cache, "j1.c")
+            code2, j2, _, _, events2 = build(fx, j_cache, "j2.c")
+            hits = [e for e in events1 + events2
+                    if e.get("event") == "hit"]
+            check(jlabel + "-no-cache-io", code == 0 and code2 == 0
+                  and not hits,
+                  [e.get("event") for e in events1 + events2])
+            check(jlabel + "-rebuild-parity", code == 0 and code2 == 0
+                  and sha(j1) == sha(j2),
+                  "%s vs %s" % (sha(j1)[:12], sha(j2)[:12]))
 
     failed = [c for c in checks if not c["pass"]]
     result = {"tool": "compiler/cache.ts via compiler/main.ts default path",
