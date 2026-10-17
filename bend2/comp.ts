@@ -115,7 +115,12 @@ type Dom = [Bend.Quant, Name, HTerm];
 
 type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 
-type Trace = { miss: (() => boolean)[]; asks: Name[]; lends: Set<string> };
+type Trace = {
+  miss: (() => boolean)[];
+  seen: Set<string>;
+  asks: Name[];
+  lends: Set<string>;
+};
 
 // Constants
 // =========
@@ -1425,8 +1430,12 @@ export function io_run(book: Bend.Book, args: string[]): number {
 class Facts extends Set<string> {
   has(k: string): boolean {
     const got = super.has(k);
-    if (!got) {
-      TRACE?.miss.push(() => super.has(k));
+    if (!got && TRACE !== null) {
+      const id = (this === FL.hot ? "h" : "s") + k;
+      if (!TRACE.seen.has(id)) {
+        TRACE.seen.add(id);
+        TRACE.miss.push(() => super.has(k));
+      }
     }
     return got;
   }
@@ -2911,7 +2920,7 @@ export function compile_book(book: Bend.Book): string {
         t.asks.forEach(brw_of);
         continue;
       }
-      TRACE = { miss: [], asks: [], lends: new Set() };
+      TRACE = { miss: [], seen: new Set(), asks: [], lends: new Set() };
       traces.set(k, TRACE);
       FL.lend = TRACE.lends;
       memo_gc();
