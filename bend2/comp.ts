@@ -1783,7 +1783,7 @@ function seg_name(stem: string): string {
 function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
   live: [Of<"Var">, Bind][], res: Val, rest: HTerm[]): Scope {
   const vals = live.map(([, b]) => val_new(b.val.ws.map((w) =>
-    name_local(sc, FL.locals.get(w) ?? w)), b.val.lay, false, b.val.rs));
+    name_local(sc, FL.locals.get(w) ?? w)), b.val.lay, b.val.rs));
   const seg = seg_new(name, ret, [...vals, res], frame);
   FL.unit!.segs.push(seg);
   sc = { ...sc, seg, spares: [], uses: new Map() };
@@ -1826,7 +1826,7 @@ function node_fields(sc: Scope, t: string, r: string | null, k: Name,
   } else if (r === null) {
     spare_free(sc, spare);
   }
-  return val_arm(val_new(ws, node, false, node.ks.map((kd) =>
+  return val_arm(val_new(ws, node, node.ks.map((kd) =>
     kd === "box" ? r : null)));
 }
 
@@ -1838,20 +1838,20 @@ function node_fields(sc: Scope, t: string, r: string | null, k: Name,
 // at `at`, a rooted word passes its lend on, and an unheld owned box
 // owns `at`. A destination every arm fills from one root stays rooted.
 
-function val_new(ws: string[], lay: Lay, stat = false,
-  rs: (string | null)[] = []): Val {
+function val_new(ws: string[], lay: Lay, rs: (string | null)[] = [],
+  stat = false): Val {
   return { ws, lay, stat, rs: ws.map((_, j) => rs[j] ?? null) };
 }
 
 function val_arm(v: Val, k = Object.keys(v.lay.arms!)[0]): Val[] {
   let at = Number(Object.keys(v.lay.arms!).length > 1);
   return v.lay.arms![k].map((lay) => val_new(v.ws.slice(at,
-    at + lay.ks.length), lay, false, v.rs.slice(at, at += lay.ks.length)));
+    at + lay.ks.length), lay, v.rs.slice(at, at += lay.ks.length)));
 }
 
 function val_hold(sc: Scope, v: Val, k: string): Val {
   return val_new(v.ws.map((w, j) => emit_alias(sc, w, k, v.lay.ks[j])),
-    v.lay, false, v.rs);
+    v.lay, v.rs);
 }
 
 function val_own(sc: Scope, v: Val, at: string | null = null,
@@ -1882,7 +1882,7 @@ function val_sink(sc: Scope, v: Val): void {
 // A word boxed as is (one word, no arms) keeps its root.
 function val_to(sc: Scope, v: Val, lay: Lay): Val {
   return lay_eq(v.lay, lay) ? v : lay === BOX ? val_new([val_box(sc, v)], BOX,
-    false, v.lay.arms === null ? v.rs : [])
+    v.lay.arms === null ? v.rs : [])
     : v.lay === BOX ? val_unbox(sc, v, lay)
     : val_arms(sc, lay, v.ws[0], (k) => val_arm(v, k));
 }
@@ -1894,7 +1894,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
     val_to(al, f, lay.arms![k][j]));
   if (arms.length <= 1) {
     const fs = arms.flatMap((k) => vs(sc, k));
-    return val_new(fs.flatMap((f) => f.ws), lay, false,
+    return val_new(fs.flatMap((f) => f.ws), lay,
       fs.flatMap((f) => f.rs));
   }
   const out = emit_dst(sc, lay, "o").ws;
@@ -1910,7 +1910,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
     });
   }]));
   // a destination every arm fills from one root keeps it
-  return val_new(out, lay, false, rs.map((r) => {
+  return val_new(out, lay, rs.map((r) => {
     if (r[0] && r.every((x) => x === r[0])) {
       return r[0];
     }
@@ -1938,7 +1938,7 @@ function val_box(sc: Scope, v: Val): string {
 
 function val_unbox(sc: Scope, v: Val, lay: Lay): Val {
   if (lay.arms === null) {
-    return val_new(v.ws, lay, false, v.rs);
+    return val_new(v.ws, lay, v.rs);
   }
   const t = emit_alias(sc, v.ws[0], "u");
   return val_arms(sc, lay, t, (k) => node_fields(sc, t, v.rs[0], k), true);
@@ -1987,7 +1987,7 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
   const ra = [args[0].rs[0]];
   if (k === "array_size") {
     return val_new([a, `(1ull << (blk_cls(${a}) - ${lgs}))`],
-      lay_pack([["Tuple", [BOX, W32]]]), false, ra);
+      lay_pack([["Tuple", [BOX, W32]]]), ra);
   }
   const [l, at] = emit_hold(sc, [arr_loc(sc, a),
     `blk_at(${a}, ${args[1].ws[0]}, ${lgs})`], "at");
@@ -1998,10 +1998,10 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
       `blk_write(e.mem, ${Number(arr)}, ${l}, ${at} + ${j}, ${w});`));
     if (k !== "array_swap") {
       val_sink(sc, old);
-      return val_new([a], BOX, false, ra);
+      return val_new([a], BOX, ra);
     }
   }
-  return val_new([a, ...old.ws], lay_pack([["Tuple", [BOX, el]]]), false, ra);
+  return val_new([a, ...old.ws], lay_pack([["Tuple", [BOX, el]]]), ra);
 }
 
 function arr_leaf(sc: Scope, s: string, el: Lay): Val {
@@ -2402,7 +2402,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
     } else if (!(vs[i] === null && v === b) && !ctr_packed(x)) {
       val_own(sc, v, at);
     }
-    return val_new(v.ws, v.lay, false, v.rs);
+    return val_new(v.ws, v.lay, v.rs);
   });
 }
 
@@ -2457,7 +2457,7 @@ function emit_open(sc: Scope, k: Name): [Scope, Val[]] {
   const { live, lays, ret } = fun_of(k);
   const brw = brw_of(k);
   const vals = lays.map((l, i) => val_new(l.ks.map(() =>
-    name_local(sc, live[i]?.[1] ?? "k")), l, false, l.ks.map((kd) =>
+    name_local(sc, live[i]?.[1] ?? "k")), l, l.ks.map((kd) =>
     brw[i] && kd === "box" ? arg_key(k, i) : null)));
   const seg = seg_new(k, ret, vals);
   return [{ ...sc, seg, spares: [], uses: new Map(), def: k,
@@ -2514,7 +2514,7 @@ function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
   // an op that returns its first argument ($0) returns it as rooted
   if (Array.isArray(C)) {
     return val_new(C.map((p) => emit_alias(sc, tpl(p, as), "a")), lay,
-      false, C.map((p) => p === "$0" ? vs[0].rs[0] : null));
+      C.map((p) => p === "$0" ? vs[0].rs[0] : null));
   }
   return val_new([tpl(C, as)], lay.ks.length === 1 ? lay : BOX);
 }
@@ -2538,7 +2538,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   at: Lay | null): Val {
   const [adt, u] = ctr_adt(x, ty);
   if (u !== null) {
-    return val_new([`${u}ull`], W32, true);
+    return val_new([`${u}ull`], W32, [], true);
   }
   const flds = ctr_flds(x.k, x.x);
   const ctr = FL.book.ctrs[x.k];
@@ -2546,7 +2546,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   if (word !== undefined || adt.k === "Array") {
     if (adt.k === "Nat") {
       const [b, n] = nat_peel(x, (s) => emit_refold(sc, s));
-      return b === null ? val_new([`${n}ull`], word, true)
+      return b === null ? val_new([`${n}ull`], word, [], true)
         : val_new([`nat_chk(e, ${emit_expr(sc, b, adt, null).ws[0]} + ${n})`],
           word);
     }
@@ -2562,7 +2562,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
         .join(" | ")})`], word);
     }
     if (vs.length === 0) {
-      return val_new(["0"], word, true);
+      return val_new(["0"], word, [], true);
     }
     return val_new([`term_word(e, ${vs[0].ws[0]})`], word);
   }
@@ -2575,10 +2575,11 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   const tag = arms.length > 1 ? [String(arms.indexOf(x.k))] : [];
   const ws = [...tag, ...fs.flatMap((f) => f.ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
-    vs.every((f) => f.stat), [...tag.map(() => null), ...fs.flatMap((f) =>
-      f.rs)]);
+    [...tag.map(() => null), ...fs.flatMap((f) => f.rs)],
+    vs.every((f) => f.stat));
   return lay === pos ? v
-    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, v.stat);
+    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, [],
+      v.stat);
 }
 
 function emit_fold(sc: Scope, t: HTerm): HTerm | null {
