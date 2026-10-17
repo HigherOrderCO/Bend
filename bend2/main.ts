@@ -572,15 +572,23 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
     },
   };
   try {
+    // Build in memory; Bun can name a symlink input after its target.
     const out = await Bun.build({
       entrypoints: [page],
-      outdir: dir,
       target: "browser",
       minify: true,
       plugins: [inline, PLUGIN],
     });
+    const input = path_real(page);
     for (const a of out.outputs) {
-      cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
+      if (path_real(path.resolve(dir, a.path)) === input) {
+        cli_fail("-o " + dir + " would overwrite the input page");
+      }
+    }
+    for (const a of out.outputs) {
+      const at = path.resolve(dir, a.path);
+      await Bun.write(at, a);
+      cli_say(1, at + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
     }
   } catch (e) {
     let message = book_err(e);
