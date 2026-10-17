@@ -2432,14 +2432,19 @@ function emit_put(sc: Scope, dst: Val | null, v: Val): void {
 }
 
 function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
-  const k = ck.k!;
-  const flat = flat_of(k);
-  const { h, lays, ret } = fun_of(k);
-  const vals = emit_args(sc, ck, tail && !flat, false, lays);
-  if (!flat) {
-    return emit_body({ ...sc, def: k }, h!, ck.tld!.T, vals, dst);
+  const { h, lays } = fun_of(ck.k!);
+  if (flat_of(ck.k!)) {
+    return emit_put(sc, dst, emit_spin(sc, ck, tail));
   }
-  const ws = vals.flatMap((v) => v.ws);
+  emit_body({ ...sc, def: ck.k! }, h!, ck.tld!.T,
+    emit_args(sc, ck, tail, false, lays), dst);
+}
+
+// A flat call runs its def's spin, which writes its results to a local array.
+function emit_spin(sc: Scope, ck: Spine, tail = false): Val {
+  const k = ck.k!;
+  const { lays, ret } = fun_of(k);
+  const ws = emit_args(sc, ck, false, false, lays).flatMap((v) => v.ws);
   const name = emit_native(sc, k);
   const o = name_local(sc, "o");
   const out = val_new(ret.ks.map((kd, j) =>
@@ -2457,7 +2462,7 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
     file_push(sc, "return 0;"));
   bind_dead(sc, tail ? [] : sc.rest, tail ? undefined
     : ck.xs.map(term_strip).filter((x) => x.$ === "Var").map(probe_of));
-  emit_put(sc, dst, out);
+  return out;
 }
 
 // A foreign def's last parameter, past its live ones, is its continuation k.
@@ -2703,9 +2708,7 @@ function emit_expr(sc: Scope, tm: HTerm, ty0: HTerm | null,
       }
       const m = term_spine(x);
       if (flat_call(x)) {
-        const dst = emit_dst(sc, fun_of(m.k!).ret);
-        emit_fuse(sc, m, dst);
-        return dst;
+        return emit_spin(sc, m);
       }
       const y = call_eta(x)
         ?? (m.t.$ !== "Ref" && m.args.length === 0 ? m.h : null);
