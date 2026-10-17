@@ -1500,8 +1500,10 @@ function file_new(book: Bend.Book, js: boolean) {
     depths: new Map<HTerm, number>(),
     facts: new Set<string>(),
     miss: new Map<string, Set<Unit>>(),
+    when: new Map<string, (() => void)[]>(),
     stale: new Set<Unit>(),
     units: new Map<string, Unit>(),
+    lazy: new Map<string, () => void>(),
     unit: null as Unit | null,
     tabs: new Map<string, number>(),
     lits: new Map<string, number>(),
@@ -1611,7 +1613,21 @@ function fact_add(kind: string, k = ""): boolean {
   FL.facts.add(key);
   FL.miss.get(key)?.forEach((u) => FL.stale.add(u));
   FL.miss.delete(key);
+  const then = FL.when.get(key) ?? [];
+  FL.when.delete(key);
+  then.forEach((f) => f());
   return true;
+}
+
+// Runs f once the fact holds: what leads only to more facts needs no unit
+// to emit again.
+function fact_when(kind: string, k: string, f: () => void): void {
+  const key = kind + " " + k;
+  if (FL.facts.has(key)) {
+    f();
+  } else {
+    memo(FL.when, key, () => []).push(f);
+  }
 }
 
 function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
@@ -1648,9 +1664,11 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
     }
     return;
   }
-  const hot = force || fact("type", w.k);
-  w.x.forEach((x) => facts_hot(sc, x, hot, local));
-  if (!hot || !fact_add("type", w.k)) {
+  w.x.forEach((x) => facts_hot(sc, x, force, local));
+  if (!force) {
+    return fact_when("type", w.k, () => facts_hot(sc, w, true, local));
+  }
+  if (!fact_add("type", w.k)) {
     return;
   }
   const tld = FL.book.tlds[w.k];
@@ -1738,6 +1756,8 @@ function seg_text(lines: string[], tab: number): string[] {
 
 function seg_ref(sc: Scope, fid: string): string {
   sc.seg.refs.add(fid);
+  FL.lazy.get(fid)?.();
+  FL.lazy.delete(fid);
   return fid;
 }
 
@@ -2010,7 +2030,8 @@ function bind_pop(sc: Scope, x: HTerm): Val {
 function bind_uses(sc: Scope, p: Of<"Var">, v: Val, rest: HTerm[],
   A: HTerm): void {
   const n = rest_use(rest, p);
-  facts_hot(sc, A, fact("open"));
+  facts_hot(sc, A, false);
+  fact_when("open", "", () => facts_hot(sc, A, true));
   bind_set(sc, p, { val: v, n, A }, n);
 }
 
@@ -2310,11 +2331,8 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
   lays = fun_of(ck.k!).lays): string[] {
   const k = ck.k!;
   const brw = brw_of(k);
-  ck.all.forEach((a, q) => {
-    if (fact("arg", arg_key(k, q))) {
-      facts_hot(sc, a, true);
-    }
-  });
+  ck.all.forEach((a, q) =>
+    fact_when("arg", arg_key(k, q), () => facts_hot(sc, a, true)));
   const xs = ck.xs.map(term_strip);
   const vars = xs.filter((x) => x.$ === "Var");
   const vs = ck.xs.map((a, i) => xs[i].$ === "Var" ? null
@@ -2514,9 +2532,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     }
     return val_new([`term_word(e, ${vs[0].ws[0]})`], word);
   }
-  if (fact("ctr", x.k)) {
-    facts_ctr(sc, ctr, adt.x);
-  }
+  fact_when("ctr", x.k, () => facts_ctr(sc, ctr, adt.x));
   const pos = at ?? lay_of(adt);
   const lay = pos === BOX ? lay_node(x.k) : pos;
   const arms = Object.keys(lay.arms!);
@@ -3026,9 +3042,11 @@ export function compile_book(book: Bend.Book): string {
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
+  // a flat def's callers run its spin, so its segment is a unit only once
+  // a segment names it (seg_ref): main's, a bang's, a fork's
   for (const [k, tld] of [...done_defs().reverse(),
     ...done_defs(def_foreign)]) {
-    unit_new(k, () => {
+    const unit = () => unit_new(k, () => {
       const [dl, vals] = emit_open(scope_new(), k);
       FL.unit!.segs.push(dl.seg);
       if (def_foreign(tld)) {
@@ -3037,6 +3055,11 @@ export function compile_book(book: Bend.Book): string {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
     });
+    if (flat_of(k) && k !== "main" && !FL.bangs.has(k)) {
+      FL.lazy.set(seg_fid(k), unit);
+    } else {
+      unit();
+    }
   }
   // after a sweep, a boxed parameter that no caller lends is owned
   let us: Unit[] = [];
