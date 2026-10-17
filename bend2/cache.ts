@@ -1,16 +1,11 @@
 #!/usr/bin/env bun
-// CgenCache: fail-closed whole-.c cache with exact foreign-fragment refresh.
+// CgenCache stores generated C with a source identity and artifact digest.
+// cli_emit uses a matching cache entry or performs ordinary generation.
+// Foreign-only refresh applies one exact substitution when all other source
+// identities match. Invalid or incomplete entries cause ordinary generation.
 //
-// Default normal-path integration (no flag, no approval gate): cli_emit asks
-// here first; a hit serves byte-identical C without running compile_book, a
-// proven foreign-only delta derives refreshed C by exact substitution, and
-// every uncertain or changed non-FFI input falls through to a full rebuild.
-// Reuse fails closed (miss/invalid never serve); generation always runs on
-// doubt, so output correctness never depends on the cache.
-//
-// Compiler-free I/O only: hashing, byte comparison, atomic file writes. This
-// module never launches a compiler or linker. A hit proves byte-identity with
-// previously stored bytes, not compiler determinism and not speed.
+// This module performs file I/O and hashing. It does not run a compiler or
+// linker. Cache hits reuse stored bytes for an identical source identity.
 
 import * as crypto from "node:crypto";
 import * as fs from "node:fs";
@@ -59,6 +54,59 @@ function canon(value: unknown): string {
 export interface KeyResult {
   key: string;
   manifest: Record<string, unknown>;
+}
+
+type FileRow = { path: string; sha256: string; bytes: number };
+
+function is_record(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object"
+    && !Array.isArray(value);
+}
+
+function is_digest(value: unknown): value is string {
+  return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
+}
+
+function is_file_rows(value: unknown): value is FileRow[] {
+  return Array.isArray(value) && value.every((row) => is_record(row)
+    && typeof row.path === "string" && is_digest(row.sha256)
+    && Number.isSafeInteger(row.bytes) && (row.bytes as number) >= 0);
+}
+
+function is_manifest(value: unknown): value is Record<string, unknown> {
+  if (!is_record(value) || value.schema !== KEY_SCHEMA
+    || !is_file_rows(value.k1_compiler)
+    || !is_record(value.k2_toolchain)
+    || typeof value.k2_toolchain.bun_version !== "string"
+    || !Array.isArray(value.k3_closure_ordered)
+    || !value.k3_closure_ordered.every((part) => typeof part === "string")
+    || !is_file_rows(value.k3_closure_files)
+    || !Array.isArray(value.k3_namespaces)
+    || !value.k3_namespaces.every((row) => Array.isArray(row)
+      && row.length === 2 && typeof row[0] === "string"
+      && (typeof row[1] === "string" || row[1] === null))
+    || typeof value.k3_entry !== "string"
+    || typeof value.k4_laws_proof !== "boolean"
+    || !is_file_rows(value.k5_effs)
+    || typeof value.k6_emit_kind !== "string"
+    || !Array.isArray(value.k7_lib_hub)
+    || typeof value.k8_diagnostics !== "string"
+    || !is_record(value.k9_host)) {
+    return false;
+  }
+  const host = value.k9_host;
+  return typeof host.platform === "string" && typeof host.arch === "string"
+    && typeof host.cc === "string" && typeof host.no_telemetry === "string";
+}
+
+function is_receipt(value: unknown, key: string): value is
+  Record<string, unknown> {
+  return is_record(value) && value.schema === RECEIPT_SCHEMA
+    && value.key === key && is_digest(value.artifact_sha256)
+    && Number.isSafeInteger(value.artifact_bytes)
+    && (value.artifact_bytes as number) >= 0
+    && value.compiler_invoked === false && is_manifest(value.manifest)
+    && sha_bytes(canon(value.manifest)) === key;
 }
 
 function file_rows(paths: string[]): { path: string; sha256: string;
@@ -160,10 +208,10 @@ export function lookup(dir: string,
       return { status: "invalid", key: keyed.key,
         reason: "receipt digest mismatch" };
     }
-    const receipt = JSON.parse(raw.toString());
-    if (receipt.schema !== RECEIPT_SCHEMA || receipt.key !== keyed.key) {
+    const receipt: unknown = JSON.parse(raw.toString());
+    if (!is_receipt(receipt, keyed.key)) {
       return { status: "invalid", key: keyed.key,
-        reason: "receipt schema/key mismatch" };
+        reason: "receipt shape or key mismatch" };
     }
     const bytes = fs.readFileSync(paths.artifact);
     if (sha_bytes(bytes) !== receipt.artifact_sha256) {
@@ -235,20 +283,29 @@ export function try_refresh(dir: string, keyed: KeyResult,
   let match: { key: string; receipt: Record<string, unknown>;
     oldPath: string; oldBytes: Buffer } | null = null;
   for (const name of names) {
-    if (name.startsWith(".") || name.length !== 64) {
+    if (!/^[0-9a-f]{64}$/.test(name)) {
       continue;
     }
-    let receipt: Record<string, unknown>;
+    let receipt: unknown;
     try {
-      receipt = JSON.parse(fs.readFileSync(
-        path.join(dir, name, "receipt.json"), "utf8"));
+      const paths = entry_paths(dir, name);
+      const raw = fs.readFileSync(paths.receipt);
+      const recorded = fs.readFileSync(paths.digest, "utf8").trim();
+      if (sha_bytes(raw) !== recorded) {
+        continue;
+      }
+      receipt = JSON.parse(raw.toString());
+      if (!is_receipt(receipt, name)) {
+        continue;
+      }
+      const artifact = fs.readFileSync(paths.artifact);
+      if (sha_bytes(artifact) !== receipt.artifact_sha256) {
+        continue;
+      }
     } catch {
       continue;
     }
-    if (receipt.schema !== RECEIPT_SCHEMA) {
-      continue;
-    }
-    const cand = receipt.manifest as Record<string, unknown>;
+    const cand = receipt.manifest;
     const same = ["k1_compiler", "k2_toolchain", "k3_closure_ordered",
       "k3_closure_files", "k3_namespaces", "k3_entry", "k4_laws_proof",
       "k6_emit_kind", "k7_lib_hub", "k8_diagnostics", "k9_host"].every(
@@ -358,8 +415,21 @@ export function emit_c_cached(book: Bend.Book,
   }
   const origin_c_of = (key: string): string | null => {
     try {
-      return fs.readFileSync(
-        path.join(dir, key, "artifact.c"), "utf8");
+      const paths = entry_paths(dir, key);
+      const raw = fs.readFileSync(paths.receipt);
+      const recorded = fs.readFileSync(paths.digest, "utf8").trim();
+      if (sha_bytes(raw) !== recorded) {
+        return null;
+      }
+      const receipt: unknown = JSON.parse(raw.toString());
+      if (!is_receipt(receipt, key)) {
+        return null;
+      }
+      const artifact = fs.readFileSync(paths.artifact);
+      if (sha_bytes(artifact) !== receipt.artifact_sha256) {
+        return null;
+      }
+      return artifact.toString("utf8");
     } catch {
       return null;
     }

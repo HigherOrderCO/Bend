@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 """Bounded TS-flow fixture for compiler/cache.ts (no Main artifacts).
 
-Runs the pinned Bun against THIS worktree's bend2/main.ts on a tiny
+Runs the pinned Bun against THIS worktree's compiler/main.ts on a tiny
 foreign-effect fixture (pure temp dirs): miss+compile+store, rebuild hit with
 byte-identity and skipped generation, Bend-mutation miss, diagnostics-env
-miss, foreign-only refresh, and refresh-vs-fresh byte-identity. Records
-wall/RSS per bun invocation via /usr/bin/time -v plus the tool's own
+miss/bypass parity, foreign-only refresh, and refresh-vs-fresh byte-identity.
+Records wall/RSS per bun invocation via /usr/bin/time -v plus the tool's own
 log.jsonl event/ms evidence (the event log is what proves compile() was or
-was not invoked). Writes results/fixture-ts-result.json.
+was not invoked). Writes tests/results/fixture-ts-result.json.
+
+EXECUTION GATE: this fixture launches the Bend compiler on synthetic
+fixtures. Per tasks/COMMON.md it must not run without Principal Conductor
+approval. The gate refuses unless BATON_COMPILER_RUN_APPROVED=1; without
+approval the committed status is NOT RUN (no result file is written and no
+pass is claimed).
 """
 
 import hashlib
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -25,8 +30,8 @@ MAIN_TS = os.path.join(WORKTREE, "bend2", "main.ts")
 BUN = ("/run/baton2-native-homelab/retained/baton2-compiler-741-20261015"
        "/postrelease-751-761-20261015-11/toolchain-home/bin/bun")
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.normpath(os.path.join(
-    HERE, "..", "results", "fixture-ts-result.json"))
+RESULTS = os.path.normpath(os.path.join(HERE, "results",
+                                        "fixture-ts-result.json"))
 
 FX_BEND = """import Base
 
@@ -99,6 +104,11 @@ def build(fx_dir, cache_dir, out_name, extra_env=None):
 
 
 def main():
+    if os.environ.get("BATON_COMPILER_RUN_APPROVED") != "1":
+        print("REFUSED: set BATON_COMPILER_RUN_APPROVED=1 only with "
+              "Principal Conductor approval (tasks/COMMON.md). "
+              "Status: NOT RUN, no pass claimed.")
+        return 2
     checks = []
 
     def check(name, condition, detail=""):
@@ -190,6 +200,88 @@ def main():
               and events[-1]["event"] == "compile", events[-1])
         check("E-refresh-byte-identical-to-fresh", sha(c4) == sha(c5),
               "%s vs %s" % (sha(c4)[:12], sha(c5)[:12]))
+
+        # A damaged cache entry must never become the source of a foreign
+        # refresh. Exercise artifact and receipt integrity independently.
+        for label in ("artifact", "receipt"):
+            with open(os.path.join(fx, "fx.bend"), "w") as handle:
+                handle.write(FX_BEND)
+            with open(os.path.join(fx, "host.c"), "w") as handle:
+                handle.write(HOST_C % 7)
+            corrupt_cache = os.path.join(tmp, "corrupt-" + label)
+            code, origin, _, _, events = build(
+                fx, corrupt_cache, label + "-origin.c")
+            key = events[-1]["key"] if events else None
+            check(label + "-origin-compiled", code == 0 and key is not None
+                  and events[-1]["event"] == "compile", events[-1])
+            if key is None:
+                continue
+            entry = os.path.join(corrupt_cache, key)
+            if label == "artifact":
+                with open(os.path.join(entry, "artifact.c"), "ab") as handle:
+                    handle.write(b"damaged")
+            else:
+                with open(os.path.join(entry, "receipt.sha256"), "w") as handle:
+                    handle.write("0" * 64 + "\n")
+            with open(os.path.join(fx, "host.c"), "w") as handle:
+                handle.write(HOST_C % 8)
+            code, repaired, _, _, events = build(
+                fx, corrupt_cache, label + "-repaired.c")
+            check(label + "-origin-rebuilds", code == 0
+                  and events[-1]["event"] == "compile", events[-1])
+            fresh_cache = os.path.join(tmp, "fresh-" + label)
+            code, fresh, _, _, _ = build(
+                fx, fresh_cache, label + "-fresh.c")
+            check(label + "-repair-equals-fresh",
+                  code == 0 and sha(repaired) == sha(fresh),
+                  "%s vs %s" % (sha(repaired)[:12], sha(fresh)[:12]))
+
+        # Well-formed JSON can still contain an unusable origin receipt.
+        # Refresh scans must skip each malformed shape and run ordinary codegen.
+        malformed_cases = {
+            "null-manifest": lambda receipt: receipt.update(manifest=None),
+            "missing-manifest-key": lambda receipt: receipt["manifest"].pop(
+                "k3_entry"),
+            "null-foreign-rows": lambda receipt: receipt["manifest"].update(
+                k5_effs=None),
+            "malformed-foreign-row": lambda receipt: receipt["manifest"].update(
+                k5_effs=[None]),
+        }
+        for label, corrupt in malformed_cases.items():
+            with open(os.path.join(fx, "fx.bend"), "w") as handle:
+                handle.write(FX_BEND)
+            with open(os.path.join(fx, "host.c"), "w") as handle:
+                handle.write(HOST_C % 7)
+            corrupt_cache = os.path.join(tmp, "malformed-" + label)
+            code, _, _, _, events = build(
+                fx, corrupt_cache, label + "-origin.c")
+            key = events[-1]["key"] if events else None
+            check(label + "-origin-compiled", code == 0 and key is not None
+                  and events[-1]["event"] == "compile", events[-1])
+            if key is None:
+                continue
+            entry = os.path.join(corrupt_cache, key)
+            receipt_path = os.path.join(entry, "receipt.json")
+            with open(receipt_path) as handle:
+                receipt = json.load(handle)
+            corrupt(receipt)
+            raw = json.dumps(receipt, indent=2).encode() + b"\n"
+            with open(receipt_path, "wb") as handle:
+                handle.write(raw)
+            with open(os.path.join(entry, "receipt.sha256"), "w") as handle:
+                handle.write(hashlib.sha256(raw).hexdigest() + "\n")
+            with open(os.path.join(fx, "host.c"), "w") as handle:
+                handle.write(HOST_C % 8)
+            code, repaired, _, _, events = build(
+                fx, corrupt_cache, label + "-repaired.c")
+            check(label + "-malformed-origin-rebuilds", code == 0
+                  and events[-1]["event"] == "compile", events[-1])
+            fresh_cache = os.path.join(tmp, "fresh-malformed-" + label)
+            code, fresh, _, _, _ = build(
+                fx, fresh_cache, label + "-fresh.c")
+            check(label + "-repair-equals-fresh",
+                  code == 0 and sha(repaired) == sha(fresh),
+                  "%s vs %s" % (sha(repaired)[:12], sha(fresh)[:12]))
 
     failed = [c for c in checks if not c["pass"]]
     result = {"tool": "compiler/cache.ts via compiler/main.ts default path",
