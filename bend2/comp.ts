@@ -81,6 +81,7 @@ type File = {
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
+  vals: Map<Name, boolean[]>;
   lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
@@ -903,7 +904,10 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words.
+// but for the words. Its type arguments are looked into on every visit,
+// its fields once. When p takes an unknown type as a hit, they are opened
+// with DUMMY for its value arguments, so the answer covers every index it
+// is met with (#1513); else with the arguments first met.
 function ty_holds(A: HTerm | null,
   p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
@@ -917,17 +921,18 @@ function ty_holds(A: HTerm | null,
     return false;
   }
   const tld = FL.book.tlds[t.k];
-  const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
-    && ty_holds(x, p, seen))) {
+  const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, () =>
+    tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K))) : [];
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen))) {
     return true;
   }
   if (tld?.$ !== "ADT" || seen.has(t.k)) {
     return false;
   }
   seen.add(t.k);
+  const xs = p(DUMMY) ? t.x.map((x, i) => vs[i] ? DUMMY : x) : t.x;
   return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen)));
+    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen)));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
@@ -1446,6 +1451,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
+    vals: new Map(),
     lay_ids: new Map(),
     memo: {
       opens: new Map(),
