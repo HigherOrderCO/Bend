@@ -178,8 +178,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
-  u32_pow: { C: "u32_pow($0, $1)" },
+  u32_pow: { C: "u32_pow($0, $1)", JS: "u32_pow($0, $1)" },
+  // Including bit zero preserves Base's log2(0) = 0.
+  u32_log2: { JS: "(31 - Math.clz32($0 | 1))" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -248,6 +249,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   nat_read: { JS: "decimal_read($0, 281474976710655)" },
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
+  string_order: { JS: "cmp_new(string_compare($0, $1), 0)" },
+  string_eq: { JS: "(string_compare($0, $1) === 0)" },
+  string_get: { JS: "string_get($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
   string_take: { JS: "string_take($0, $1)" },
   string_drop: { JS: "string_drop($0, $1)" },
@@ -258,6 +262,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_to_lower: { JS: "string_case($0, 65, 32)" },
   string_trim_start: { JS: "string_trim_start($0)" },
   string_to_list: { JS: "string_to_list($0)" },
+  string_from_list: { JS: "string_join($0, \"\")" },
   string_reverse: { JS: "string_reverse($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
@@ -550,6 +555,34 @@ function string_contains(s, p) {
     }
   }
   return false;
+}
+
+function u32_pow(a, n) {
+  let out = 1;
+  while (n > 0) {
+    if (n % 2) out = Math.imul(out, a) >>> 0;
+    n = Math.trunc(n / 2);
+    if (n > 0) a = Math.imul(a, a) >>> 0;
+  }
+  return out;
+}
+
+function string_compare(a, b) {
+  if (a === b) return 0;
+  let x = 0, y = 0;
+  while (x < a.length && y < b.length) {
+    const ac = char_code(a, x), bc = char_code(b, y);
+    if (ac !== bc) return ac < bc ? -1 : 1;
+    x += char_len(a, x); y += char_len(b, y);
+  }
+  return x < a.length ? 1 : y < b.length ? -1 : 0;
+}
+
+function string_get(s, n) {
+  let at = 0;
+  while (n > 0 && at < s.length) { at += char_len(s, at); n--; }
+  return at < s.length
+    ? {$: "Some", value: s.slice(at, at + char_len(s, at))} : {$: "None"};
 }
 
 function nat_show(n) {
