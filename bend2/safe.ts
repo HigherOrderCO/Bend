@@ -936,7 +936,7 @@ function rebuild(e: Safe, s: Scope, x: Extract<HTerm, { $: "Lam" }>, all: Extrac
   };
   const arm = (k: Name, U: HTerm, xs: HTerm[]): HTerm => {
     const G = B.term_wnf(e.book, U);
-    return G.$ !== "All" ? x.f(B.Ann(B.Ctr(k, xs), F)) : B.Lam(G.k, 0, (v: HTerm) => arm(k, G.B(v), [...xs, v]));
+    return G.$ !== "All" ? (subst(x, s.d) as typeof x).f(B.Ann(B.Ctr(k, xs), F)) : B.Lam(G.k, 0, (v: HTerm) => arm(k, G.B(v), [...xs, v]));
   };
   const cs = (e.book.tlds[F.k] as ADT).c.filter((c) => !F.r.includes(c.k)).map((c): [Name, HTerm] => [c.k, B.tele_fill(e.book, c.T, F.x, B.ctx_nil())]);
   return cs.every(([, U]) => data(U)) ? B.Ann(cs.reduceRight<HTerm>((m, [k, U]) => B.Mat(k, arm(k, U, []), m), B.Efq()), all) : null;
