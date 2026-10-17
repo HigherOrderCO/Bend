@@ -303,7 +303,7 @@ async function cli_file(args: string[]): Promise<void> {
       return await cli_checkup(file);
     }
     const seen = new Map<string, string | null>();
-    const book = await book_read(file, undefined, seen);
+    const book = await book_read(file, undefined, seen, only && !verdict);
     if (only || verdict) {
       process.exitCode = cli_verdict(book, verdict);
       return;
@@ -864,8 +864,8 @@ function book_promises(book: Bend.Book): Array<[string, string[]]> {
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
         term_refs(Bend.term_lower(c.T), rs);
       }
-      if (t.$ === "Def" && t.e !== undefined) {
-        term_refs(t.e, rs);
+      if (t.$ === "Def" && (t.e !== undefined || t.v !== null)) {
+        term_refs(t.e ?? Bend.term_lower(t.v!), rs);
       }
       for (const r of rs) {
         (uses[r] ??= []).push(k);
@@ -920,8 +920,35 @@ function cli_fail(msg: string): never {
 // Book
 // ====
 
+// BEND_CACHE=<dir>: an order prefix an earlier run checked, from the same
+// files loaded in the same order under the same checker and Base, is taken
+// as validated (book_valid's done). Imports load before their root, and
+// cannot name its defs, so their entries check the same whatever follows.
+// The key holds the prefix's names, so a hit is that exact prefix
+async function book_cache(book: Bend.Book, seen: Map<string, string | null>, file: string):
+  Promise<{ done: number; save: () => void } | null> {
+  const dir = process.env.BEND_CACHE;
+  if (!dir) {
+    return null;
+  }
+  const ks = book.order.slice();
+  const root = ks.findIndex((k) => !k.includes(":") && book.tlds[k]?.b !== true);
+  const pre = root < 0 ? ks.length : root;
+  const me = fs.realpathSync(file);
+  const fls = [...seen.keys()];
+  const key = (fs_: string[], n: number) => path.join(dir, crypto.createHash("sha256").update([VERSION,
+    ...[path.join(Bend.BEND_DIR, "bend.ts"), BASE, ...fs_].map((f) => f + "\0" + fs.readFileSync(f, "utf8")),
+    ...ks.slice(0, n)].join("\0")).digest("hex"));
+  const at = key(fls.filter((f) => f !== me), pre);
+  return { done: fs.existsSync(at) ? pre : 0, save: () => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(at, "");
+    fs.writeFileSync(key(fls, ks.length), "");
+  } };
+}
+
 async function book_read(file: string, base?: Bend.Book,
-  seen = new Map<string, string | null>()): Promise<Bend.Book> {
+  seen = new Map<string, string | null>(), only = false): Promise<Bend.Book> {
   const book = base === undefined ? Bend.book_nil() : book_seed(base);
   if (base !== undefined) {
     seen.set(BASE, "");
@@ -933,11 +960,13 @@ async function book_read(file: string, base?: Bend.Book,
       && !seen.has(fs.realpathSync(laws))) {
       throw "Error: PROOF.bend must import ./LAWS.bend";
     }
-    Bend.book_valid(book, base?.order.length ?? 0);
+    const cache = only ? await book_cache(book, seen, file) : null;
+    Bend.book_valid(book, Math.max(base?.order.length ?? 0, cache?.done ?? 0));
     if (book.hols > 0) {
       throw "Error: " + String(book.hols) + " TODO" + (book.hols === 1 ? "" : "s")
         + " found.\nThe code is incomplete, and not a valid proof yet.";
     }
+    cache?.save();
   } catch (e) {
     throw new Check_Fail(e);
   }
