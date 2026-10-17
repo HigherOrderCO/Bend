@@ -3053,6 +3053,9 @@ export function compile_book(book: Bend.Book): string {
       } else {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
+      // what its body owned, its callers (emitted after it) see
+      FL.brws.delete(k);
+      brw_of(k);
     }
     graph_close(FL.lent, FL.lends.map(([at, r]) => [r, at]));
     FL.brws.forEach((bs, k) => bs.forEach((b, i) => {
