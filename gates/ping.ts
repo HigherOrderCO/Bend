@@ -337,6 +337,12 @@ try {
     && page.err.includes("page.ts:1:") && !page.err.includes("Bun v"));
   const bad_file = path.join(TMP, "bad.bend");
   const sum_file = path.join(TMP, "sum.bend");
+  const sum_alias = path.join(TMP, "sum-alias.js");
+  fs.linkSync(sum_file, sum_alias);
+  const linked_out = await bend([sum_file, "-o", sum_alias]);
+  const linked_run = await bend([sum_file]);
+  check("an output hard link cannot destroy its input",
+    linked_out.code === 1 && linked_run.code === 0 && linked_run.out === "5n\n");
   const unsafe_file = path.join(TMP, "unsafe.bend");
   const checkup = path.join(TMP, "checkup.bend");
   const good_checkup = path.join(TMP, "good_checkup.bend");
