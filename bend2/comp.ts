@@ -245,6 +245,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
+  string_repeat: { JS: "string_repeat($0, $1)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -536,6 +537,10 @@ function string_contains(s, p) {
     }
   }
   return false;
+}
+
+function string_repeat(s, n) {
+  return s.length === 0 ? s : s.repeat(n);
 }
 
 function str_out(s) {

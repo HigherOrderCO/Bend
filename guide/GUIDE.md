@@ -496,9 +496,9 @@ is_le is_gt is_ge` (returning `Bool`) for comparisons, `show` to `String` and
 are just sugar for these. Beyond numbers there are `Bool`, `Cmp`, `Maybe`,
 `Result`, `List`, `Array`, a string-keyed `Map` (`new set get has del keys`;
 `get` takes a default, and `get` and `has` hand the map back beside their
-result), `Set` on top of it, the `Equal` lemmas, and the effects. `bend base`
-prints all of it, `bend base --types` only the types, and `bend base Map` one
-name and everything under it.
+result), `Set` on it, `Equal` lemmas, and effects. `bend base` lists the library;
+`bend base --types` lists types; `bend base Map` prints that name and its
+children. JS `String.repeat` uses host repetition.
 
 ### Modules
 
