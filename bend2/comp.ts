@@ -54,6 +54,7 @@ type Name = Bend.Name;
 type File = {
   book: Bend.Book;
   js: boolean;
+  to_lists: Set<Name> | null;
   bangs: Set<Name>;
   sites: Map<Name, number>;
   hot: Set<Name>;
@@ -245,6 +246,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
+  array_to_list: { JS: "array_to_list($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -842,8 +844,15 @@ function dom_live([q]: Dom): boolean {
 
 function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
-  const it = tld?.$ === "Def" && tld.i === undefined && tld.b
-    ? OPERATIONS[op_name(k)] : undefined;
+  if (tld?.$ !== "Def" || tld.i !== undefined) {
+    return undefined;
+  }
+  // Specializations of a Base template do not carry its Base flag.
+  const list = FL.to_lists !== null && FL.to_lists.has(k);
+  if (!tld.b && !list) {
+    return undefined;
+  }
+  const it = OPERATIONS[list ? "array_to_list" : op_name(k)];
   return it && (js || it.C !== undefined) && (!FL.js || it.JS)
     ? it : undefined;
 }
@@ -1416,9 +1425,13 @@ export function io_run(book: Bend.Book, args: string[]): number {
 
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
+  const lists = js && book.tlds["Array.to_list"]?.b === true
+    ? book.tmps["Array.to_list"] : undefined;
   return {
     book,
     js,
+    to_lists: lists === undefined || lists.size === 0
+      ? null : new Set(lists.values()),
     bangs: new Set(),
     sites: new Map(),
     hot: new Set(),
@@ -6055,6 +6068,14 @@ function array_new(d, v) {
     throw "bend: ${ERRS[8]}";
   }
   return Array(2 ** d).fill(v);
+}
+
+function array_to_list(a) {
+  let xs = {$: "Nil"};
+  for (let i = a.length - 1; i >= 0; i -= 1) {
+    xs = {$: "Con", head: a[i], tail: xs};
+  }
+  return xs;
 }
 
 function array_node(a, b) {
