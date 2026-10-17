@@ -3,11 +3,6 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
-## Unreleased
-
-- JS `String.contains` uses native substring search when the haystack has
-  no packed-Char marker, retaining Char-boundary checks otherwise (#1637).
-
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by
