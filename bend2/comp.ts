@@ -1521,6 +1521,7 @@ function file_new(book: Bend.Book, js: boolean) {
     unit: null as Unit | null,
     tabs: new Map<string, number>(),
     lits: new Map<string, number>(),
+    consts: new Map<Lay, Map<HTerm, Val>>(),
     img: [] as string[],
     tails: new Map<Name, Set<Name>>(),
     entries: new Set<Name>(),
@@ -2568,6 +2569,12 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   }
   fact_when("ctr", x.k, () => facts_ctr(sc, ctr, adt.x));
   const pos = at ?? lay_of(adt);
+  // a static value is emitted once per layout, so a constant shared as a DAG
+  // (record_deep_boxed's one7, 8^7 nodes as a tree) costs its DAG
+  const seen = memo(FL.consts, pos, () => new Map<HTerm, Val>());
+  if (seen.has(x)) {
+    return seen.get(x)!;
+  }
   const lay = pos === BOX ? lay_node(x.k) : pos;
   const arms = Object.keys(lay.arms!);
   const vs = emit_each(sc, flds, lay.arms![x.k], ctr_doms(ctr, adt.x));
@@ -2577,9 +2584,12 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
     [...tag.map(() => null), ...fs.flatMap((f) => f.rs)],
     vs.every((f) => f.stat));
-  return lay === pos ? v
-    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, [],
-      v.stat);
+  const out = lay === pos ? v
+    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, [], v.stat);
+  if (out.stat) {
+    seen.set(x, out);
+  }
+  return out;
 }
 
 function emit_fold(sc: Scope, t: HTerm): HTerm | null {
