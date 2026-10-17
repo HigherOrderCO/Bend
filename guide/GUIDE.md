@@ -488,17 +488,18 @@ def main() -> String:
   U32.show(a) ++ " = " ++ Nat.show(b)
 ```
 
-Every def is named `Type.verb`, and the same verbs recur across `Nat`, `U32`
-and `F32`: `add sub mul div mod` for arithmetic, `and or xor not shl shr` for
-bits (`U32` only), `cmp` (returning `Cmp`, not on `F32`) and `is_eq is_ne is_lt
-is_le is_gt is_ge` (returning `Bool`) for comparisons, `show` to `String` and
-`read` back from it (answering a `Maybe`). Operators and `<`-style comparisons
-are just sugar for these. Beyond numbers there are `Bool`, `Cmp`, `Maybe`,
-`Result`, `List`, `Array`, a string-keyed `Map` (`new set get has del keys`;
-`get` takes a default, and `get` and `has` hand the map back beside their
-result), `Set` on top of it, the `Equal` lemmas, and the effects. `bend base`
-prints all of it, `bend base --types` only the types, and `bend base Map` one
-name and everything under it.
+`Nat`, `U32`, and `F32` share `Type.verb` arithmetic (`add sub mul div mod`),
+comparisons (`is_eq is_ne is_lt is_le is_gt is_ge`, to `Bool`), `show`
+(to `String`), and `read` (to `Maybe`). `U32` alone has bit operations
+(`and or xor not shl shr`); `Nat` and `U32` have `cmp` (to `Cmp`).
+Operators and `<`-style comparisons are sugar for these.
+Base also has `Bool`, `Cmp`, `Maybe`, `Result`, `List`, `Array`, string-keyed
+`Map` (`new set get has del keys`), `Set` on it, `Equal` lemmas, and effects.
+`Map.get` takes a default; `get` and `has` return the map beside the result.
+`bend base` prints the library; `bend base --types` prints its types, and
+`bend base Map` prints that name and its children.
+
+JS `String.trim_end` scans only trailing `Char.is_space` codes.
 
 ### Modules
 

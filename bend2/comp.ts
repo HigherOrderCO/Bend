@@ -245,6 +245,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
+  string_trim_end: { JS: "string_trim_end($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -536,6 +537,21 @@ function string_contains(s, p) {
     }
   }
   return false;
+}
+
+function string_trim_end(s) {
+  let n = s.length;
+  while (n > 0) {
+    const c = s.charCodeAt(n - 1);
+    if (c !== 32 && (c < 9 || c > 13)) break;
+    // A packed payload can end in space; a scalar's low surrogate is not a marker.
+    if (s.charCodeAt(n - 4) === 0xDC00) {
+      const prev = s.charCodeAt(n - 5);
+      if (!(prev >= 0xD800 && prev <= 0xDBFF)) break;
+    }
+    n -= 1;
+  }
+  return s.slice(0, n);
 }
 
 function str_out(s) {
