@@ -6,6 +6,42 @@ import * as fs from "node:fs";
 
 import * as Bend from "./bend.ts";
 
+const DIAGNOSTICS = process.env.BEND_COMPILER_DIAGNOSTICS === "1";
+const diagnostic_started = performance.now();
+function diagnostic(event: string, details: Record<string, unknown> = {}): void {
+  if (!DIAGNOSTICS) return;
+  fs.writeSync(2, JSON.stringify({
+    compiler_diagnostic: event,
+    at: new Date().toISOString(),
+    elapsed_ms: performance.now() - diagnostic_started,
+    memory: process.memoryUsage(),
+    caches: { probes: PROBES.length, teles: TELES.size, opens: OPENS.size,
+      uses: USES.size, folds: FOLDS.size, spines: SPINES.size, consts: CONSTS.size },
+    ...details,
+  }) + "\n");
+}
+function diagnostic_join(site: string, values: (string | number)[],
+  separator: string): string {
+  if (!DIAGNOSTICS) return values.join(separator);
+  let code_units = separator.length * Math.max(0, values.length - 1);
+  let largest_part = 0;
+  for (const value of values) {
+    const length = typeof value === "string" ? value.length : String(value).length;
+    code_units += length;
+    largest_part = Math.max(largest_part, length);
+  }
+  diagnostic("join.begin", { site, parts: values.length, code_units, largest_part });
+  const result = values.join(separator);
+  diagnostic("join.end", { site, code_units: result.length });
+  return result;
+}
+
+// By default, compile_book converges own/hot/stat with facts-only passes
+// before emitting C. These passes run the same definition and fact logic as
+// emission while file_push counts generated lines without retaining them.
+// Set BEND_FACTS_ONLY_FIRST=0 to compare the original full-emission loop.
+const FACTS_ONLY_FIRST = process.env.BEND_FACTS_ONLY_FIRST !== "0";
+
 // Comp
 // ====
 
@@ -90,6 +126,9 @@ type File = Carb & {
   consts: Map<string, Map<HTerm, Val>>;
   reqs: string;
   fuel: number;
+  dry: boolean;
+  dry_lines: number;
+  dry_units: number;
 };
 
 type Gen = string | ((xs: string[]) => string);
@@ -607,7 +646,9 @@ const CYCLES: Map<Bend.Name, boolean> = new Map();
 
 const CONSTS: Map<HTerm, boolean> = new Map();
 
-const LITS = new Map<HTerm, HTerm>();
+const LITS = new WeakMap<HTerm, HTerm>();
+
+const CONSTANTS = new WeakSet<HTerm>();
 
 // Name
 // ====
@@ -674,8 +715,18 @@ function memo<K, V>(m: Map<K, V>, k: K, f: () => V): V {
   return out;
 }
 
+function weak_memo<K extends object, V>(m: WeakMap<K, V>, k: K, f: () => V): V {
+  const got = m.get(k);
+  if (got !== undefined) {
+    return got;
+  }
+  const out = f();
+  m.set(k, out);
+  return out;
+}
+
 function memo_gc(): void {
-  [OPENS, USES, FOLDS, SPINES, CONSTS, LITS].forEach((m) => m.clear());
+  [OPENS, USES, FOLDS, SPINES, CONSTS].forEach((m) => m.clear());
 }
 
 // Probe
@@ -696,7 +747,7 @@ function probe_of(t: HTerm): Probe {
 
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
-  return s.$ !== "Lit" ? s : memo(LITS, s, () => Bend.term_higher(
+  return s.$ !== "Lit" ? s : weak_memo(LITS, s, () => Bend.term_higher(
     typeof s.v === "number" && s.v > Bend.NAT_LITERAL_MAX
       ? Bend.App(Bend.Ref("U32.to_nat"), Bend.u32_to_term(s.v))
       : Bend.lit_full(s)));
@@ -822,7 +873,13 @@ function term_nodes(cf: Carb, t: HTerm): number {
 
 function term_const(t: HTerm): boolean {
   const s = term_strip(t);
-  return s.$ === "Ctr" && memo(CONSTS, s, () => s.x.every(term_const));
+  return s.$ === "Ctr" && (CONSTANTS.has(s) || memo(CONSTS, s, () => {
+    const value = s.x.every(term_const);
+    if (value) {
+      CONSTANTS.add(s);
+    }
+    return value;
+  }));
 }
 
 function term_use(u: UMap, p: Probe): number {
@@ -1546,10 +1603,18 @@ function file_new(cb: Carb, decl: string): File {
     cids: new Map(), tabs: new Map(), spins: [], spun: new Map(), clos: new Set(),
     img: [], lits: new Map(), consts: new Map(), reqs: "", fuel: 0,
     fresh: new Map(), spares: [],
-    uses: new Map(), brwl: new Map(), rest: [], def: "" };
+    uses: new Map(), brwl: new Map(), rest: [], def: "",
+    dry: false, dry_lines: 0, dry_units: 0 };
 }
 
 function file_push(fl: File, line: string): void {
+  // Facts-only passes use the same compiler decisions while counting output
+  // lines without retaining their strings.
+  if (fl.dry) {
+    fl.dry_lines += 1;
+    fl.dry_units += line.length + fl.tab * 2;
+    return;
+  }
   fl.seg.lines.push("  ".repeat(fl.tab) + line);
 }
 
@@ -2201,14 +2266,18 @@ function emit_native(fl: File, ck: Call, ers: HTerm[]): string {
   seg.fid = name;
   const dst = val_new(seg.ret.ks.map(() => name_local(fl, "v")), seg.ret);
   emit_body(fl, tld.h as HTerm, tld.T, ers, vals, dst);
-  fl.spins.push([name, [`${seg.lines.length < SPIN_FAR ? "INLINE" : "FAR"} Term ${name}(Env e, THR Term* o${
-    seg.ks.map((k, i) => `, ${lay_c(k)} r${i}`).join("")}) {`,
-  "  u32 wpoll = 0;",
-  ...dst.ws.map((v, j) => `  ${lay_c(seg.ret.ks[j])} ${v} = 0;`),
-  ...seg_take(seg).map((l) => "  " + l),
-  "  WL_SPIN", ...seg.lines, "  break;", "  }",
-  ...dst.ws.map((v, j) => `  o[${j}] = ${v};`),
-  "  return 1;", "}"].join("\n"), seg.refs]);
+  // A dry pass keeps the spin memo, reference, and emitted-body facts, but
+  // discards the joined spin source (the INLINE/FAR read is output-only).
+  if (!fl.dry) {
+    fl.spins.push([name, [`${seg.lines.length < SPIN_FAR ? "INLINE" : "FAR"} Term ${name}(Env e, THR Term* o${
+      seg.ks.map((k, i) => `, ${lay_c(k)} r${i}`).join("")}) {`,
+    "  u32 wpoll = 0;",
+    ...dst.ws.map((v, j) => `  ${lay_c(seg.ret.ks[j])} ${v} = 0;`),
+    ...seg_take(seg).map((l) => "  " + l),
+    "  WL_SPIN", ...seg.lines, "  break;", "  }",
+    ...dst.ws.map((v, j) => `  o[${j}] = ${v};`),
+    "  return 1;", "}"].join("\n"), seg.refs]);
+  }
   Object.assign(fl, outer);
   return name;
 }
@@ -2843,17 +2912,24 @@ function emit_chain(fl: File, cond: (i: number) => string,
 // =======
 
 function compile_def(fl: File, k: Bend.Name, tld: Def): void {
+  const diagnostic_before = performance.now();
+  diagnostic("definition.begin", { name: k, segments: fl.segs.length });
   Object.assign(fl, { fresh: new Map(), brwl: new Map(), rest: [] });
   memo_gc();
   const vals = emit_open(fl, k);
   fl.segs.push(fl.seg);
   emit_body(fl, tld.h as HTerm, tld.T, [], vals, null);
+  diagnostic("definition.end", { name: k, duration_ms: performance.now() - diagnostic_before,
+    segments: fl.segs.length, spins: fl.spins.length, tables: fl.tabs.size,
+    image_words: fl.img.length, file_maps: { fresh: fl.fresh.size, uses: fl.uses.size,
+      brwl: fl.brwl.size, cids: fl.cids.size, tabs: fl.tabs.size, spun: fl.spun.size,
+      clos: fl.clos.size, lits: fl.lits.size, consts: fl.consts.size } });
 }
 
-function compile_reqs(fl: File): void {
+function compile_reqs(fl: File, defs: [Bend.Name, Def][]): void {
   const seen = new Set<string>();
   fl.spares = [];
-  for (const [k, tld] of done_defs(fl, def_foreign)) {
+  for (const [k, tld] of defs) {
     const ns = k.slice(0, k.length - LOCAL.get(k)!.length);
     const own = ns === "" ? []
       : Object.keys(fl.book.ctrs).filter((c) => c.startsWith(ns));
@@ -2964,22 +3040,38 @@ function compile_tables(fl: File, entries: Seg[]): string[] {
 }
 
 function compile_segs(fl: File): string {
-  return fl.segs.map((seg) => {
+  diagnostic("segments.begin", { segments: fl.segs.length });
+  return diagnostic_join("segments.all", fl.segs.map((seg) => {
     const out = [`  WL_CASE(${seg.fid})`, "  {",
       ...seg_take(seg).map((l) => "    " + l),
       "    WL_OPEN", ...seg.spin ? ["    WL_SPIN"] : [],
       ...seg.lines, ...seg.spin ? ["    WL_SPUN"] : [], "  }}"];
-    return (seg.host ? ["#if !DEVICE", ...out, "#endif"] : out).join("\n");
-  }).join("\n\n");
+    return diagnostic_join("segments." + seg.fid,
+      seg.host ? ["#if !DEVICE", ...out, "#endif"] : out, "\n");
+  }), "\n\n");
 }
 
 export function compile_book(book: Bend.Book): string {
+  diagnostic("book.begin", { definitions: Object.keys(book.tlds).length });
+  diagnostic("carb.begin");
   const cb = carb_book(book, ["main", ...RUNTIME_ADTS]);
+  diagnostic("carb.end", { sources: SRCS.size });
   const show = show_main(book);
+  diagnostic("show.end");
+  // SRCS and TLD liveness are fixed after carb_book; reuse both ordered lists
+  // through the emission fixed point instead of rebuilding them each pass.
+  const stable_defs = done_defs(cb);
+  const emission_defs = [...stable_defs].reverse();
+  const foreign_defs = done_defs(cb, def_foreign);
   const facts = () => cb.own.size + cb.hot.size + cb.stat.size;
-  const pass = (defs: [Bend.Name, Def][]): File => {
+  let diagnostic_pass = 0;
+  const pass = (defs: [Bend.Name, Def][], dry = false): File => {
+    const pass_number = ++diagnostic_pass;
+    diagnostic("pass.begin", { pass: pass_number, definitions: defs.length,
+      own: cb.own.size, hot: cb.hot.size, stat: cb.stat.size, dry });
     [cb.lend, BRWS].forEach((m) => m.clear());
     const fl = file_new(cb, "Term");
+    fl.dry = dry;
     for (const k of SRCS.keys()) {
       for (const c of (cb.book.tlds[k] as Bend.ADT).c ?? []) {
         fl.cids.set(c.k, lay_node(fl.book, c.k).ks.length);
@@ -2988,25 +3080,83 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of defs) {
       compile_def(fl, k, tld);
     }
-    compile_reqs(fl);
     facts_lend(cb);
+    let constant_entries = 0;
+    for (const values of fl.consts.values()) constant_entries += values.size;
+    let lines = 0, line_code_units = 0, spin_code_units = 0;
+    for (const seg of fl.segs) {
+      lines += seg.lines.length;
+      for (const line of seg.lines) line_code_units += line.length;
+    }
+    for (const spin of fl.spins) spin_code_units += spin[1].length;
+    // A dry pass retains no lines: report the counted (not retained) units.
+    if (dry) {
+      lines = fl.dry_lines;
+      line_code_units = fl.dry_units;
+    }
+    diagnostic("pass.end", { pass: pass_number, segments: fl.segs.length,
+      spins: fl.spins.length, tables: fl.tabs.size, image_words: fl.img.length,
+      constant_entries, lines, line_code_units, spin_code_units,
+      own: cb.own.size, hot: cb.hot.size, stat: cb.stat.size, dry });
     return fl;
   };
   // Emitted callees first until a pass changes nothing (own, hot and stat
   // only grow): that pass is kept.
   let fl: File;
   let was: number;
+  if (FACTS_ONLY_FIRST) {
+    // These passes compute the same monotone facts as emission while
+    // file_push avoids retaining generated C lines. The regular loop then
+    // emits and retains the stable pass from the converged fact sets.
+    do {
+      was = facts();
+      pass(done_defs(cb).reverse(), true);
+    } while (was !== facts());
+  }
   do {
     was = facts();
-    fl = pass(done_defs(cb).reverse());
+    fl = pass(emission_defs, false);
   } while (was !== facts());
+  // Foreign source text and request stubs do not contribute to own/hot/stat/lend facts.
+  // Emit them once after the fixed point reaches its stable pass.
+  diagnostic("requests.begin", { pass: diagnostic_pass, segments: fl.segs.length });
+  compile_reqs(fl, foreign_defs);
+  diagnostic("requests.end", { pass: diagnostic_pass, code_units: fl.reqs.length });
+  // Index each id once; segments keep the precedence of the earlier find.
+  const refs_by_fid = new Map<string, Set<string>>();
+  for (const seg of fl.segs) {
+    if (!refs_by_fid.has(seg.fid)) refs_by_fid.set(seg.fid, seg.refs);
+  }
+  for (const spin of fl.spins) {
+    if (!refs_by_fid.has(spin[0])) refs_by_fid.set(spin[0], spin[2]);
+  }
   const reach = (from: string[], set = new Set<string>()): Set<string> => {
-    const grab = (fid: string) => set.has(fid) || (set.add(fid)
-      && (fl.segs.find((s) => s.fid === fid)?.refs
-        ?? fl.spins.find((s) => s[0] === fid)?.[2])?.forEach(grab));
-    from.forEach(grab);
+    // An explicit iterator stack preserves the recursive DFS visitation order
+    // while avoiding repeated linear searches and JavaScript call-stack growth.
+    const stack: [string, Iterator<string> | null][] =
+      from.slice().reverse().map((fid) => [fid, null]);
+    while (stack.length > 0) {
+      const top = stack[stack.length - 1];
+      if (top[1] === null) {
+        if (set.has(top[0])) {
+          stack.pop();
+          continue;
+        }
+        set.add(top[0]);
+        const refs = refs_by_fid.get(top[0]);
+        if (refs === undefined) {
+          stack.pop();
+          continue;
+        }
+        top[1] = refs[Symbol.iterator]();
+      }
+      const next = top[1]!.next();
+      if (next.done) stack.pop();
+      else stack.push([next.value, null]);
+    }
     return set;
   };
+  diagnostic("reach.begin", { segments: fl.segs.length, spins: fl.spins.length });
   const live = reach([seg_fid("main")]);
   // The device holds what the bangs reach and, when a bang's parameter
   // may hold a closure (a jump through its fid), every closure.
@@ -3018,6 +3168,7 @@ export function compile_book(book: Bend.Book): string {
     s.host = !dev.has(s.fid);
   }
   fl.spins = fl.spins.filter(([n]) => live.has(n));
+  diagnostic("reach.end", { segments: fl.segs.length, spins: fl.spins.length });
   const entries = [...fl.segs, seg_new("io_emit", BOX, [""]),
     seg_new("clo_apply", BOX, ["", ""])];
   const desc = show === null ? [] : ["#if !DEVICE",
@@ -3025,25 +3176,35 @@ export function compile_book(book: Bend.Book): string {
       typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
     `static const char* SHOW_NAMES[] = { ${show.names.map((n) =>
       JSON.stringify(n)).join(", ")} };`, "#endif"];
+  diagnostic("tables.begin", { entries: entries.length });
   const defs = compile_tables(fl, entries);
+  diagnostic("tables.end", { definitions: defs.length });
   defs.push(`#define MAIN_FID ${seg_fid("main")}`, `#define MAIN_PURE ${
     Number(show !== null)}`,
     `#define BLK_SHR ${Number(cb.hot.has("t:Array"))}`);
   const fills: [string, string[]][] = [
-    ["Tables", [defs.join("\n"), ...[...fl.tabs].map(([r, i]) =>
+    ["Tables", [diagnostic_join("fills.tables", defs, "\n"), ...[...fl.tabs].map(([r, i]) =>
       `CONSTV u64 TAB_${i}[] = { ${r} };`)]],
-    ["Spins", [`CONSTV u64 STAT_IMG[] = { ${fl.img.join(", ") || 0} };`,
+    ["Spins", [`CONSTV u64 STAT_IMG[] = { ${diagnostic_join("fills.image", fl.img, ", ") || 0} };`,
       ...fl.spins.map((s) => s[1])]],
     ["Segments", [compile_segs(fl)]],
     ["Requests", [fl.reqs]],
   ];
-  if (fills.some(([, parts]) => /\bundefined\b/.test(parts.join("\n")))) {
+  if (fills.some(([mark, parts]) => /\bundefined\b/.test(
+    diagnostic_join("validate." + mark, parts, "\n")))) {
     die("an unbound name in the emitted C");
   }
   fills[0][1].push(...desc);
-  return fills.reduce((src, [mark, parts]) => src.replace(
-    new RegExp("^// " + mark + "\\n// " + "=".repeat(mark.length) + "$", "m"),
-    (m) => [m, ...parts].join("\n\n")), TEMPLATE);
+  const result = fills.reduce((src, [mark, parts]) => {
+    diagnostic("template.begin", { mark, source_code_units: src.length });
+    const next = src.replace(
+      new RegExp("^// " + mark + "\\n// " + "=".repeat(mark.length) + "$", "m"),
+      (m) => diagnostic_join("template." + mark, [m, ...parts], "\n\n"));
+    diagnostic("template.end", { mark, code_units: next.length });
+    return next;
+  }, TEMPLATE);
+  diagnostic("book.end", { code_units: result.length });
+  return result;
 }
 
 // Js

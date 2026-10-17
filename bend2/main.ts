@@ -512,6 +512,7 @@ function cli_report(book: Bend.Book, n0: number, fd: number): void {
   }));
   const uses: Record<string, string[]> = Object.create(null);
   const seen = new Set<string>();
+  const queued = new Set<string>(bad.size === 0 ? [] : own);
   for (const q = bad.size === 0 ? [] : own.slice(); q.length > 0;) {
     const k = q.pop() as string;
     const t = book.tlds[k];
@@ -519,12 +520,15 @@ function cli_report(book: Bend.Book, n0: number, fd: number): void {
       seen.add(k);
       const rs = new Set<string>();
       for (const c of t.$ === "ADT" ? t.c : [t]) {
-        term_refs(Bend.term_lower(c.T), rs);
+        term_refs_higher(c.T, rs);
       }
       term_refs(t.$ === "Def" ? t.e : undefined, rs);
       for (const r of rs) {
         (uses[r] ??= []).push(k);
-        q.push(r);
+        if (!seen.has(r) && !queued.has(r)) {
+          queued.add(r);
+          q.push(r);
+        }
       }
     }
   }
@@ -541,6 +545,102 @@ function cli_report(book: Bend.Book, n0: number, fd: number): void {
   }
 }
 
+// term_refs_higher walks HTerm directly and opens its binder closures with
+// the same fresh variables used by term_lower. It collects names without
+// constructing a lowered copy of the full type tree.
+function term_refs_higher(tm: Bend.HTerm, out: Set<string>, depth = 0): void {
+  const t = Bend.term_force(tm);
+  switch (t.$) {
+    case "Var": {
+      const v = t.v;
+      if (v !== undefined && v.$ !== "PVar" && v.$ !== "PCtr") {
+        term_refs_higher(v as Bend.HTerm, out, depth);
+      }
+      return;
+    }
+    case "Ref": {
+      out.add(t.k);
+      return;
+    }
+    case "Sub": {
+      const v = t.v;
+      if (v.$ !== "PVar" && v.$ !== "PCtr") {
+        term_refs_higher(v as Bend.HTerm, out, depth);
+      }
+      term_refs_higher(t.f, out, depth);
+      return;
+    }
+    case "Let": {
+      for (const v of t.v) term_refs_higher(v, out, depth);
+      const xs = t.k.map((k, j) => Bend.Var<Bend.HBody>(k, depth + j));
+      term_refs_higher(t.f(xs), out, depth + t.k.length);
+      return;
+    }
+    case "Typ": {
+      term_refs_higher(t.g, out, depth);
+      return;
+    }
+    case "Qnt":
+    case "Qua":
+    case "Lit":
+    case "Efq":
+    case "Rfl":
+    case "Hol": {
+      return;
+    }
+    case "Min": {
+      term_refs_higher(t.a, out, depth);
+      term_refs_higher(t.b, out, depth);
+      return;
+    }
+    case "All": {
+      term_refs_higher(t.A, out, depth);
+      term_refs_higher(t.B(Bend.Var<Bend.HBody>(t.k, depth)), out, depth + 1);
+      return;
+    }
+    case "Lam": {
+      term_refs_higher(t.f(Bend.Var<Bend.HBody>(t.k, depth)), out, depth + 1);
+      return;
+    }
+    case "App": {
+      term_refs_higher(t.f, out, depth);
+      term_refs_higher(t.x, out, depth);
+      return;
+    }
+    case "ADT": {
+      out.add(t.k);
+      for (const x of t.x) term_refs_higher(x, out, depth);
+      return;
+    }
+    case "Ctr": {
+      for (const x of t.x) term_refs_higher(x, out, depth);
+      return;
+    }
+    case "Mat": {
+      term_refs_higher(t.h, out, depth);
+      term_refs_higher(t.m, out, depth);
+      return;
+    }
+    case "Eql": {
+      term_refs_higher(t.a, out, depth);
+      term_refs_higher(t.b, out, depth);
+      term_refs_higher(t.T, out, depth);
+      return;
+    }
+    case "Rwt": {
+      term_refs_higher(t.e, out, depth);
+      term_refs_higher(t.p, out, depth);
+      term_refs_higher(t.f, out, depth);
+      return;
+    }
+    case "Ann": {
+      term_refs_higher(t.x, out, depth);
+      term_refs_higher(t.T, out, depth);
+      return;
+    }
+  }
+}
+
 // term_refs adds to out the names a term (a span skipped) refers to.
 function term_refs(tm: unknown, out: Set<string>): void {
   if (typeof tm === "object" && tm !== null) {
@@ -548,9 +648,10 @@ function term_refs(tm: unknown, out: Set<string>): void {
     if (($ === "Ref" || $ === "ADT") && k !== undefined) {
       out.add(k);
     }
-    for (const [f, v] of Object.entries(tm)) {
-      if (f !== "s") {
-        term_refs(v, out);
+    const o = tm as Record<string, unknown>;
+    for (const f in o) {
+      if (f !== "s" && Object.prototype.hasOwnProperty.call(o, f)) {
+        term_refs(o[f], out);
       }
     }
   }
