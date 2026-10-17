@@ -10,6 +10,14 @@ function f32_host_export() {
 
 def add(a: F32, b: F32) -> F32:
   F32.add(a, b)
+
+def bits(x: F32) -> U32:
+  F32.bits(x)
+
+def word(n: U32) -> F32:
+  match n:
+    case U32{w}:
+      F32{w}
 `);
     const built = child.spawnSync(process.execPath,
       [path.resolve("bend2/main.ts"), input, "-o", output], {
@@ -26,6 +34,17 @@ def add(a: F32, b: F32) -> F32:
     for (const [a, b] of pairs) {
       if (!Object.is(lib.add(a, b), Math.fround(Math.fround(a) + Math.fround(b)))) {
         return 2;
+      }
+    }
+    const words = [[0, 0], [2147483648, -0], [1, 2 ** -149],
+      [1065353216, 1], [3223322624, -2.5],
+      [2139095039, Math.fround(3.4028234663852886e38)],
+      [2139095040, Infinity], [4286578688, -Infinity]];
+    for (const [bits, expected] of words) {
+      const value = lib.word(bits);
+      lib.bits(0.75);
+      if (!Object.is(value, expected) || lib.bits(value) !== bits) {
+        return 4;
       }
     }
     return lib.add(16777217)(1) === 16777216 ? 0 : 3;

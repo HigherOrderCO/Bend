@@ -501,12 +501,17 @@ function f32_show(x) {
   return (Object.is(x, -0) ? "-0" : s).replace("Infinity", "inf");
 }
 
+// Bit casts are synchronous; no caller can observe the scratch buffer.
+const f32_view = new DataView(new ArrayBuffer(4));
+
 function f32_bits(x) {
-  return new Uint32Array(new Float32Array([x]).buffer)[0];
+  f32_view.setFloat32(0, x, true);
+  return f32_view.getUint32(0, true);
 }
 
 function f32_from_bits(u) {
-  return new Float32Array(new Uint32Array([u]).buffer)[0];
+  f32_view.setUint32(0, u, true);
+  return f32_view.getFloat32(0, true);
 }
 
 function f32_read(s) {
