@@ -1935,7 +1935,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
     return val_new(fs.flatMap((f) => f.ws), lay,
       fs.flatMap((f) => f.rs));
   }
-  const out = emit_dst(sc, lay, "o").ws;
+  const out = emit_hold(sc, lay.ks.map(() => "0"), "o", lay.ks);
   const t = emit_alias(sc, sel, "t");
   const rs: (string | null)[][] = out.map(() => []);
   emit_chain(sc, arms.map((k, i) => [box ? `term_aux(${t}) == ${cid_mac(k)}`
@@ -2527,10 +2527,6 @@ function emit_native(sc: Scope, k: Name): string {
       name}(Env e, THR Term* o${ps}) {`, ...body] });
   });
   return seg_ref(sc, name);
-}
-
-function emit_dst(sc: Scope, lay: Lay, k = "v"): Val {
-  return val_new(emit_hold(sc, lay.ks.map(() => "0"), k, lay.ks), lay);
 }
 
 function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
@@ -3302,11 +3298,6 @@ export function compile_book(book: Bend.Book): string {
 // every def is out as run_loop over the def, or as the def itself.
 // A def's function and its closures' are its unit's segments.
 
-// An erased argument: it prints as null and, at DUMMY's index, is no use
-// term_uses counts, so no closure captures it.
-const JS_NULL: HTerm = Bend.Var("null", 0);
-
-
 function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
   if (tail) {
     memo(FL.tails, sc.seg.def, () => new Set()).add(k);
@@ -3436,7 +3427,9 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
     case "Efq": {
       // a match is always live: an erased lambda is its body
       if (x.$ === "Lam" && !fun_live(x, ty)) {
-        return js_expr(sc, x.f(JS_NULL), ty_all(ty).B(DUMMY));
+        const o = term_open(x);
+        FL.names.set(o.ps[0].i, "null");
+        return js_expr(sc, o.b, ty_all(ty).B(DUMMY));
       }
       const arg = name_local(sc, "x");
       const cl = { ...sc, seg: seg_new("", BOX, []) };
@@ -3616,7 +3609,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const jumps = graph_close(new Set([CLO_APPLY]), [...FL.tails]
     .flatMap(([k, ts]) => [...ts].map((t) => [t, k])));
   const funs = [...FL.units.values()].flatMap((u) => u.segs)
-    .flatMap((f) => seg_text(f.lines, 0));
+    .flatMap((f) => f.lines);
   const entries = [...FL.entries].map((k) => {
     const [f, g] = [name_id("$", k), name_id("$$", k)];
     const ps = fun_of(k).live.map((_, i) => "a" + i);
