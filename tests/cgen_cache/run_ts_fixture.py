@@ -325,26 +325,50 @@ def main():
               and sha(i2) == sha(i3),
               "%s vs %s" % (sha(i2)[:12], sha(i3)[:12]))
 
-        for jlabel, jsetup in (("J-open-mode", "mode"),
-                               ("J-symlink-dir", "link")):
+        # Refused directories get zero artifact I/O: event logs stay empty
+        # and the directory tree is byte-unchanged. Outputs are anchored to
+        # a separately built trusted-cache binary, not to each other.
+        # Writable ancestors are trusted by design (ownership is enforced
+        # at the leaf only); a hostile rename there remains a documented
+        # residual, still gated per served byte by digests.
+        def snapshot(d):
+            return {os.path.relpath(os.path.join(r, f), d): sha(
+                os.path.join(r, f)) for r, _, fs in os.walk(
+                d, followlinks=False) for f in fs}
+
+        j_fresh = os.path.join(tmp, "j-fresh")
+        code, jf, _, _, events = build(fx, j_fresh, "jf.c")
+        check("J-fresh-compile", code == 0
+              and events[-1]["event"] == "compile", events[-1])
+        for jlabel in ("J-open-mode", "J-symlink-dir",
+                       "J-ancestor-symlink"):
             j_cache = os.path.join(tmp, "j-" + jlabel)
-            if jsetup == "mode":
+            if jlabel == "J-open-mode":
                 os.makedirs(j_cache)
                 os.chmod(j_cache, 0o777)
-            else:
+            elif jlabel == "J-symlink-dir":
                 real = os.path.join(tmp, "j-" + jlabel + "-real")
                 os.makedirs(real)
                 os.symlink(real, j_cache)
+            else:
+                areal = os.path.join(tmp, "j-" + jlabel + "-areal")
+                os.makedirs(os.path.join(areal, "sub"))
+                os.symlink(areal, os.path.join(tmp, "j-" + jlabel))
+                j_cache = os.path.join(tmp, "j-" + jlabel, "sub")
+            before = snapshot(j_cache)
             code, j1, _, _, events1 = build(fx, j_cache, "j1.c")
             code2, j2, _, _, events2 = build(fx, j_cache, "j2.c")
-            hits = [e for e in events1 + events2
-                    if e.get("event") == "hit"]
-            check(jlabel + "-no-cache-io", code == 0 and code2 == 0
-                  and not hits,
+            check(jlabel + "-empty-events", code == 0 and code2 == 0
+                  and events1 == [] and events2 == [],
                   [e.get("event") for e in events1 + events2])
-            check(jlabel + "-rebuild-parity", code == 0 and code2 == 0
-                  and sha(j1) == sha(j2),
-                  "%s vs %s" % (sha(j1)[:12], sha(j2)[:12]))
+            check(jlabel + "-dir-unchanged",
+                  snapshot(j_cache) == before,
+                  "%d entries" % len(before))
+            check(jlabel + "-fresh-parity", code == 0 and code2 == 0
+                  and sha(j1) == sha(jf) and sha(j2) == sha(jf),
+                  "%s vs %s" % (sha(j1)[:12], sha(jf)[:12]))
+
+
 
     failed = [c for c in checks if not c["pass"]]
     result = {"tool": "compiler/cache.ts via compiler/main.ts default path",

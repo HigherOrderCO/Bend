@@ -410,8 +410,9 @@ function log_event(dir: string, event: Record<string, unknown>): void {
 // (never a symlink), owned by the current user, and private to that user,
 // and every ancestor up to the filesystem root must be a real directory,
 // never a symlink (a symlinked ancestor would redirect the whole subtree).
-// Anything else fails closed: the caller rebuilds without reading,
-// writing, or logging into the directory, so a shared, planted, or
+// Anything else fails closed: the caller rebuilds with no entry read or
+// stored and the audit log untouched (this check itself only creates the
+// missing directory and lstats the path chain), so a shared, planted, or
 // misconfigured cache path can neither serve nor poison output. Missing
 // directories are created private (0700). Without a uid API ownership
 // cannot be checked, so nothing is trusted either. Residual: rename or

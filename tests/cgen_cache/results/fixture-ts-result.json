@@ -3,10 +3,10 @@
   "checks": [
     {
       "detail": {
-        "at": "2026-10-17T06:39:18.531Z",
+        "at": "2026-10-17T06:41:34.862Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 145.582218
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 58.07412199999999
       },
       "name": "A-miss-compile-exit-0",
       "pass": true
@@ -21,7 +21,7 @@
         "artifact_bytes": 79755,
         "artifact_sha256": "4ebfd0c5a4b5bacd2bea8fdb3fbf572b0422b0f2c09acec54059119e861e3e5a",
         "compiler_invoked": false,
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
         "manifest": {
           "k1_compiler": [
             {
@@ -40,9 +40,9 @@
               "sha256": "08565579081dd996ddadd0e492fa870120a2c0b5d63cf5577bd6a0d03855abff"
             },
             {
-              "bytes": 18237,
+              "bytes": 18322,
               "path": "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/cache.ts",
-              "sha256": "16483d71067b8524120b7315aae833cc455c7bc81fcd168cddeaf6c22e577f6f"
+              "sha256": "78823e4f72324b8e2dce8077eb43b1ad3a19fc85cf871c3bc66bc5a2ab55e1d0"
             },
             {
               "bytes": 76669,
@@ -61,7 +61,7 @@
             },
             {
               "bytes": 164,
-              "path": "/tmp/cgen-ts-lc9swmuh/fx/fx.bend",
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
               "sha256": "c492e629bd29964f443fd74341179cf44549bec470f5688255583ef40dca0691"
             }
           ],
@@ -568,14 +568,14 @@
             "Fx.tag",
             "main"
           ],
-          "k3_entry": "/tmp/cgen-ts-lc9swmuh/fx/fx.bend",
+          "k3_entry": "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
           "k3_namespaces": [
             [
               "/run/baton2-native-homelab/retained/baton-compiler-forkflush-20261016T195048Z/worktrees/upstream-pr1649-amend/bend2/base.bend",
               ""
             ],
             [
-              "/tmp/cgen-ts-lc9swmuh/fx/fx.bend",
+              "/tmp/cgen-ts-__tjbpcf/fx/fx.bend",
               ""
             ]
           ],
@@ -903,12 +903,12 @@
             },
             {
               "bytes": 221,
-              "path": "/tmp/cgen-ts-lc9swmuh/fx/host.c",
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/host.c",
               "sha256": "fb46acf73279510d8ec297d7fe9c06a521db6a6b3cb887f8111b9dcb18be3a9f"
             },
             {
               "bytes": 51,
-              "path": "/tmp/cgen-ts-lc9swmuh/fx/host.js",
+              "path": "/tmp/cgen-ts-__tjbpcf/fx/host.js",
               "sha256": "ee3bb658cee084ec1cacd123200f0064175ca0e8e3d02e2f7ba483ba2e7e7805"
             }
           ],
@@ -930,10 +930,10 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:18.868Z",
+        "at": "2026-10-17T06:41:35.208Z",
         "event": "hit",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 9.763143999999954
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 10.493516999999997
       },
       "name": "B-hit-exit-0",
       "pass": true
@@ -944,36 +944,36 @@
       "pass": true
     },
     {
-      "detail": "hit 9.8ms < compile 145.6ms (tool log)",
+      "detail": "hit 10.5ms < compile 58.1ms (tool log)",
       "name": "B-hit-skips-generation",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:19.825Z",
+        "at": "2026-10-17T06:41:35.656Z",
         "event": "compile",
-        "key": "9f25a63efddbf034d7f0320140ad2335069c8e9b2654fee117131a22418d1969",
-        "ms": 667.815527
+        "key": "229e3182ae88a8dca18ca1aa2f560be602f13ae178c891ea3c734009e6690332",
+        "ms": 129.968883
       },
       "name": "C-bend-mutation-miss",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:20.220Z",
+        "at": "2026-10-17T06:41:35.991Z",
         "event": "rebuild-uncertain",
         "key": null,
-        "ms": 27.32061699999997
+        "ms": 26.462030999999968
       },
       "name": "F-diagnostics-env-miss",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:20.595Z",
+        "at": "2026-10-17T06:41:36.301Z",
         "event": "rebuild-uncertain",
         "key": null,
-        "ms": 33.38766199999998
+        "ms": 25.852926000000025
       },
       "name": "G-diagnostics-bypass-same-key",
       "pass": true
@@ -985,20 +985,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:21.119Z",
+        "at": "2026-10-17T06:41:36.642Z",
         "event": "refresh",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 127.64709099999999
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 31.19836600000002
       },
       "name": "D-foreign-refresh",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:21.717Z",
+        "at": "2026-10-17T06:41:36.971Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 237.395282
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 45.07010199999999
       },
       "name": "E-fresh-compile",
       "pass": true
@@ -1010,20 +1010,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:22.143Z",
+        "at": "2026-10-17T06:41:37.345Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 69.98253499999998
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 56.270992000000035
       },
       "name": "artifact-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:22.551Z",
+        "at": "2026-10-17T06:41:37.755Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 68.39156899999995
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 59.920375999999976
       },
       "name": "artifact-origin-rebuilds",
       "pass": true
@@ -1035,20 +1035,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:23.360Z",
+        "at": "2026-10-17T06:41:38.473Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 60.98376200000001
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 58.20810799999998
       },
       "name": "receipt-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:23.777Z",
+        "at": "2026-10-17T06:41:39.560Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 77.67401999999998
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 736.260775
       },
       "name": "receipt-origin-rebuilds",
       "pass": true
@@ -1060,20 +1060,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:25.092Z",
+        "at": "2026-10-17T06:41:40.482Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 57.638439000000005
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 129.86825700000003
       },
       "name": "null-manifest-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:25.514Z",
+        "at": "2026-10-17T06:41:40.956Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 66.34933699999999
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 96.14610199999998
       },
       "name": "null-manifest-malformed-origin-rebuilds",
       "pass": true
@@ -1085,20 +1085,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:26.260Z",
+        "at": "2026-10-17T06:41:41.871Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 56.34281199999998
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 115.486042
       },
       "name": "missing-manifest-key-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:26.648Z",
+        "at": "2026-10-17T06:41:42.364Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 61.77731800000004
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 119.992773
       },
       "name": "missing-manifest-key-malformed-origin-rebuilds",
       "pass": true
@@ -1110,20 +1110,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:27.381Z",
+        "at": "2026-10-17T06:41:43.276Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 58.375496999999996
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 78.28144200000003
       },
       "name": "null-foreign-rows-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:27.768Z",
+        "at": "2026-10-17T06:41:44.488Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 56.860274000000004
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 904.317843
       },
       "name": "null-foreign-rows-malformed-origin-rebuilds",
       "pass": true
@@ -1135,20 +1135,20 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:28.972Z",
+        "at": "2026-10-17T06:41:45.465Z",
         "event": "compile",
-        "key": "0dfca4daa4af847a021df15fe5525001c6a88e64a1c657bf721ce3027a3230d9",
-        "ms": 224.58702499999998
+        "key": "006bfce5ea6596ea504553116aa982877c175d1b00035bb8d265f612672e7cff",
+        "ms": 220.92069100000003
       },
       "name": "malformed-foreign-row-origin-compiled",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:29.356Z",
+        "at": "2026-10-17T06:41:45.835Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 55.89731899999998
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 71.55967000000001
       },
       "name": "malformed-foreign-row-malformed-origin-rebuilds",
       "pass": true
@@ -1160,30 +1160,30 @@
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:30.099Z",
+        "at": "2026-10-17T06:41:47.156Z",
         "event": "compile",
-        "key": "60bd72d3b55d7b03f584feee72cd4b4ce3b31cef9b2b2e1c82d57a81ed6ae7dc",
-        "ms": 53.783771
+        "key": "72034537cf023e17dc18da1464117667698547b5746b45fd160facb8b8f0e800",
+        "ms": 142.12701799999996
       },
       "name": "I-setup-compile",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:30.720Z",
+        "at": "2026-10-17T06:41:47.567Z",
         "event": "compile",
-        "key": "aa5307342c8cb2bdf8e39308f6c9785c68a88470f5c1caf5bc82e5acdafbc74a",
-        "ms": 266.5642500000001
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 88.83771999999999
       },
       "name": "I-cid-decline-compiles",
       "pass": true
     },
     {
       "detail": {
-        "at": "2026-10-17T06:39:31.150Z",
+        "at": "2026-10-17T06:41:48.026Z",
         "event": "compile",
-        "key": "aa5307342c8cb2bdf8e39308f6c9785c68a88470f5c1caf5bc82e5acdafbc74a",
-        "ms": 68.69349499999998
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 121.36231399999997
       },
       "name": "I-fresh-compile",
       "pass": true
@@ -1194,23 +1194,58 @@
       "pass": true
     },
     {
+      "detail": {
+        "at": "2026-10-17T06:41:48.519Z",
+        "event": "compile",
+        "key": "49996998b31460955e3125bbd05e22f59978368d4f124bbdd84370f447122092",
+        "ms": 179.71180399999997
+      },
+      "name": "J-fresh-compile",
+      "pass": true
+    },
+    {
       "detail": [],
-      "name": "J-open-mode-no-cache-io",
+      "name": "J-open-mode-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-open-mode-dir-unchanged",
       "pass": true
     },
     {
       "detail": "928d38965095 vs 928d38965095",
-      "name": "J-open-mode-rebuild-parity",
+      "name": "J-open-mode-fresh-parity",
       "pass": true
     },
     {
       "detail": [],
-      "name": "J-symlink-dir-no-cache-io",
+      "name": "J-symlink-dir-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-symlink-dir-dir-unchanged",
       "pass": true
     },
     {
       "detail": "928d38965095 vs 928d38965095",
-      "name": "J-symlink-dir-rebuild-parity",
+      "name": "J-symlink-dir-fresh-parity",
+      "pass": true
+    },
+    {
+      "detail": [],
+      "name": "J-ancestor-symlink-empty-events",
+      "pass": true
+    },
+    {
+      "detail": "0 entries",
+      "name": "J-ancestor-symlink-dir-unchanged",
+      "pass": true
+    },
+    {
+      "detail": "928d38965095 vs 928d38965095",
+      "name": "J-ancestor-symlink-fresh-parity",
       "pass": true
     }
   ],
@@ -1220,47 +1255,47 @@
   "main_artifacts_used": false,
   "network_used": false,
   "note": "compiler_invoked=true ONLY for bounded synthetic fixtures through the instrumented default path; no Main build, no release impact. Event log proves compile() skipped on hit. No generation-time saving claimed beyond observed per-event ms.",
-  "passed": 39,
+  "passed": 45,
   "runs": [
     {
       "event": "compile",
-      "event_ms": 145.582218,
+      "event_ms": 58.07412199999999,
       "exit": 0,
-      "rss_kib": 118812,
+      "rss_kib": 123940,
       "step": "A-first-build",
-      "wall_s": 0.45764523100297083
+      "wall_s": 0.39855027699741186
     },
     {
       "event": "hit",
-      "event_ms": 9.763143999999954,
+      "event_ms": 10.493516999999997,
       "exit": 0,
-      "rss_kib": 119276,
+      "rss_kib": 115332,
       "step": "B-rebuild",
-      "wall_s": 0.3253462819993729
+      "wall_s": 0.34681968099903315
     },
     {
       "event": "compile",
-      "event_ms": 667.815527,
+      "event_ms": 129.968883,
       "exit": 0,
-      "rss_kib": 120396,
+      "rss_kib": 121340,
       "step": "C-bend-mutation",
-      "wall_s": 0.9594230639995658
+      "wall_s": 0.45611875299800886
     },
     {
       "event": "refresh",
-      "event_ms": 127.64709099999999,
+      "event_ms": 31.19836600000002,
       "exit": 0,
-      "rss_kib": 119676,
+      "rss_kib": 121268,
       "step": "D-foreign-refresh",
-      "wall_s": 0.4529057309991913
+      "wall_s": 0.32361053400018136
     },
     {
       "event": "compile",
-      "event_ms": 237.395282,
+      "event_ms": 45.07010199999999,
       "exit": 0,
-      "rss_kib": 117196,
+      "rss_kib": 118172,
       "step": "E-fresh-of-changed-tree",
-      "wall_s": 0.5949322720007331
+      "wall_s": 0.32941351200133795
     }
   ],
   "tool": "compiler/cache.ts via compiler/main.ts default path"
