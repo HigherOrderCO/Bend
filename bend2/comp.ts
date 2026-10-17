@@ -242,9 +242,23 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     JS: "nat_divmod($0, $1)",
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
+  u32_show: { JS: "String($0)" },
+  nat_show: { JS: "nat_show($0)" },
+  u32_read: { JS: "decimal_read($0, 4294967295)" },
+  nat_read: { JS: "decimal_read($0, 281474976710655)" },
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
+  string_take: { JS: "string_take($0, $1)" },
+  string_drop: { JS: "string_drop($0, $1)" },
+  string_split: { JS: "string_split($0, $1)" },
+  string_join: { JS: "string_join($0, $1)" },
+  string_concat: { JS: "string_join($0, \"\")" },
+  string_to_upper: { JS: "string_case($0, 97, -32)" },
+  string_to_lower: { JS: "string_case($0, 65, 32)" },
+  string_trim_start: { JS: "string_trim_start($0)" },
+  string_to_list: { JS: "string_to_list($0)" },
+  string_reverse: { JS: "string_reverse($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -523,9 +537,9 @@ function char_len(s, at = 0) {
   return s[at] === "\uDC00" ? 4 : s.codePointAt(at) > 0xFFFF ? 2 : 1;
 }
 
-function char_code(s) {
-  return s.length < 4 ? s.codePointAt(0)
-    : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+function char_code(s, at = 0) {
+  return s[at] !== "\uDC00" ? s.codePointAt(at)
+    : (s.charCodeAt(at + 1) << 22 | s.charCodeAt(at + 2) << 11 | s.charCodeAt(at + 3)) >>> 0;
 }
 
 function string_contains(s, p) {
@@ -536,6 +550,114 @@ function string_contains(s, p) {
     }
   }
   return false;
+}
+
+function nat_show(n) {
+  // Base rebuilds the quotient as Succ, checking the immediate Nat bound.
+  nat_chk(Math.trunc(n / 10));
+  return String(n);
+}
+
+function decimal_read(s, max) {
+  if (s === "") return {$: "None"};
+  let n = 0;
+  for (let at = 0; at < s.length; at += char_len(s, at)) {
+    const digit = char_code(s, at) - 48;
+    if (digit < 0 || digit > 9) return {$: "None"};
+    n = n * 10 + digit;
+    if (n > max) return {$: "None"};
+  }
+  return {$: "Some", value: n};
+}
+
+function string_take(s, n) {
+  let out = "", at = 0;
+  while (n > 0 && at < s.length) {
+    const end = at + char_len(s, at);
+    out += s.slice(at, end);
+    at = end;
+    n--;
+  }
+  return out;
+}
+
+function string_suffix(s, at) {
+  if (at === s.length) return "";
+  const end = at + char_len(s, at);
+  // Preserve Base's SCon rebuild so ABI output can release a large source.
+  return s.slice(at, end) + s.slice(end);
+}
+
+function string_drop(s, n) {
+  let at = 0;
+  while (n > 0 && at < s.length) { at += char_len(s, at); n--; }
+  return string_suffix(s, at);
+}
+
+function string_case(s, first, delta) {
+  let out = "";
+  const end = first + 26;
+  for (let at = 0; at < s.length; at += char_len(s, at)) {
+    const c = char_code(s, at);
+    out += char_new(c >= first && c < end ? c + delta : c);
+  }
+  return out;
+}
+
+function string_trim_start(s) {
+  let at = 0;
+  while (at < s.length) {
+    const c = char_code(s, at);
+    if (c !== 32 && (c < 9 || c > 13)) break;
+    at += char_len(s, at);
+  }
+  return string_suffix(s, at);
+}
+
+function string_reverse(s) {
+  let out = "";
+  for (let at = 0; at < s.length;) {
+    const end = at + char_len(s, at);
+    out = s.slice(at, end) + out;
+    at = end;
+  }
+  return out;
+}
+
+function string_split(s, sep) {
+  const nil = {$: "Nil"}, code = char_code(sep);
+  let head = nil, tail, part = "";
+  for (let at = 0;;) {
+    const done = at === s.length, end = at + (done ? 0 : char_len(s, at));
+    if (done || char_code(s, at) === code) {
+      const cell = {$: "Con", head: part, tail: nil};
+      if (tail) tail.tail = cell; else head = cell;
+      tail = cell;
+      if (done) return head;
+      part = "";
+    } else part += s.slice(at, end);
+    at = end;
+  }
+}
+
+function string_join(xs, sep) {
+  if (xs.$ === "Nil") return "";
+  if (xs.tail.$ === "Nil") return xs.head;
+  const parts = [];
+  for (; xs.$ === "Con"; xs = xs.tail) parts.push(xs.head);
+  return parts.join(sep);
+}
+
+function string_to_list(s) {
+  const nil = {$: "Nil"};
+  let head = nil, tail;
+  for (let at = 0; at < s.length;) {
+    const end = at + char_len(s, at), cell = {$: "Con", head: s.slice(at, end), tail: nil};
+    if (tail) tail.tail = cell; else head = cell;
+    tail = cell;
+    at = end;
+  }
+  return head;
 }
 
 function str_out(s) {

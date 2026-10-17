@@ -1,6 +1,5 @@
-# An exported def takes a Nat as a whole number from 0 to 2^53: a
-# negative, fractional, BigInt or larger argument throws the Nat error,
-# in one call or curried, and a good one still runs.
+# Exported Nat arguments reject invalid whole numbers, including curried calls.
+# Nat.show also preserves the constructor overflow reached by its Base body.
 import Base
 
 def Nat.host_export() -> IO(U32):
