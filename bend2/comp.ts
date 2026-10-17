@@ -880,7 +880,7 @@ function op_bare(t: HTerm): boolean {
 }
 
 function op_name(k: Name): string {
-  return k.toLowerCase().replace(/[./]/g, "_");
+  return memo(FL.ops, k, () => k.toLowerCase().replace(/[./]/g, "_"));
 }
 
 function f32_bin(o: string): Intr {
@@ -1514,6 +1514,7 @@ function file_new(book: Bend.Book, js: boolean) {
     folds: new Map<HTerm, HTerm | null>(),
     spines: new Map<HTerm, Spine>(),
     steps: new Map<HTerm, HTerm>(),
+    ops: new Map<Name, string>(),
   };
 }
 
