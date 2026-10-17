@@ -38,6 +38,7 @@ const USAGE = [
   ["bend <file.bend> -o <out>", "build a binary, or C, JS, .mjs or BendTT by extension"],
   ["bend <file.bend> --check-only", "check the file and its imports; run nothing"],
   ["bend <file.bend> --verdict", "check it, then recheck it with the proven kernel"],
+  ["bend <file.bend> --profile", "check it one def at a time; list the slowest"],
   ["bend <file.bend> --publish [<name>@<version>]", "publish the file and its imports; a name needs login"],
   ["bend link <name>@<version> 0x<hash>", "name a package already on the hub"],
   ["bend login", "log in to BendAI for --publish <name>@…"],
@@ -238,6 +239,7 @@ async function cli_file(args: string[]): Promise<void> {
   let only = false;
   let verdict = false;
   let checkup = false;
+  let profile = false;
   let publish = false;
   let named: string | undefined;
   for (let i = 0; i < args.length; i += 1) {
@@ -250,6 +252,8 @@ async function cli_file(args: string[]): Promise<void> {
       verdict = true;
     } else if (a === "--checkup") {
       checkup = true;
+    } else if (a === "--profile") {
+      profile = true;
     } else if (a === "--publish") {
       publish = true;
       if (args[i + 1]?.includes("@")) {
@@ -288,6 +292,9 @@ async function cli_file(args: string[]): Promise<void> {
   if (argv.length !== 0 && args.some((a) => a.startsWith("-") && a !== "--")) {
     cli_fail("arguments go to a run: bend <file.bend> [args]");
   }
+  if (profile && (outs.length !== 0 || only || verdict || checkup || publish)) {
+    cli_fail("--profile takes no other option");
+  }
   if (checkup && outs.length !== 0) {
     cli_fail("--checkup takes no -o: a binary holds one main, so build each"
       + " import alone");
@@ -301,6 +308,10 @@ async function cli_file(args: string[]): Promise<void> {
     }
     if (checkup) {
       return await cli_checkup(file);
+    }
+    if (profile) {
+      process.exitCode = await cli_profile(file);
+      return;
     }
     const seen = new Map<string, string | null>();
     const book = await book_read(file, undefined, seen);
@@ -833,6 +844,72 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   }
   cli_say(1, PASS + "\n" + (kernel ? "" : HINT + "\n"));
   return 0;
+}
+
+// cli_profile checks a file as --check-only does, one order entry at a
+// time: book_valid(book, i) takes the entries before i as validated, so
+// each call times entry i on the book the full check builds. A def's body
+// stays hidden until its last entry, as in the full check, so a law's proof
+// is timed once, at its fill. It lists the 20 slowest entries, then gives
+// --check-only's verdict
+async function cli_profile(file: string): Promise<number> {
+  const book = Bend.book_nil();
+  const seen = new Map<string, string | null>();
+  try {
+    await Bend.book_load(book, file, "", seen);
+  } catch (e) {
+    cli_say(2, book_err(new Check_Fail(e)) + "\n");
+    return 1;
+  }
+  const order = book.order.slice();
+  const orig = { ...book.tlds };
+  for (const k of order) {
+    const t = orig[k];
+    book.tlds[k] = t.$ === "Def" ? { ...t, v: null } : t;
+  }
+  const ms: number[] = [];
+  let why: unknown = null;
+  for (let i = 0; i < order.length && why === null; i++) {
+    const k = order[i];
+    const t = orig[k];
+    const early = order.lastIndexOf(k) > i && t.$ === "Def";
+    book.order = order.slice(0, i + 1);
+    book.tlds[k] = early ? { ...t, v: null } : t;
+    const h = book.hols;
+    const t0 = performance.now();
+    try {
+      Bend.book_valid(book, i);
+    } catch (e) {
+      why = e;
+    }
+    ms.push(performance.now() - t0);
+    book.hols = early ? h : book.hols;
+  }
+  if (why === null && book.hols > 0) {
+    why = "Error: " + String(book.hols) + " TODO" + (book.hols === 1 ? "" : "s")
+      + " found.\nThe code is incomplete, and not a valid proof yet.";
+  }
+  const all = ms.reduce((a, b) => a + b, 0);
+  const at = new Map([...seen].map(([f, ns]) => [ns, f]));
+  const row = (m: number, i: number): string => {
+    const k = order[i];
+    const t = book.tlds[k];
+    const s = t.T.s;
+    const f = s === undefined ? "" : t.b ? "Base"
+      : path.relative(".", (s.file.ns ? at.get(s.file.ns) : file) ?? "");
+    const ln = s === undefined ? "" : ":" + String(s.file.str.slice(0, s.beg).split("\n").length);
+    return m.toFixed(1).padStart(9) + " ms " + (100 * m / all).toFixed(1).padStart(5) + "%  "
+      + Bend.name_key(k) + (order.lastIndexOf(k) > i ? " (statement)" : order.indexOf(k) < i
+        ? " (proof)" : "") + "  " + f + ln;
+  };
+  cli_say(1, String(ms.length) + " of " + String(order.length) + " entries checked in "
+    + all.toFixed(0) + " ms; the slowest:\n" + ms.map((m, i) => [m, i])
+      .sort((a, b) => b[0] - a[0]).slice(0, 20).map(([m, i]) => row(m, i) + "\n").join(""));
+  if (why !== null) {
+    cli_say(2, book_err(new Check_Fail(why)) + "\n");
+    return 1;
+  }
+  return cli_verdict(book, false);
 }
 
 // book_promises lists, per promise (@unsafe, foreign effects), the defs
