@@ -2483,7 +2483,7 @@ function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
   const args = emit_each(sc, m.args);
   const op = op_name(k);
   const C = it.C!;
-  if ("array_get array_new array_clone".includes(op)
+  if (["array_get", "array_new", "array_clone"].includes(op)
     && lay_el(m.all[0]).ks.includes("box")
     && !(op === "array_new" && ctr_packed(m.all[2]))) {
     facts_hot(sc, m.all[0], true);
