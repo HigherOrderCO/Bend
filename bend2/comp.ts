@@ -77,13 +77,11 @@ type File = {
   lits: Map<string, number>;
   img: string[];
   tails: Map<Name, Set<Name>>;
-  memo: {
-    opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
-    uses: Map<HTerm, Bend.PMap<number>>;
-    folds: Map<HTerm, HTerm | null>;
-    spines: Map<HTerm, Spine>;
-    steps: Map<HTerm, HTerm>;
-  };
+  opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
+  uses: Map<HTerm, Bend.PMap<number>>;
+  folds: Map<HTerm, HTerm | null>;
+  spines: Map<HTerm, Spine>;
+  steps: Map<HTerm, HTerm>;
 };
 
 type Scope = {
@@ -688,7 +686,7 @@ function lit_call(s: Of<"Lit">): HTerm | null {
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
   return s.$ !== "Lit" ? s
-    : memo(FL.memo.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
+    : memo(FL.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -696,7 +694,7 @@ function term_strip(t: HTerm): HTerm {
 }
 
 function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
-  return memo(FL.memo.opens, t, () => {
+  return memo(FL.opens, t, () => {
     const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
     return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
   });
@@ -705,7 +703,7 @@ function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
 function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
   const l = Bend.Let(ps.map((p) => p.k), ps.map(() => 0), vs,
     () => die("a pre-opened let")) as Of<"Let">;
-  FL.memo.opens.set(l, { ps, b });
+  FL.opens.set(l, { ps, b });
   return l;
 }
 
@@ -716,7 +714,7 @@ function let_live(t: Of<"Let">): boolean[] {
 }
 
 function term_spine(tm: HTerm): Spine {
-  return memo(FL.memo.spines, tm, () => {
+  return memo(FL.spines, tm, () => {
     const apps: Of<"App">[] = [];
     let h = tm;
     let c = term_force(tm);
@@ -862,7 +860,7 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
 }
 
 function term_uses(tm: HTerm): Bend.PMap<number> {
-  return memo(FL.memo.uses, tm, () => {
+  return memo(FL.uses, tm, () => {
     const t = term_force(tm);
     if (t.$ === "Var") {
       return t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
@@ -1539,13 +1537,11 @@ function file_new(book: Bend.Book, js: boolean): File {
     lits: new Map(),
     img: [],
     tails: new Map(),
-    memo: {
-      opens: new Map(),
-      uses: new Map(),
-      folds: new Map(),
-      spines: new Map(),
-      steps: new Map(),
-    },
+    opens: new Map(),
+    uses: new Map(),
+    folds: new Map(),
+    spines: new Map(),
+    steps: new Map(),
   };
 }
 
@@ -1580,7 +1576,6 @@ function file_book(roots: Name[]): void {
   }
   roots.forEach(src_add);
   for (const d of FL.srcs.keys()) {
-    memo_gc();
     const tld = FL.book.tlds[d];
     for (const x of tld?.$ === "ADT" ? tld.c : tld ? [tld] : []) {
       ty_srcs(x.T);
@@ -2085,10 +2080,6 @@ function memo<K, V>(m: Map<K, V>, k: K, f: (k: K) => V): V {
   return v;
 }
 
-function memo_gc(): void {
-  Object.values(FL.memo).forEach((m) => m.clear());
-}
-
 // Unit
 // ====
 
@@ -2570,7 +2561,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
 
 function emit_fold(sc: Scope, t: HTerm): HTerm | null {
   const s = term_strip(t);
-  const r = memo(FL.memo.folds, s, () => {
+  const r = memo(FL.folds, s, () => {
     if (term_const(s)) {
       return s;
     }
@@ -3082,7 +3073,6 @@ export function compile_book(book: Bend.Book): string {
   while (FL.stale.size > 0) {
     for (const u of FL.units.values()) {
       if (FL.stale.has(u)) {
-        memo_gc();
         unit_emit(u);
       }
     }
@@ -3496,7 +3486,6 @@ function js_def(k: Name, def: Bend.Def): void {
     }
     block(sc, pc ? "for (;;) switch ($pc) {" : "for (;;) {", () =>
       loop.forEach((d, i) => {
-        memo_gc();
         const fx = { ...sc, fresh: new Map(), def: d,
           fuel: { n: FOLD_FUEL } };
         const ps = fun_of(d).live.map(([, x]) => name_local(fx, x));
@@ -3529,7 +3518,6 @@ export function js_lib(book: Bend.Book, mod = false): string {
   });
   file_book(outs ?? ["main"]);
   for (const [k, def] of done_defs(fun_runs)) {
-    memo_gc();
     unit_emit(unit_new(k, () => js_def(k, def)));
   }
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
