@@ -1559,9 +1559,6 @@ function file_book(roots: Name[]): void {
     const refs = new Set<Name>();
     let flat = true;
     term_each(fun_of(d).h!, (s, tail) => {
-      if (s.$ === "Ann") {
-        ty_srcs(s.T);
-      }
       if (s.$ === "Ref") {
         if (s.b) {
           FL.bangs.add(s.k);
