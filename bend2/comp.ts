@@ -1762,6 +1762,7 @@ function seg_text(lines: string[], tab: number): string[] {
   return lines.map((l) => "  ".repeat(tab) + l);
 }
 
+// A lazy unit (unit_lazy) is made the first time a segment names it.
 function seg_ref(sc: Scope, fid: string): string {
   sc.seg.refs.add(fid);
   FL.lazy.get(fid)?.();
@@ -2104,6 +2105,15 @@ function unit_order(): Unit[] {
   };
   FL.units.forEach(visit);
   return out;
+}
+
+// A unit made only once a segment names it (seg_ref): a spin, a def whose
+// callers run its spin or fuse it. It emits in the sweep, never inside the
+// unit that named it, so no chain of them nests.
+function unit_lazy(fid: string, name: string, emit: () => void): void {
+  if (!FL.units.has(name)) {
+    memo(FL.lazy, fid, () => () => unit_new(name, emit));
+  }
 }
 
 function unit_emit(u: Unit): void {
@@ -2456,26 +2466,24 @@ function emit_open(sc: Scope, k: Name): [Scope, Val[]] {
 
 function emit_native(sc: Scope, k: Name): string {
   const name = name_id("spin_", k);
-  if (!FL.units.has("spin " + k)) {
-    unit_emit(unit_new("spin " + k, () => {
-      const [sl, vals] = emit_open(scope_new(), k);
-      const seg = sl.seg;
-      seg.fid = name;
-      seg.native = true;
-      const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
-      emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, vals, dst);
-      const hs = seg.ks.flatMap((kd, i) => arr_q(kd)
-        ? [`Term h${i} = r${i};`] : []);
-      const body = [
-        ...seg_text(["u32 wpoll = 0;", ...hs, ...seg_take(seg), "WL_SPIN"], 1),
-        ...seg_text(seg.lines, 2), "  break;", "  }", "  return 1;", "}"];
-      const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
-      const ps = seg.ks.map((kd, i) => `, ${lay_c(kd)} r${i}`
-        + (arr_q(kd) ? `, u64 q${i}` : "")).join("");
-      FL.unit!.segs.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
-        name}(Env e, THR Term* o${ps}) {`, ...body] });
-    }));
-  }
+  unit_lazy(name, "spin " + k, () => {
+    const [sl, vals] = emit_open(scope_new(), k);
+    const seg = sl.seg;
+    seg.fid = name;
+    seg.native = true;
+    const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
+    emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, vals, dst);
+    const hs = seg.ks.flatMap((kd, i) => arr_q(kd)
+      ? [`Term h${i} = r${i};`] : []);
+    const body = [
+      ...seg_text(["u32 wpoll = 0;", ...hs, ...seg_take(seg), "WL_SPIN"], 1),
+      ...seg_text(seg.lines, 2), "  break;", "  }", "  return 1;", "}"];
+    const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
+    const ps = seg.ks.map((kd, i) => `, ${lay_c(kd)} r${i}`
+      + (arr_q(kd) ? `, u64 q${i}` : "")).join("");
+    FL.unit!.segs.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
+      name}(Env e, THR Term* o${ps}) {`, ...body] });
+  });
   return seg_ref(sc, name);
 }
 
@@ -3078,12 +3086,9 @@ export function compile_book(book: Bend.Book): string {
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
-  // a flat def's callers run its spin, and a def with one call site is
-  // most often fused into it, so their segments are units only once a
-  // segment names them (seg_ref)
   for (const [k, tld] of [...done_defs().reverse(),
     ...done_defs(def_foreign)]) {
-    const unit = () => unit_new(k, () => {
+    const emit = () => {
       const [dl, vals] = emit_open(scope_new(), k);
       FL.unit!.segs.push(dl.seg);
       if (def_foreign(tld)) {
@@ -3091,12 +3096,12 @@ export function compile_book(book: Bend.Book): string {
       } else {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
-    });
+    };
     if ((flat_of(k) || FL.sites.get(k) === 1) && k !== "main"
       && !FL.bangs.has(k)) {
-      FL.lazy.set(seg_fid(k), unit);
+      unit_lazy(seg_fid(k), k, emit);
     } else {
-      unit();
+      unit_new(k, emit);
     }
   }
   // a sweep emits the stale units callee-first, then the units it made as
