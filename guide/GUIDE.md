@@ -190,10 +190,10 @@ write followed by another statement re-binds its array: `a[5] <- 42` on its own
 line is `a = a[5] <- 42`. As the last statement it is the written array. The
 slot count after `*` is a power of two; `[0 : U32^3n]` names the depth instead.
 
-The `a[i]` sugar assumes `Array<U32>`. For other element types, call
-`Array.get` (`Data` elements; else `Array.swap`) and `Array.set` directly, and
-`Array.clone` when you need two copies. Read Bend's Base for reference. This
-will be generalized soon!
+`a[i]` assumes `Array<U32>`. Otherwise use `Array.get` (`Data` elements;
+else `Array.swap`), `Array.set`, and `Array.clone` for copies.
+`Array.to_list` consumes in index order; JS walks flat slots.
+Generic indexing sugar is planned; see Base for reference.
 
 ### Quantities
 
