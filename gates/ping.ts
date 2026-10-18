@@ -343,6 +343,14 @@ try {
   const linked_run = await bend([sum_file]);
   check("an output hard link cannot destroy its input",
     linked_out.code === 1 && linked_run.code === 0 && linked_run.out === "5n\n");
+  const first_output = path.join(TMP, "first-output.js");
+  const output_alias = path.join(TMP, "first-output.c");
+  fs.writeFileSync(first_output, "");
+  fs.linkSync(first_output, output_alias);
+  const overlapping = await bend([sum_file, "-o", first_output, "-o", output_alias]);
+  const first_run = await run(process.execPath, [first_output]);
+  check("a later output alias cannot overwrite an earlier emitted program",
+    overlapping.code === 1 && first_run.code === 0 && first_run.out === "5n\n");
   const unsafe_file = path.join(TMP, "unsafe.bend");
   const checkup = path.join(TMP, "checkup.bend");
   const good_checkup = path.join(TMP, "good_checkup.bend");

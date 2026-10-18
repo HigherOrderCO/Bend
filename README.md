@@ -116,8 +116,8 @@ curl -fsSL https://bend-lang.com/install.sh | sh
 This `bend` ignores a project's `bunfig.toml` and `.env`; `bun bend2/main.ts`
 from a checkout reads them, so check untrusted code with `bend`.
 
-Compilation rejects `-o` paths that match a program input by path or file
-identity, including symlinks and hard links.
+Compilation rejects `-o` paths that match a program input or an earlier output,
+including symlinks and hard links.
 
 ### 2. Tell your agent to use Bend:
 

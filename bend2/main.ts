@@ -316,9 +316,11 @@ async function cli_file(args: string[]): Promise<void> {
       t.$ === "Def" && t.i !== undefined ? t.i : [])].map(path_id)).add("");
     for (const out of outs) {
       if (ins.has(path_id(out))) {
-        cli_fail("-o " + out + " is a file the program reads, or a directory");
+        cli_fail("-o " + out + " is an input, a previous output, or a directory");
       }
       cli_emit(book, out);
+      // A new output acquires its inode only after it is written.
+      ins.add(path_id(out));
     }
   } catch (e) {
     cli_say(2, book_err(e) + "\n");
