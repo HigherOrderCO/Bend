@@ -5,9 +5,8 @@
 # the empty string is "". Before, such a value fell back to its
 # constructors (SCon{Chr{U32{...}}, ...}, SNil{}) because the language
 # had no escape for it. Pinned on the interpreter, C and JS: the
-# compiled printer spells the same escapes. A surrogate or a code past
-# U+10FFFF is not pinned here: the JS lane holds a Char as a JS string
-# and refuses those at char_new.
+# compiled printer spells the same escapes; char_any_code pins a
+# surrogate and a code past U+10FFFF.
 import Base
 
 law main:

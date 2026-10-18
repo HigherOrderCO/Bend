@@ -2,8 +2,8 @@
 # own types. The program builds no Tree and names no Empty (its sum has
 # a default arm), and never takes a Chain apart at all: it hands one to a
 # def that drops it. The emitter defined a CID_ macro for the
-# constructors compiled Bend code named, so the C's CID_EMPTY, CID_END
-# and CID_CELL were undefined and it did not compile. Every constructor
+# constructors compiled Bend code named, so the C's CID_Empty, CID_End
+# and CID_Cell were undefined and it did not compile. Every constructor
 # of every datatype now has its macro and its arity, by which the
 # default arm and the drop free what they never name.
 import Base

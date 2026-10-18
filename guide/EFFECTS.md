@@ -40,7 +40,7 @@ def's body would. A constructor the program does not use has no id, so
 `#ifdef CID(Name)` tests for it. `FID(name)` is a def's function id the
 same way. `f` holds the def's arguments in order: a `U32` is the word
 (`(u32)f[0]`), a `String` is taken with `io_cstr(e, f[0], &len)` (a
-`malloc`ed copy you free), a handle with `io_hand_v(f[0])`. The loop
+`malloc`ed copy you free), a packed handle with `io_hand_v(f[0])`. The loop
 calls the effect at once; an effect that waits (for a handle, or for time)
 parks itself, as below.
 
@@ -50,11 +50,31 @@ constructor is `io_node(e, CID(K), a, b)`. A `Result` is `io_done(e, v)`
 or `io_fail(e, code, text)` (`text` NULL prints `strerror(code)`).
 `io_sys_end(w, n)` stores `errno` in `w->code` when a call fails.
 
-A handle is a descriptor or pointer packed in one word by `io_hand(v)`. Its
+Descriptor and window handles pack one word with `io_hand(v)`. Their
 type must be one of Base's handle laws (`File`, `Socket`, ...): a user
 handle type is a WONTFIX entry for now, see `WONTFIX.txt`. An effect on a
 handle hands it back beside its result: `io_tup(e, io_hand(h), r)`, also
 on failure.
+
+A handle owns its descriptor, on both sides. An effect that answers a new
+handle gives its fd away open: it does not close it later or keep its
+number. An effect that takes a handle borrows the fd and hands back the
+same one, still open; only a close effect (`Socket.close`, ...), which
+consumes the handle, closes it. A descriptor that never becomes a handle
+is the effect's own, closed on every path, as `tcp_connect.c` does when
+its setup fails. Since handles are affine, this keeps every parked fd
+open: an fd closed under the loop is a bug in the effect that closed it,
+and the number it freed may already belong to another open.
+
+`Chan` instead owns a native heap block containing its row and buffered
+Terms, wrapped in a reference count at birth so a shared Data cell may
+hold it. Handle copies use the ordinary native reference count. Close wakes
+waiters but preserves buffered values for copied handles; dropping the
+last handle releases the block and unread values. A parked channel
+operation retains its input handle until it wakes or times out. The C
+effect consumes that handle, rather than returning it beside the result.
+Channels share the native heap's reference-counting lifetime model, not
+a tracing garbage collector.
 
 Blocking work leaves the loop in two ways. `io_work(w, call, pack)` runs
 `call(w)` on a helper thread, then `pack(e, w)` on the loop; `pack`'s value
@@ -80,11 +100,13 @@ allocate it in the run function and free it in `pack`. In `bend2/effs/`,
 The `.js` file is a plain script, run once in a closure of its own, that
 registers the effect: `io_eff(CID(Clock.now), clock_now)`. The effect
 takes the def's arguments as JS values: a `U32` is a number, a `Nat` a
-`BigInt`, a `String` a string, a constructor
+number, a `String` a string, a constructor
 `{$: CID(Name), field: value}`, a handle its host value (a descriptor).
 `CID(Name)` is the constructor's tag, read as on the C side. It returns
 the answer the same way: `io_done(v)`, `io_fail(code)`,
-`io_tup(handle, result)`, `{$: CID(Unit)}`.
+`io_tup(handle, result)`, `{$: CID(Unit)}`. A `Nat` answer that is not a
+whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
+unchecked, so the host keeps it in that range.
 
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls

@@ -5,7 +5,7 @@
 # its own effect seam (the import ran, its answer fed Emit, exit 0),
 # tojs refused it loud, and tocl compiled it into a binary that
 # aborts with the internal "error 6: solo delivery lost" -- a foreign
-# def emits a REQUEST segment, dead without FID_CLO_APPLY, so the
+# def emits a REQUEST segment, dead without FID_Clo_apply, so the
 # root task never delivers. Now io_type, the shared main gate every
 # lane consults, refuses a foreign main the moment its type resolves
 # to base's IO, and the three lanes answer one law.

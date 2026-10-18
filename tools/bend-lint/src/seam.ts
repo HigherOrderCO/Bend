@@ -48,7 +48,7 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; js_sat(k: Name): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_id(pre: string, k: string): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
@@ -99,6 +99,7 @@ export type Checked = {
   book: Book;
   sources: Source[];
   map: Mapper;
+  declarations: Name[];
   facts?: Fact[];
   failure?: Diag;
 };
@@ -147,15 +148,16 @@ const PATCHES: Record<string, Patch> = {
       ...SHIMMED,
       ["export function term_infer(", "function unseen_term_infer("],
       ["export function term_check(", "function unseen_term_check("],
+      ["export function parse_book(", "function unseen_parse_book("],
     ],
-    tail: `import { seeInfer, seeCheck } from ${SHIM};\nexport const term_infer = seeInfer(unseen_term_infer);\nexport const term_check = seeCheck(unseen_term_check);\n`,
+    tail: `import { seeInfer, seeCheck, seeParseBook } from ${SHIM};\nexport const term_infer = seeInfer(unseen_term_infer);\nexport const term_check = seeCheck(unseen_term_check);\nexport const parse_book = seeParseBook(unseen_parse_book);\n`,
     exports: [],
   },
   "comp.ts": {
     edits: [],
     needs: ["let cli_args = [];", "function io_run(m) {"],
     tail: "",
-    exports: ["RUNTIME_MAIN", "js_sat"],
+    exports: ["RUNTIME_MAIN", "name_id"],
   },
   "main.ts": { edits: SHIMMED, tail: "", exports: ["book_read", "book_err", "Check_Fail"] },
 };
@@ -164,7 +166,10 @@ const PATCHES: Record<string, Patch> = {
 export const PATCHED = Object.keys(PATCHES);
 
 // Where the wrappers report, set for one check at a time.
-export const hook: { see?: (report: Report) => void } = {};
+export const hook: {
+  see?: (report: Report) => void;
+  parsed?: (dir: string, ns: string, names: Name[]) => void;
+} = {};
 
 // Text an editor holds unsaved, by real path, set for one check at a time.
 // bend.ts reads it in place of the file on disk.
@@ -270,7 +275,7 @@ export const path = {
 const arity = (f: (...args: never[]) => unknown, n: number, name: string): void => {
   if (f.length !== n) {
     throw drift(
-      `${name} takes ${f.length} parameters, not ${n}; update seeInfer and seeCheck in tools/bend-lint/src/seam.ts`,
+      `${name} takes ${f.length} parameters, not ${n}; update the wrappers in tools/bend-lint/src/seam.ts`,
     );
   }
 };
@@ -296,6 +301,17 @@ export const seeCheck = (f: typeof BendModule.term_check): typeof BendModule.ter
     const [bok, lhs, tm, qt, ty, ctx, dep] = args;
     hook.see?.({ tm: r.tm, ty, bok, ctx, dep, def: lhs.def, qt, us: r.us, spn: tm.s });
     return r;
+  };
+};
+
+// Record the declarations read by the parser, including imported law fills.
+export const seeParseBook = (f: typeof BendModule.parse_book): typeof BendModule.parse_book => {
+  arity(f, 5, "parse_book");
+  return (...args) => {
+    const [book, dir, , ns] = args;
+    const begin = book.order.length;
+    f(...args);
+    hook.parsed?.(dir, ns, book.order.slice(begin));
   };
 };
 
@@ -648,8 +664,10 @@ const checked = async (
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
+  let declarations: Name[] = [];
   reads = texts;
-  const seeded = real !== "" && /^import Base$/m.test(fs.readFileSync(real, "utf8"));
+  const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+    .test(fs.readFileSync(real, "utf8"));
   const key = fs.readFileSync(Bend.BASE_BEND, "utf8");
   if (seeded && BASE?.key !== key) {
     BASE = { key, book: Main.book_read(Bend.BASE_BEND) };
@@ -666,6 +684,9 @@ const checked = async (
   const read = await Promise.resolve(seeded ? BASE?.book : undefined)
     .then((base) => {
       hook.see = filters.length > 0 ? see : undefined;
+      hook.parsed = (dir, ns, names) => {
+        if (dir === home && ns === "") declarations = names;
+      };
       return Main.book_read(file, base, seen);
     })
     .then(
@@ -702,6 +723,7 @@ const checked = async (
       book,
       sources,
       map,
+      declarations,
       facts: filters.length > 0 ? [...new Map(facts).values()] : undefined,
     };
   }
@@ -716,6 +738,7 @@ const checked = async (
     book: Bend.book_nil(),
     sources,
     map,
+    declarations: [],
     failure: {
       code: "bend/check",
       severity: "error",
@@ -748,6 +771,7 @@ export const check = (
       return await checked(m, file, filters, signal);
     } finally {
       hook.see = undefined;
+      hook.parsed = undefined;
       reads = undefined;
       unsaved.clear();
     }
@@ -783,7 +807,7 @@ export const select = (
 // in meaning. No typecheck, disk writes or import fetches. A proof made
 // only of {==} has no body span, so its aliases come from the sources. A
 // proof of an imported law fills its declaration rather than creating one.
-const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): boolean => {
+const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, text: string): boolean => {
   const { Bend } = m;
   const root = sources.find((s) => s.root)!;
   const ns = FILES.get(root)!.ns;
@@ -823,17 +847,7 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
     },
     original.imports.length ? spanned() : {},
   );
-  const qualify = (name: string) => {
-    const dot = name.indexOf(".");
-    return dot >= 0 && aliases[name.slice(0, dot)] !== undefined
-      ? aliases[name.slice(0, dot)] + ":" + name.slice(dot + 1)
-      : (ns ? ns + ":" : "") + name;
-  };
-  const own = new Set(
-    [...root.text.matchAll(/^(?:@unsafe\s+)?(?:def|type|law)\s+([\w.]+)/gm)].map((match) =>
-      qualify(match[1]),
-    ),
-  );
+  const own = new Set(declarations);
   const seed = (): Book => {
     const fresh = Bend.book_nil();
     fresh.tlds = { ...book.tlds };
@@ -851,7 +865,13 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
   };
   const snapshot = (s: string) => {
     const parsed = seed();
-    Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
+    const held = hook.parsed;
+    hook.parsed = undefined;
+    try {
+      Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
+    } finally {
+      hook.parsed = held;
+    }
     const lower = (t: HTerm | null) => (t === null ? null : Bend.term_lower(t));
     return JSON.stringify(
       parsed.order.map((k) => {
@@ -985,7 +1005,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
   }
   const main = new Function(
     "require",
-    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.js_sat("main")}); };`,
+    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_id("$", "main")}); };`,
   )(import.meta.require) as (args: string[]) => number;
   return { id, want: want as FactFilter | null, main };
 };
@@ -1018,6 +1038,7 @@ const selfCheck = async (m: Loaded): Promise<void> => {
   demand(
     [
       ["check", run.failure === undefined],
+      ["declarations (parse_book)", run.declarations.join(",") === "N,id,main"],
       ["Ref id (term_infer)", views.some((v) => v.kind === "Ref" && v.name === "id")],
       ["Lam (term_check)", views.some((v) => v.kind === "Lam")],
       ["type", x !== undefined && ops.show(x.fact, ops.type(x.fact)) === "N"],

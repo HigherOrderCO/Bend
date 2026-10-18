@@ -313,6 +313,79 @@ def main() -> String:
     expect((await lint(fixture("import Base\ndef main() -> U32:\n  1\n"), [guard])).ok).toBe(true);
   });
 
+  test("indented declarations allow safe formatting", async () => {
+    fixture("import Base\nlaw same:\n  for x: U32\n  {x == x : U32}\n", "INDENTED_LAWS.bend");
+    for (const source of [
+      "import Base\n  def main()->U32: 7\n",
+      "import Base\n\tdef main()->U32: 7\n",
+      "import Base\n  type Box is Data:\n    Box{value: U32}\n  def main()->Box: Box{7}\n",
+      "import Base\n  law same:\n    for x: U32\n    {x == x : U32}\n  def same(x):\n    {==}\n",
+      "import Base\n  import ./INDENTED_LAWS.bend as Laws\n  def Laws.same(x):\n    {==}\n",
+      "import Base\n  @unsafe\n  def identity(x: U32)->U32: x\ndef main()->U32: identity(7)\n",
+    ]) {
+      for (const endOfLine of ["lf", "crlf"] as const) {
+        const newline = endOfLine === "crlf" ? "\r\n" : "\n";
+        await fixed(source.replaceAll("\n", newline), { ...opts, endOfLine });
+      }
+    }
+  });
+
+  test("the guard rejects changes to indented declarations", async () => {
+    const source = "import Base\n  def main()->U32: 7\ndef extra()->U32: 7\n";
+    const guard: LintRule = {
+      id: "test/indented-guard",
+      run: (cx) => {
+        expect(cx.sameDeclarations(cx.root.text)).toBe(true);
+        expect(cx.sameDeclarations(format(cx.root.text, opts))).toBe(true);
+        expect(cx.sameDeclarations(source.replace("main()->U32: 7", "main()->U32: 8"))).toBe(false);
+        expect(cx.sameDeclarations(source + "def added()->U32: 7\n")).toBe(false);
+        expect(cx.sameDeclarations(source.replace("def extra()->U32: 7\n", ""))).toBe(false);
+        return [];
+      },
+    };
+    expect((await lint(fixture(source), [guard])).ok).toBe(true);
+  });
+
+  test("the guard compares declaration-looking multiline literal contents", async () => {
+    fixture("import Base\ndef value()->U32: 7\n", "INDENTED_VALUE.bend");
+    const source =
+      'import Base\nimport ./INDENTED_VALUE.bend as D\n  def main()->String:\n    "first\ndef D.value() -> U32: 0\nlast"\n';
+    const guard: LintRule = {
+      id: "test/declaration-literal-guard",
+      run: (cx) => {
+        expect(cx.sameDeclarations(cx.root.text)).toBe(true);
+        expect(cx.sameDeclarations(format(cx.root.text, opts))).toBe(true);
+        expect(cx.sameDeclarations(source.replace("U32: 0", "U32: 1"))).toBe(false);
+        return [];
+      },
+    };
+    expect((await lint(fixture(source), [guard])).ok).toBe(true);
+  });
+
+  test("concurrent rules keep each check's declarations", async () => {
+    const alpha = fixture("import Base\ndef alpha()->U32: 7\n", "concurrent-alpha.bend");
+    const beta = fixture("import Base\ndef beta()->U32: 8\n", "concurrent-beta.bend");
+    for (let delay = 0; delay < 15; delay++) {
+      const same: boolean[] = [];
+      let malformed: boolean | undefined;
+      const checks = await Promise.all([
+        lint(alpha, [{ id: "test/alpha", async run(cx) {
+          for (let i = 0; i < delay; i++) await Promise.resolve();
+          same[0] = cx.sameDeclarations(cx.root.text);
+          malformed = cx.sameDeclarations("def");
+          return [];
+        } }], { config: {} }),
+        lint(beta, [{ id: "test/beta", run(cx) {
+          same[1] = cx.sameDeclarations(cx.root.text);
+          return [];
+        } }], { config: {} }),
+      ]);
+      expect(checks.every((result) => result.ok)).toBe(true);
+      expect(same).toEqual([true, true]);
+      expect(malformed).toBe(false);
+    }
+  });
+
   test("the guard compares import-looking multiline literal contents", async () => {
     const source = 'import Base\ndef main() -> String:\n  "first\nimport Base\nlast"\n';
     const guard: LintRule = {

@@ -82,8 +82,13 @@ type Image is Data:
   Pix{color: U32}
   Qua{tl: Image, tr: Image, bl: Image, br: Image}
 
+# Key is a key, pressed or let go. Text is what the keys typed, after
+# Shift, Caps Lock, the layout and any input method: never a control
+# character, so Enter or Backspace come only as Keys. A long input method
+# commit can come as several Texts.
 type Event is Data:
   Key{code: U32, down: Bool}
+  Text{text: String}
   Mouse{x: U32, y: U32, button: U32, down: Bool}
   Move{x: U32, y: U32}
   Look{dx: F32, dy: F32}
@@ -1779,7 +1784,7 @@ law F32.is_ge:
   Bool
 
 law F32.show:
-  for +a: F32
+  for a: F32
   String
 
 law F32.bits:
@@ -1813,13 +1818,36 @@ def F32.square(a: F32) -> F32:
     case F32{+x}:
       F32.mul(F32{x}, F32{x})
 
+# Outside [2^-60, 2^60] the squares would overflow or underflow, so scale
+# both sides by a power of two first; inside, the scale is 1 and exact.
 def F32.hypot(a: F32, b: F32) -> F32:
-  match a b:
-    case F32{+x} F32{+y}:
-      F32.sqrt(F32.add(F32.mul(F32{x}, F32{x}), F32.mul(F32{y}, F32{y})))
+  +x = F32.abs(a)
+  +y = F32.abs(b)
+  +m = F32.max(x, y)
+  +hi = F32.is_gt(m, 1.152921504606847e18)
+  +lo = F32.is_lt(m, 8.673617379884035e-19)
+  +s = Bool.pick(F32, hi, 8.470329472543003e-22,
+    Bool.pick(F32, lo, 1.2676506002282294e30, 1.0))
+  +u = Bool.pick(F32, hi, 1.1805916207174113e21,
+    Bool.pick(F32, lo, 7.888609052210118e-31, 1.0))
+  +p = F32.mul(x, s)
+  +q = F32.mul(y, s)
+  F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
+
+# A rounded zero keeps the input sign, including at the negative half.
+def F32.round.zero(a: F32, r: F32, zero: Bool) -> F32:
+  match zero:
+    case True{}:
+      F32.mul(a, 0.0)
+    case False{}:
+      r
 
 def F32.round(a: F32) -> F32:
-  F32.floor(F32.add(a, 0.5))
+  match a:
+    case F32{+x}:
+      +f = F32.floor(F32{x})
+      +r = F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
+      F32.round.zero(F32{x}, r, F32.is_eq(r, 0.0))
 
 def F32.pi() -> F32:
   3.14159265
@@ -1953,8 +1981,21 @@ def String.reverse.go(s: String, acc: String) -> String:
 def String.reverse(s: String) -> String:
   String.reverse.go(s, SNil{})
 
+# c is the order of the chars so far: the walk is one tail call per char
+# and builds nothing (String.cmp rebuilds both strings for its callers).
+def String.order.go(a: String, b: String, c: Cmp) -> Cmp:
+  match a b c:
+    case SNil{} SCon{h, t} EQ{}:
+      LT{}
+    case SCon{h, t} SNil{} EQ{}:
+      GT{}
+    case SCon{Chr{x}, t1} SCon{Chr{y}, t2} EQ{}:
+      String.order.go(t1, t2, U32.cmp(x, y))
+    case _ _ o:
+      o
+
 def String.order(a: String, b: String) -> Cmp:
-  Pair.snd(String & String, Cmp, String.cmp(a, b))
+  String.order.go(a, b, EQ{})
 
 def String.is_lt(a: String, b: String) -> Bool:
   Cmp.is_lt(String.order(a, b))

@@ -1,7 +1,6 @@
-# bend3's harness-cache adversary, stats side: --stats bypassed the
-# cache and measured a fresh check. bend has no --stats; the cache
-# half that still speaks is pinned -- the rendered page and the value
-# repeat byte-identically around each other off one in-process book
+# gates/test.ts's state_run compiles a second checked copy of this book
+# in one process, C and JS over and over, around normalization and the
+# next fixture: each must give the first copy's bytes and probe count.
 import Base
 
 law flip:
