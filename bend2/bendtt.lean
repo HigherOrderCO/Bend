@@ -518,7 +518,9 @@ def Nat.name (d : Nat) : String :=
   "x" ++ toString d
 
 def Term.show : Term → Nat → String
-  | Var i, d => Nat.name (d - i - 1)
+  | Var i, d =>
+    if i < d then Nat.name (d - i - 1)
+    else "free[" ++ toString (i - d) ++ "]"
   | Ref k, _ => k
   | Ann x T, d =>
     let x := Term.show x d
