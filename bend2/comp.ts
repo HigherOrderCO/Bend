@@ -245,6 +245,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
+  map_bit: { C: ["$0", "map_bit(e, $0, $1)"] },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -3978,6 +3979,15 @@ INLINE u64 term_peek(DEV u64* H, Term t) {
     return w64_load(&H[term_loc(t)]) >> 24;
   }
   return term_loc(t);
+}
+
+INLINE u64 map_bit(Env e, Term key, u64 pos) {
+  for (u64 i = pos / 33; i > 0 && term_aux(key) == CID(SCon); i -= 1) {
+    key = e.mem[term_peek(e.mem, key) + 1];
+  }
+  if (term_aux(key) != CID(SCon)) return 0;
+  u64 off = pos % 33;
+  return off == 0 || (((u32)e.mem[term_peek(e.mem, key)] >> (32 - off)) & 1);
 }
 
 #define blk_shr(t) (BLK_SHR && term_rfc(t))
