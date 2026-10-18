@@ -903,11 +903,22 @@ function term_refs(t: object, out: Set<string>): void {
 
 // cli_say writes text to fd, and drops it if the reader has left (EPIPE).
 function cli_say(fd: number, text: string): void {
-  try {
-    fs.writeSync(fd, text);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "EPIPE") {
-      throw e;
+  const data = Buffer.from(text);
+  for (let at = 0; at < data.length;) {
+    try {
+      const n = fs.writeSync(fd, data, at, data.length - at);
+      if (n === 0) {
+        throw new Error("bend: a write made no progress");
+      }
+      at += n;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EPIPE") {
+        return;
+      }
+      if (code !== "EAGAIN" && code !== "EINTR") {
+        throw e;
+      }
     }
   }
 }
