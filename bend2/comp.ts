@@ -5897,7 +5897,7 @@ static void show_val(Env e, u32 d, const Term* w, char chain) {
 // ===
 
 static void io_step(Env e, IoWork* a) {
-  for (;;) {
+  for (u32 step = 0; step < 64; step += 1) {
     u64  ap  = task_node(e, FID(Clo~apply), TERM_HOLE, 0, 0);
     e.mem[ap]     = a->cont;
     e.mem[ap + 1] = a->item;
@@ -5929,6 +5929,7 @@ static void io_step(Env e, IoWork* a) {
     }
     a->item = x;
   }
+  io_push(&io_runs, a);
 }
 
 OUTLINE void io_loop(u64* H) {
@@ -6324,8 +6325,17 @@ function io_addr(host, port) {
 
 let io_active;
 
+function io_queue(s) {
+  if (io_active.last === null) {
+    io_active.runs = s;
+  } else {
+    io_active.last.next = s;
+  }
+  io_active.last = s;
+}
+
 function io_push(fun, arg, fresh) {
-  io_active.runs.push({ fun, arg });
+  io_queue({ fun, arg, next: null });
   io_active.live += fresh ? 1 : 0;
 }
 
@@ -6371,14 +6381,14 @@ function io_park_on(fd, out, k, more, at) {
 }
 
 function io_run(m) {
-  const io = { runs: [], live: 0, waits: [] };
+  const io = { runs: null, last: null, live: 0, waits: [] };
   const parent = io_active;
   io_active = io;
   try {
     io_push(run_loop(m()), (x) => ({ $: "Emit", value: x }), true);
     let look = 0;
     for (let n = 0;; n += 1) {
-      if (io.runs.length === 0) {
+      if (io.runs === null) {
         if (io.live === 0) {
           return 0;
         }
@@ -6396,9 +6406,12 @@ function io_run(m) {
           io_wait(io, false);
         }
       }
-      const s = io.runs.shift();
+      const s = io.runs;
+      io.runs = s.next;
+      s.next = null;
+      if (io.runs === null) io.last = null;
       let op = s.fun(s.arg);
-      while (op !== undefined) {
+      for (let left = 64; op !== undefined; left -= 1) {
         if (op.$ === "Emit") {
           io.live -= 1;
           break;
@@ -6417,6 +6430,12 @@ function io_run(m) {
         }
         const x = run(...op.args, op.kont);
         if (x === undefined) {
+          break;
+        }
+        if (left === 1) {
+          s.fun = op.kont;
+          s.arg = x;
+          io_queue(s);
           break;
         }
         op = op.kont(x);
