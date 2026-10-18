@@ -638,10 +638,10 @@ A `Nat` literal past `256n` is `U32.to_nat(n)` underneath, up to `4294967295n`.
 
 ## Under the Hood
 
-Bend's compiler emits one C file, and that file is both the CPU program and the
-GPU kernel. clang compiles it for the CPU. Metal (on Apple) or CUDA (on NVIDIA)
-compiles the same file for the GPU. So a `!` call runs the same code on
-whichever chip it lands on.
+Bend emits one C file for CPU and GPU: clang builds the CPU program,
+Metal the Apple kernel, CUDA the NVIDIA kernel. Native scalar paths keep
+Base's definitions: checked repeated squaring for `Nat.pow`, count-leading-zero
+queries for `U32.log2` and fuel-bounded `Map.msb.u`.
 
 A term is one 64-bit word: small values are stored inline, everything else is a
 pointer into a single heap shared by every core and by the GPU. There is no
