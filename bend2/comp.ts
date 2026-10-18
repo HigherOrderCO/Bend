@@ -725,8 +725,12 @@ function weak_memo<K extends object, V>(m: WeakMap<K, V>, k: K, f: () => V): V {
   return out;
 }
 
+// Clear term-keyed caches after each definition is emitted.
+// TELES retains telescope type terms from definitions and fixed-point passes.
+// Reset probe indices with these caches; index 0 retains DUMMY.
 function memo_gc(): void {
-  [OPENS, USES, FOLDS, SPINES, CONSTS].forEach((m) => m.clear());
+  [OPENS, USES, FOLDS, SPINES, CONSTS, TELES].forEach((m) => m.clear());
+  PROBES.length = 1;
 }
 
 // Probe
