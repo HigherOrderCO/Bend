@@ -36,11 +36,12 @@ function diagnostic_join(site: string, values: (string | number)[],
   return result;
 }
 
-// By default, compile_book converges own/hot/stat with facts-only passes
-// before emitting C. These passes run the same definition and fact logic as
-// emission while file_push counts generated lines without retaining them.
-// Set BEND_FACTS_ONLY_FIRST=0 to compare the original full-emission loop.
-const FACTS_ONLY_FIRST = process.env.BEND_FACTS_ONLY_FIRST !== "0";
+// Facts-only passes are OFF by default on this lineage. They converge
+// own/hot/stat before emitting C, but on the large fixtures they measured
+// 22-24% slower than the two full passes they replace, with identical output
+// (paired interleaved A/B, 8 pairs per fixture, receipts in the round record).
+// Set BEND_FACTS_ONLY_FIRST=1 to enable them; the code path is unchanged.
+const FACTS_ONLY_FIRST = process.env.BEND_FACTS_ONLY_FIRST === "1";
 
 // Comp
 // ====
