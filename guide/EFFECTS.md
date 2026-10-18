@@ -38,7 +38,10 @@ replaces it with the name's own id, reading `Name` in the effect's
 namespace first (the file that declares the def), then in Base's, as the
 def's body would. A constructor the program does not use has no id, so
 `#ifdef CID(Name)` tests for it. `FID(name)` is a def's function id the
-same way. `f` holds the def's arguments in order: a `U32` is the word
+same way; a function referenced only through `FID` is retained in the
+compiled program. Both forms match complete identifier tokens, not
+suffixes of host identifiers such as `$CID` or `πCID`.
+`f` holds the def's arguments in order: a `U32` is the word
 (`(u32)f[0]`), a `String` is taken with `io_cstr(e, f[0], &len)` (a
 `malloc`ed copy you free), a packed handle with `io_hand_v(f[0])`. The loop
 calls the effect at once; an effect that waits (for a handle, or for time)
