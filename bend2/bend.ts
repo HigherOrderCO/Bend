@@ -1713,7 +1713,15 @@ export function parse_patt(p: Parse, t: LTerm): Patt {
   const book = p.book;
   switch (t.$) {
     case "Var": {
-      if (book_ctr(book, parse_reso(p, t.k)) !== null) {
+      // A bare name that names a constructor must not silently become a
+      // catch-all binder. In-file the guard fires, but cross-file (an imported
+      // datatype) parse_reso only yields the current namespace's name, so the
+      // guard missed it and a false law could pass. Also check every constructor
+      // whose last segment is the bare name (all of them are in scope here).
+      const resolved = parse_reso(p, t.k);
+      const isCtr = book_ctr(book, resolved) !== null ||
+        Object.keys(book.ctrs).some((ck) => ck === t.k || ck.endsWith(":" + t.k));
+      if (isCtr) {
         throw Err(book, ctx_nil(), "a braced constructor pattern (" + name_key(t.k) + " is a constructor: write " + name_key(t.k) + "{}, or rename the binder)", undefined, t.s);
       }
       return parse_bind(p, t);
