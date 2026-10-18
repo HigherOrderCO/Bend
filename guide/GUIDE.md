@@ -86,7 +86,7 @@ applications like `U32.add(2)` are closures too.
 
 ### Recursion and Termination
 
-Bend uses recursion to repeat work. Tail calls compile to loops.
+Tail calls compile to loops. Compiled JS uses repeated squaring for `Nat.pow`.
 
 ```python
 import Base
@@ -102,13 +102,10 @@ def main() -> U32:
   sum([1, 2, 3, 4], 0)
 ```
 
-Here, `t` has one fewer element than `xs`, so `sum` eventually reaches the empty
-list. Bend verifies termination by requiring recursive calls to use smaller
-parts of their inputs, obtained through pattern matching. The check reads the
-arguments of a recursive call from left to right: each must be passed unchanged
-until one is a smaller part of its parameter, and the ones after it are free.
-So, put the parameter that shrinks first. Also, is no `if` syntax yet. Use
-`match` on `True{}` and `False{}` instead.
+`t` is a pattern-bound tail of `xs`, so `sum` terminates. Recursive arguments
+must be passed unchanged, left to right, until one is a structurally smaller
+part of its parameter; later arguments are unrestricted. Put the shrinking
+parameter first. There is no `if`: match `True{}` or `False{}` instead.
 
 Termination is mandatory and mutual recursion is not allowed. Both restrictions
 keep Bend's proofs sound, as a function that never returns could otherwise prove

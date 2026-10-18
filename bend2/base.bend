@@ -2598,9 +2598,11 @@ def Map.bit.at(key: String, co: Nat & Nat) -> String & Bool:
   (ci, off) = co
   Map.bit.go(key, ci, off)
 
+# Each Char contributes a presence bit, then 32 code bits, most significant first.
 def Map.bit(key: String, pos: Nat) -> String & Bool:
   Map.bit.at(key, Nat.divmod(pos, 33n))
 
+# Bit width of x, capped by the fuel n; zero has width zero.
 law Map.msb.u:
   for n: Nat
   for +x: U32

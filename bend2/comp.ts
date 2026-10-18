@@ -234,9 +234,10 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   ...tpl_ops("nat_", "add:$1 double:$0", "nat_chk(e, $0 + $o)",
     "nat_chk($0 + $o)"),
   nat_mul: { C: "nat_mul(e, $0, $1)", JS: "nat_chk($0 * $1)" },
+  nat_pow: { JS: "nat_pow($0, $1)" },
   nat_cmp: { C: "(($0 > $1) + ($0 >= $1))", JS: "cmp_new($0, $1)" },
   ...tpl_ops("nat_", "sub", "($0 < $1 ? 0 : $0 - $1)"),
-  ...tpl_ops("nat_", "is_lt:<", "($0 $o $1)"),
+  ...tpl_ops("nat_", CMPS, "($0 $o $1)"),
   ...tpl_ops("nat_", "min:< max:>", "($0 $o $1 ? $0 : $1)"),
   nat_divmod: {
     C:  ["($1 == 0 ? 0 : $0 / $1)", "($1 == 0 ? $0 : $0 % $1)"],
@@ -244,12 +245,18 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   u32_show: { JS: "String($0)" },
+  map_bit: { JS: "map_bit($0, $1)" },
+  map_msb_u: { JS: "Math.min($0, 32 - Math.clz32($1))" },
   nat_show: { JS: "nat_show($0)" },
   u32_read: { JS: "decimal_read($0, 4294967295)" },
   nat_read: { JS: "decimal_read($0, 281474976710655)" },
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_order: { JS: "cmp_new(string_compare($0, $1), 0)" },
+  string_cmp: {
+    JS: "{$: \"Tuple\", fst: {$: \"Tuple\", fst: $0, snd: $1},"
+      + " snd: cmp_new(string_compare($0, $1), 0)}",
+  },
   string_eq: { JS: "(string_compare($0, $1) === 0)" },
   string_get: { JS: "string_get($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
@@ -506,6 +513,24 @@ function nat_chk(n) {
     throw "bend: ${ERRS[5]}";
   }
   return n;
+}
+
+function nat_pow(a, n) {
+  let r = 1;
+  while (n > 0) {
+    if (n % 2) r = nat_chk(r * a);
+    n = Math.floor(n / 2);
+    if (n > 0) a = nat_chk(a * a);
+  }
+  return r;
+}
+
+function map_bit(s, n) {
+  let i = 0, k = Math.floor(n / 33);
+  const off = n % 33;
+  while (i < s.length && k-- > 0) i += char_len(s, i);
+  return {$: "Tuple", fst: s, snd: i < s.length
+    && (off === 0 || ((char_code(s, i) >>> (32 - off)) & 1) !== 0)};
 }
 
 function nat_in(n) {
