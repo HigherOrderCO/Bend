@@ -212,7 +212,7 @@ async function state_run(): Promise<Fail[]> {
   const files = ["reg/borrow_loop", "run/harness_cache_compile",
     "run/harness_cache_purity", "run/harness_cache_stats"];
   const books: Bend.Book[][] = [];
-  for (const file of files) {
+  for (const file of [...files, "comptime/hand", "comptime/tmpl"]) {
     const copies = [Bend.book_nil(), Bend.book_nil()];
     for (const book of copies) {
       await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
@@ -224,8 +224,9 @@ async function state_run(): Promise<Fail[]> {
   const emit = (book: Bend.Book, lane: string): string =>
     Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book))
     + " bytes, " + String(Comp.PROBES.length) + " probes";
-  const base = books.map(([book]): Record<string, string> =>
-    ({ c: emit(book, "c"), js: emit(book, "js") }));
+  const base = books.slice(0, files.length)
+    .map(([book]): Record<string, string> =>
+      ({ c: emit(book, "c"), js: emit(book, "js") }));
   const fails: Fail[] = [];
   for (const [i, file] of files.entries()) {
     const book = books[i][1];
@@ -247,6 +248,18 @@ async function state_run(): Promise<Fail[]> {
           probe: "state " + file + " " + step, want: base[at][lane], got });
       }
     }
+  }
+  // The last two fixtures promise the same C up to definition names. Keep
+  // every other byte, naming each FID by its numeric declaration.
+  const twins = books.slice(-2).map(([book]): string => {
+    const c = Comp.compile_book(book);
+    const ids = new Map([...c.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
+      .map((m) => [m[1], "FID_" + m[2]]));
+    return c.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k);
+  });
+  if (twins[0] !== twins[1]) {
+    fails.push({ name: "comptime_tmpl", probe: "C matches hand",
+      want: String(Bun.hash(twins[0])), got: String(Bun.hash(twins[1])) });
   }
   return fails;
 }
