@@ -233,6 +233,8 @@ def add_zero(x):
 - Strings are linked lists of characters, so text processing is slow.
 - Base is small: expect to write helpers other languages ship built in.
 - Effects are few: print, env, time, sleep, spawn, channels, files, TCP, UDP.
+  UDP buffers fit IPv4's 65,507-byte payload limit. Text reads decode independently;
+  binary writes avoid intermediate number arrays.
 - No TLS, HTTP library, JSON or regex for now (you can add them as foreigns).
 - Targets are C, Metal, CUDA and JavaScript; Lua, Luau and Python are planned.
 - The JavaScript target runs on one core and has no graphics or audio.

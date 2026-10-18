@@ -6284,12 +6284,15 @@ function io_tup(...xs) {
   return xs.reduceRight((snd, fst) => ({ $: "Tuple", fst, snd }));
 }
 
+let io_encoder, io_decoder;
+
 function io_bytes(text) {
-  return new TextEncoder().encode(str_out(text));
+  return (io_encoder ??= new TextEncoder()).encode(str_out(text));
 }
 
 function io_text(b, n) {
-  return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b.subarray(0, n));
+  io_decoder ??= new TextDecoder("utf-8", { ignoreBOM: true });
+  return io_decoder.decode(b.subarray(0, n));
 }
 
 // Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
@@ -6303,11 +6306,17 @@ function io_list(b, n) {
 }
 
 function io_unlist(xs) {
-  const b = [];
-  for (; xs.$ === "Con"; xs = xs.tail) {
-    b.push(xs.head);
+  let n = 0;
+  for (let p = xs; p.$ === "Con"; p = p.tail) {
+    if (p.head > 255) return null;
+    ++n;
   }
-  return b.some((x) => x > 255) ? null : Uint8Array.from(b);
+  const b = new Uint8Array(n);
+  let i = 0;
+  for (; xs.$ === "Con"; xs = xs.tail) {
+    b[i++] = xs.head;
+  }
+  return b;
 }
 
 function io_addr(host, port) {
