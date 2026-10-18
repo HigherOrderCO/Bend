@@ -180,6 +180,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
   // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
+  u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -233,6 +234,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   ...tpl_ops("nat_", "add:$1 double:$0", "nat_chk(e, $0 + $o)",
     "nat_chk($0 + $o)"),
   nat_mul: { C: "nat_mul(e, $0, $1)", JS: "nat_chk($0 * $1)" },
+  nat_pow: { C: "nat_pow(e, $0, $1)" },
+  map_msb_u: { C: "map_msb_u($0, $1)" },
   nat_cmp: { C: "(($0 > $1) + ($0 >= $1))", JS: "cmp_new($0, $1)" },
   ...tpl_ops("nat_", "sub", "($0 < $1 ? 0 : $0 - $1)"),
   ...tpl_ops("nat_", "is_lt:<", "($0 $o $1)"),
@@ -382,6 +385,22 @@ INLINE u64 nat_chk(Env e, u64 n) {
 
 INLINE u64 nat_mul(Env e, u64 a, u64 b) {
   return nat_chk(e, b != 0 && a > NAT_IMM / b ? NAT_IMM + 1 : a * b);
+}
+
+INLINE u64 nat_pow(Env e, u64 a, u64 n) {
+  u64 r = 1;
+  while (n > 0) {
+    if (n & 1) r = nat_mul(e, r, a);
+    n >>= 1;
+    if (n) a = nat_mul(e, a, a);
+  }
+  return r;
+}
+
+INLINE u64 map_msb_u(u64 n, u32 x) {
+  if (n == 0 || x == 0) return 0;
+  u64 width = 32 - CLZ(x);
+  return n < width ? n : width;
 }
 
 #if DEVICE
