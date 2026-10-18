@@ -1559,44 +1559,43 @@ function book_show(e: Safe): string {
   while ([...e.taken].some((k) => new RegExp("^" + p + "[0-9]+$").test(k))) {
     p += "x";
   }
-  return e.out.map(([k, T, v, m]) => (m ? "opaque " : "") + k + " : " + o_show(T, p) + " =\n  " + o_show(v, p)).join("\n\n") + "\n";
+  const nm = (l: number): string => p + String(l);
+  function show(o: O): string {
+    switch (o.$) {
+      case "Var": return nm(o.l);
+      case "Ref": return o.k;
+      case "Ann": return `{${show(o.x)} : ${show(o.T)}}`;
+      case "Let": return `!${mark(o.q)}${nm(o.l)} = ${show(o.v)}; ${show(o.f)}`;
+      case "Typ": return `*(${show(o.q)})`;
+      case "Min": return `(${show(o.a)} <&> ${show(o.b)})`;
+      case "All": case "Sig":
+        return `${o.$ === "All" ? "∀" : "Σ"}${mark(o.q)}${nm(o.l)} : ${show(o.A)} -> ${show(o.B)}`;
+      case "Lam": return `λ${mark(o.q)}${nm(o.l)} => ${show(o.f)}`;
+      case "App": {
+        const xs: string[] = [];
+        let f: O = o;
+        while (f.$ === "App") {
+          xs.push(mark(f.q) + show(f.x));
+          f = f.f;
+        }
+        return `(${show(f)} ${xs.reverse().join(" ")})`;
+      }
+      case "Tup": return `(${mark(o.q)}${show(o.a)}, ${show(o.b)})`;
+      case "Prj": return `λ{(,): ${show(o.h)}}`;
+      case "Enu": return `<${o.ks.join(", ")}>`;
+      case "Lab": return o.k === "()" ? "()" : "." + o.k;
+      case "Mat": return `λ{${show({ $: "Lab", k: o.k })}: ${show(o.h)}; ${show(o.m)}}`;
+      case "Efq": return "λ{}";
+      case "Eql": return `{${show(o.a)} == ${show(o.b)} : ${show(o.T)}}`;
+      case "Rfl": return "{==}";
+      case "Rwt": return `%${show(o.e)} : ${nm(o.l)}, ${nm(o.l + 1)} => ${show(o.P)}; ${show(o.f)}`;
+    }
+  }
+  return e.out.map(([k, T, v, m]) => `${m ? "opaque " : ""}${k} : ${show(T)} =\n  ${show(v)}`).join("\n\n") + "\n";
 }
 
 function mark(q: Q): string {
   return q === 0 ? "-" : q === 2 ? "+" : "";
-}
-
-function o_show(o: O, p: string): string {
-  const nm = (l: number): string => p + String(l);
-  switch (o.$) {
-    case "Var": return nm(o.l);
-    case "Ref": return o.k;
-    case "Ann": return "{" + o_show(o.x, p) + " : " + o_show(o.T, p) + "}";
-    case "Let": return "!" + mark(o.q) + nm(o.l) + " = " + o_show(o.v, p) + "; " + o_show(o.f, p);
-    case "Typ": return "*(" + o_show(o.q, p) + ")";
-    case "Min": return "(" + o_show(o.a, p) + " <&> " + o_show(o.b, p) + ")";
-    case "All": return "∀" + mark(o.q) + nm(o.l) + " : " + o_show(o.A, p) + " -> " + o_show(o.B, p);
-    case "Lam": return "λ" + mark(o.q) + nm(o.l) + " => " + o_show(o.f, p);
-    case "App": {
-      const xs: string[] = [];
-      let f: O = o;
-      while (f.$ === "App") {
-        xs.push(mark(f.q) + o_show(f.x, p));
-        f = f.f;
-      }
-      return "(" + o_show(f, p) + " " + xs.reverse().join(" ") + ")";
-    }
-    case "Sig": return "Σ" + mark(o.q) + nm(o.l) + " : " + o_show(o.A, p) + " -> " + o_show(o.B, p);
-    case "Tup": return "(" + mark(o.q) + o_show(o.a, p) + ", " + o_show(o.b, p) + ")";
-    case "Prj": return "λ{(,): " + o_show(o.h, p) + "}";
-    case "Enu": return "<" + o.ks.join(", ") + ">";
-    case "Lab": return o.k === "()" ? "()" : "." + o.k;
-    case "Mat": return "λ{" + o_show({ $: "Lab", k: o.k }, p) + ": " + o_show(o.h, p) + "; " + o_show(o.m, p) + "}";
-    case "Efq": return "λ{}";
-    case "Eql": return "{" + o_show(o.a, p) + " == " + o_show(o.b, p) + " : " + o_show(o.T, p) + "}";
-    case "Rfl": return "{==}";
-    case "Rwt": return "%" + o_show(o.e, p) + " : " + nm(o.l) + ", " + nm(o.l + 1) + " => " + o_show(o.P, p) + "; " + o_show(o.f, p);
-  }
 }
 
 // Kernel
