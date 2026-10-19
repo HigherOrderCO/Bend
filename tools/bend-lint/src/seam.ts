@@ -472,8 +472,6 @@ export const fetchBend = async (
     nodeFs.rmSync(dir, { recursive: true, force: true });
     nodeFs.renameSync(part, dir);
   } catch (e) {
-    if (!cachedBend(dir)) throw e;
-  } finally {
     nodeFs.rmSync(part, { recursive: true, force: true });
     if (!whole()) {
       throw e;
