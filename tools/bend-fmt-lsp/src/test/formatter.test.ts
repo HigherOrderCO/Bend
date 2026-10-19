@@ -289,3 +289,38 @@ test("semicolon pins respect delimiters, literals, and comments", () => {
     assert.equal(formatBend(expected), expected);
   }
 });
+
+test("mixed line endings and the final-newline state survive formatting", () => {
+  for (const source of [
+    "import Base\r\ndef main()->U32:\n    7\r\n",
+    "import Base\ndef main()->U32:\r\n    7",
+    "import Base\r\ndef main()->U32:\r\n    7\r\n",
+  ]) {
+    const formatted = formatBend(source);
+    assert.deepEqual(formatted.match(/\r?\n/g), source.match(/\r?\n/g));
+    assert.equal(formatted.endsWith("\n"), source.endsWith("\n"));
+    assert.equal(formatBend(formatted), formatted);
+  }
+});
+
+test("nested cases keep their owner after a dedented body", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
+  const source = "import Base\ndef g(a:Bool,b:Bool)->Nat:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n  10n\n          case False{}:\n  20n\n    case False{}:\n  30n\ndef main()->Nat:\n  g(True{},False{})\n";
+  const directory = mkdtempSync(join(tmpdir(), "bend-fmt-cases-"));
+  const file = join(directory, "main.bend");
+  const run = (text: string) => {
+    writeFileSync(file, text);
+    const result = spawnSync(bun, [compiler, file], { encoding: "utf8", timeout: 60_000 });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    return result.stdout;
+  };
+  try {
+    assert.equal(run(source).trim(), "20n");
+    for (const options of [{}, { tabSize: 4 }, { insertSpaces: false }]) {
+      const formatted = formatBend(source, options);
+      assert.equal(run(formatted).trim(), "20n");
+      assert.equal(formatBend(formatted, options), formatted);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
