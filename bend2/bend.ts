@@ -3670,13 +3670,19 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       if (!term_compare("EQ", book, t_wnf.a, t_wnf.b, d)) {
         const file = tm.s?.file;
         const bnd  = ctx_scope(ctx);
-        // the de Bruijn markers are noise here: the note reads as prose
-        const plain = (s: string): string => s.replace(/\^\d+/g, "");
+        // as the rest of the error prints: the same rebasing, no strip
         const cut = (s: string): string => s.length <= 100 ? s : s.slice(0, 97) + "...";
-        const raw = (x: HTerm): string => plain(term_show(term_lower(x), -1, bnd, file));
+        const raw = (x: HTerm): string => term_show(term_lower(x, bnd.length), -1, bnd, file);
+        // the weak head normal form first: it is one step and short, so
+        // the strong one (the whole value) is only computed when the
+        // short one says nothing
         const show = (x: HTerm): string => {
-          const s = plain(expr_show(book, x, bnd, file));
-          return s.length <= 100 ? s : cut(plain(term_show(term_lower(term_wnf(book, x)), -1, bnd, file)));
+          const w = term_show(term_lower(term_wnf(book, x), bnd.length), -1, bnd, file);
+          if (w.length <= 100) {
+            return w;
+          }
+          const s = expr_show(book, x, bnd, file);
+          return s.length <= 100 ? s : cut(w);
         };
         const lft  = raw(t_wnf.a);
         const rgt  = raw(t_wnf.b);
