@@ -6325,17 +6325,8 @@ function io_addr(host, port) {
 
 let io_active;
 
-function io_queue(s) {
-  if (io_active.last === null) {
-    io_active.runs = s;
-  } else {
-    io_active.last.next = s;
-  }
-  io_active.last = s;
-}
-
 function io_push(fun, arg, fresh) {
-  io_queue({ fun, arg, next: null });
+  io_active.runs.push({ fun, arg });
   io_active.live += fresh ? 1 : 0;
 }
 
@@ -6381,14 +6372,14 @@ function io_park_on(fd, out, k, more, at) {
 }
 
 function io_run(m) {
-  const io = { runs: null, last: null, live: 0, waits: [] };
+  const io = { runs: [], live: 0, waits: [] };
   const parent = io_active;
   io_active = io;
   try {
     io_push(run_loop(m()), (x) => ({ $: "Emit", value: x }), true);
     let look = 0;
     for (let n = 0;; n += 1) {
-      if (io.runs === null) {
+      if (io.runs.length === 0) {
         if (io.live === 0) {
           return 0;
         }
@@ -6406,10 +6397,7 @@ function io_run(m) {
           io_wait(io, false);
         }
       }
-      const s = io.runs;
-      io.runs = s.next;
-      s.next = null;
-      if (io.runs === null) io.last = null;
+      const s = io.runs.shift();
       let op = s.fun(s.arg);
       for (let left = 64; op !== undefined; left -= 1) {
         if (op.$ === "Emit") {
@@ -6435,7 +6423,7 @@ function io_run(m) {
         if (left === 1) {
           s.fun = op.kont;
           s.arg = x;
-          io_queue(s);
+          io.runs.push(s);
           break;
         }
         op = op.kont(x);
