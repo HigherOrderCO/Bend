@@ -3670,15 +3670,17 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       if (!term_compare("EQ", book, t_wnf.a, t_wnf.b, d)) {
         const file = tm.s?.file;
         const bnd  = ctx_scope(ctx);
+        // the de Bruijn markers are noise here: the note reads as prose
+        const plain = (s: string): string => s.replace(/\^\d+/g, "");
         const show = (x: HTerm): string => {
-          const s = expr_show(book, x, bnd, file);
+          const s = plain(expr_show(book, x, bnd, file));
           if (s.length <= 100) {
             return s;
           }
-          const w = term_show(term_lower(term_wnf(book, x)), -1, bnd, file);
+          const w = plain(term_show(term_lower(term_wnf(book, x)), -1, bnd, file));
           return w.length <= 100 ? w : w.slice(0, 97) + "...";
         };
-        const raw = (x: HTerm): string => term_show(term_lower(x, bnd.length), -1, bnd, file);
+        const raw = (x: HTerm): string => plain(term_show(term_lower(x), -1, bnd, file));
         const lft  = raw(t_wnf.a);
         const rgt  = raw(t_wnf.b);
         const lval = show(t_wnf.a);
