@@ -3678,11 +3678,13 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
           const w = term_show(term_lower(term_wnf(book, x)), -1, bnd, file);
           return w.length <= 100 ? w : w.slice(0, 97) + "...";
         };
-        const lft  = term_show(term_lower(t_wnf.a), -1, bnd, file);
-        const rgt  = term_show(term_lower(t_wnf.b), -1, bnd, file);
+        const raw = (x: HTerm): string => term_show(term_lower(x), -1, bnd, file).replace(/\^\d+/g, "");
+        const lft  = raw(t_wnf.a);
+        const rgt  = raw(t_wnf.b);
         const lval = show(t_wnf.a);
         const rval = show(t_wnf.b);
-        const nte  = "- left     : " + lft + "  =>  " + lval + "\n- right    : " + rgt + "  =>  " + rval;
+        const cut = (s: string): string => s.length <= 100 ? s : s.slice(0, 97) + "...";
+        const nte  = "- left     : " + cut(lft) + "  =>  " + lval + "\n- right    : " + cut(rgt) + "  =>  " + rval;
         throw Err(book, ctx, "{==} needs both sides to compute to the same value", undefined, tm.s, lhs.def, nte);
       }
       return Check(tm, ty, uses_nil());
