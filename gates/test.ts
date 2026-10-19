@@ -11,7 +11,8 @@
 // the compiler refuses to print (a function, a Type, an erased or dependent
 // field) is checked and interpreted only; a foreign def with no twin for a
 // lane drops that lane; any other build failure fails its lanes. Meanwhile,
-// here, one process compiles four of them over and over (state_run).
+// here, one process compares the comptime twins' C, then compiles four
+// state fixtures over and over (state_run).
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -201,6 +202,32 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
 // State
 // =====
 
+// The comptime twins promise the same C up to definition names. Keep
+// every other byte, naming each FID by its numeric declaration.
+async function comptime_run(): Promise<Fail[]> {
+  const emit = async (file: string): Promise<string[]> => {
+    const book = Bend.book_nil();
+    await Bend.book_load(book, path.join(TESTS, "comptime", file + ".bend"),
+      "", new Map());
+    Bend.book_valid(book);
+    const c = Comp.compile_book(book);
+    const ids = new Map([...c.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
+      .map((m) => [m[1], "FID_" + m[2]]));
+    return c.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k).split("\n");
+  };
+  const hand = await emit("hand");
+  const tmpl = await emit("tmpl");
+  for (let i = 0; i < hand.length || i < tmpl.length; ++i) {
+    if (hand[i] !== tmpl[i]) {
+      return [{ name: "comptime_tmpl",
+        probe: "C matches hand at line " + String(i + 1),
+        want: hand[i] ?? "(end of file)", got: tmpl[i] ?? "(end of file)" }];
+    }
+  }
+  return [];
+}
+
+// After comparing the comptime twins, check the four state fixtures.
 // A process may compile many books (the bun loader, io_run), and none may
 // leave state for the next: #976 kept every book's probes, with the same
 // bytes. Each fixture loads and checks twice. Its first copy's C and JS
@@ -209,10 +236,11 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
 // at every step: C, C, JS, C, normalization, JS, C, the next fixture (+),
 // C, JS. It builds and runs nothing: the shards run these programs.
 async function state_run(): Promise<Fail[]> {
+  const fails = await comptime_run();
   const files = ["reg/borrow_loop", "run/harness_cache_compile",
     "run/harness_cache_purity", "run/harness_cache_stats"];
   const books: Bend.Book[][] = [];
-  for (const file of [...files, "comptime/hand", "comptime/tmpl"]) {
+  for (const file of files) {
     const copies = [Bend.book_nil(), Bend.book_nil()];
     for (const book of copies) {
       await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
@@ -224,10 +252,8 @@ async function state_run(): Promise<Fail[]> {
   const emit = (book: Bend.Book, lane: string): string =>
     Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book))
     + " bytes, " + String(Comp.PROBES.length) + " probes";
-  const base = books.slice(0, files.length)
-    .map(([book]): Record<string, string> =>
-      ({ c: emit(book, "c"), js: emit(book, "js") }));
-  const fails: Fail[] = [];
+  const base = books.map(([book]): Record<string, string> =>
+    ({ c: emit(book, "c"), js: emit(book, "js") }));
   for (const [i, file] of files.entries()) {
     const book = books[i][1];
     // the steps on this fixture's second copy; + is the next fixture's
@@ -248,18 +274,6 @@ async function state_run(): Promise<Fail[]> {
           probe: "state " + file + " " + step, want: base[at][lane], got });
       }
     }
-  }
-  // The last two fixtures promise the same C up to definition names. Keep
-  // every other byte, naming each FID by its numeric declaration.
-  const twins = books.slice(-2).map(([book]): string => {
-    const c = Comp.compile_book(book);
-    const ids = new Map([...c.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
-      .map((m) => [m[1], "FID_" + m[2]]));
-    return c.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k);
-  });
-  if (twins[0] !== twins[1]) {
-    fails.push({ name: "comptime_tmpl", probe: "C matches hand",
-      want: String(Bun.hash(twins[0])), got: String(Bun.hash(twins[1])) });
   }
   return fails;
 }
