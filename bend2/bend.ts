@@ -1712,11 +1712,18 @@ export function parse_bind(p: Parse, t: LTerm): PVar {
 export function parse_patt(p: Parse, t: LTerm): Patt {
   const book = p.book;
   switch (t.$) {
+    case "Ref":
     case "Var": {
-      if (book_ctr(book, parse_reso(p, t.k)) !== null) {
-        throw Err(book, ctx_nil(), "a braced constructor pattern (" + name_key(t.k) + " is a constructor: write " + name_key(t.k) + "{}, or rename the binder)", undefined, t.s);
+      const var_ = t.$ === "Var";
+      const k = var_ ? parse_reso(p, t.k) : t.k;
+      if (book_ctr(book, k) !== null) {
+        const n = var_ ? name_key(t.k) : name_show(p, k);
+        throw Err(book, ctx_nil(), "a braced constructor pattern (" + n + " is a constructor: write " + n + "{}" + (var_ ? ", or rename the binder)" : ")"), undefined, t.s);
       }
-      return parse_bind(p, t);
+      if (var_) {
+        return parse_bind(p, t);
+      }
+      break;
     }
     case "Ctr": {
       const ctr = book_ctr(book, t.k);
@@ -1731,10 +1738,8 @@ export function parse_patt(p: Parse, t: LTerm): Patt {
     case "Lit": {
       return parse_patt(p, lit_step(t));
     }
-    default: {
-      throw Err(book, ctx_nil(), "a pattern (a binder or a constructor)", term_show(term_lower(term_higher(t), 0)), t.s);
-    }
   }
+  throw Err(book, ctx_nil(), "a pattern (a binder or a constructor)", term_show(term_lower(term_higher(t), 0)), t.s);
 }
 
 // Term
