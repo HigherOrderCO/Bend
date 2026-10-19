@@ -2039,9 +2039,6 @@ def String.starts_with.go(p, s):
 def String.starts_with(s, p):
   String.starts_with.go(p, s)
 
-def String.starts_with.if(t: String, pt: String, same: Bool) -> Bool:
-  String.starts_with.go.if(pt, t, same)
-
 def String.ends_with(s: String, p: String) -> Bool:
   String.starts_with(String.reverse(s), String.reverse(p))
 
