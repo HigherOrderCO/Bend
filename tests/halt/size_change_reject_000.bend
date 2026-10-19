@@ -36,8 +36,7 @@ def main(): go(S{Z{}}, S{Z{}})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : go
+#|- message  : go's 1st argument, S{Z{}}, is not smaller than a
 #|Context:
 #|- q : N
 #|Location: go
@@ -45,4 +44,5 @@ def main(): go(S{Z{}}, S{Z{}})
 #|24>|           go(S{Z{}}, q)
 #|   |           ^^
 #|25 |     case S{p}:
+#|Note: pass a part of a, or mark the def @unsafe to skip the termination check.
 #|exit 1

@@ -24,8 +24,7 @@ def main(): 0n
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : rec
+#|- message  : rec's 1st argument, g(0n), is not smaller than o
 #|Context:
 #|- g : @_:Nat -> Ord
 #|Location: rec
@@ -33,4 +32,5 @@ def main(): 0n
 #|18>|       rec(g(0n))
 #|   |       ^^^
 #|19 |
+#|Note: pass a part of o, or mark the def @unsafe to skip the termination check.
 #|exit 1

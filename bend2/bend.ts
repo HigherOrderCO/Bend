@@ -3232,6 +3232,13 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
 // names it as open. term_key of the arguments names the instance, and
 // the first call mints it and checks it as a def one level deeper.
 
+// 1st, 2nd, 3rd, ..: an argument's place in a self-call
+function ordinal(n: number): string {
+  const s = n % 100;
+  const suf = s >= 11 && s <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return String(n) + suf;
+}
+
 export function term_descend(q: Quant, arg: HTerm, col: HTerm): Cmp {
   if (q.$ === "None") {
     return "EQ";
@@ -3333,6 +3340,24 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
             ord = term_descend(lhs.qs[j], sp[j], cols[j]);
           }
           if (ord !== "LT") {
+            const tld  = book.tlds[lhs.def];
+            const doms = tld?.$ === "Def" ? tele_unbind(book, tld.T).doms : [];
+            const file = tm.s?.file;
+            const bnd  = ctx_scope(ctx);
+            let at = -1;
+            for (let j = 0; j < sp.length && j < doms.length; j++) {
+              if (expr_show(book, sp[j], bnd, file) !== name_show(file, doms[j][1])) {
+                at = j;
+                break;
+              }
+            }
+            at = at < 0 ? 0 : at;
+            if (at < sp.length && at < doms.length) {
+              const arg = expr_show(book, sp[at], bnd, file);
+              const col = name_show(file, doms[at][1]);
+              const nte = "Note: pass a part of " + col + ", or mark the def @unsafe to skip the termination check.";
+              throw Err(book, ctx, name_key(lhs.def) + "'s " + ordinal(at + 1) + " argument, " + arg + ", is not smaller than " + col, undefined, tm.s, lhs.def, nte);
+            }
             throw Err(book, ctx, "a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)", tm, tm.s, lhs.def);
           }
         }

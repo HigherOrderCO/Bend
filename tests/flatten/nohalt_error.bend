@@ -34,11 +34,11 @@ def main(): Fx4{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : bad
+#|- message  : bad's 1st argument, Fx4{}, is not smaller than b
 #|Location: bad
 #|25 |     case Tx4{}:
 #|26>|       bad(flip(Tx4{}))
 #|   |       ^^^
 #|27 |     case Fx4{}:
+#|Note: pass a part of b, or mark the def @unsafe to skip the termination check.
 #|exit 1

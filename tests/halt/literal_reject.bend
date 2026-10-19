@@ -22,11 +22,11 @@ def main(): f(3n)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : f
+#|- message  : f's 1st argument, 7n, is not smaller than n
 #|Location: f
 #|13 |     case 5n:
 #|14>|       f(7n)
 #|   |       ^
 #|15 |     case p:
+#|Note: pass a part of n, or mark the def @unsafe to skip the termination check.
 #|exit 1
