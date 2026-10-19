@@ -1808,10 +1808,12 @@ def F32.max(a: F32, b: F32) -> F32:
 def F32.clamp(x: F32, lo: F32, hi: F32) -> F32:
   F32.min(F32.max(x, lo), hi)
 
+# The weighted sum is exact at both endpoints and does not overflow between
+# finite endpoints of opposite signs, as b - a can.
 def F32.lerp(a: F32, b: F32, t: F32) -> F32:
-  match a:
-    case F32{+x}:
-      F32.add(F32{x}, F32.mul(F32.sub(b, F32{x}), t))
+  match t:
+    case F32{+z}:
+      F32.add(F32.mul(a, F32.sub(1.0, F32{z})), F32.mul(b, F32{z}))
 
 def F32.square(a: F32) -> F32:
   match a:
@@ -1855,8 +1857,23 @@ def F32.pi() -> F32:
 def F32.from_nat(n: Nat) -> F32:
   U32.to_f32(U32.from_nat(n))
 
+# Preserve the direct cast below 2^32; wider Nats need both word halves.
+# Past 2^48-1 no Nat fits, so the direct cast gives 0.
+def F32.to_nat.wide(+a: F32, wide: Bool) -> Nat:
+  match wide:
+    case False{}:
+      U32.to_nat(F32.to_u32(a))
+    case True{}:
+      +hi = U32.to_nat(F32.to_u32(F32.div(a, 4294967296.0)))
+      +lo = U32.to_nat(F32.to_u32(F32.mod(a, 4294967296.0)))
+      Nat.add(Nat.mul(hi, Nat.mul(65536n, 65536n)), lo)
+
 def F32.to_nat(a: F32) -> Nat:
-  U32.to_nat(F32.to_u32(a))
+  match a:
+    case F32{+x}:
+      +wide = Bool.and(F32.is_ge(F32{x}, 4294967296.0),
+        F32.is_lt(F32{x}, 281474976710656.0))
+      F32.to_nat.wide(F32{x}, wide)
 
 # Char
 # ----
@@ -2014,23 +2031,30 @@ law String.starts_with:
   for p: String
   Bool
 
-def String.starts_with.if(t: String, pt: String, same: Bool) -> Bool:
+law String.starts_with.go:
+  for p: String
+  for s: String
+  Bool
+
+def String.starts_with.go.if(pt: String, t: String, same: Bool) -> Bool:
   match same:
     case False{}:
       False{}
     case True{}:
-      String.starts_with(t, pt)
+      String.starts_with.go(pt, t)
+
+# Match the prefix first so an exhausted prefix never inspects the tail.
+def String.starts_with.go(p, s):
+  match p s:
+    case SNil{} _:
+      True{}
+    case SCon{y, yt} SNil{}:
+      False{}
+    case SCon{y, yt} SCon{x, xt}:
+      String.starts_with.go.if(yt, xt, Char.is_eq(x, y))
 
 def String.starts_with(s, p):
-  match s p:
-    case SNil{} SNil{}:
-      True{}
-    case SNil{} SCon{h, t}:
-      False{}
-    case SCon{h, t} SNil{}:
-      True{}
-    case SCon{x, xt} SCon{y, yt}:
-      String.starts_with.if(xt, yt, Char.is_eq(x, y))
+  String.starts_with.go(p, s)
 
 def String.ends_with(s: String, p: String) -> Bool:
   String.starts_with(String.reverse(s), String.reverse(p))

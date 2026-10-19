@@ -1247,7 +1247,7 @@ function put(e: Safe, x: Map<string, string> | Set<string>, k: string, v = ""): 
 // m's selector, annotated (the kernel infers an unreduced mode)
 function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, live: boolean): O {
   const n = g.qs.length;
-  if (ps.length < (e.book.tlds[m] as Def).n || ps.slice(n).some((p) => p[3] !== null)) {
+  if (ps.length < Math.max(e.book.tlds[m].n, n) || ps.slice(n).some((p) => p[3] !== null)) {
     oos("a partial or specialized call to " + m + ", mutually recursive");
   }
   const k = item_ref(e, "\t" + g.k, ps.slice(0, n).map((p) => p[3]), live);
@@ -1270,7 +1270,7 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
   const rest = (s1: Scope, m: Name) => {
     const tld = e.book.tlds[m];
     const nx = tld.$ === "Def" ? tld.x : 0;
-    const r = tele_open(e, s1, tld.T, lead, tld.n);
+    const r = tele_open(e, s1, tld.T, lead, Math.max(tld.n, lead.length));
     const qs = B.tele_unbind(e.book, tld.T).doms.map(([q]) => quant(q));
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
   };

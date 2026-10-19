@@ -93,7 +93,12 @@ allow(/^tools\/bend-lint\/rules\/[a-z_]+(\.test)?\.(ts|bend)$/);
 // ====
 
 function ttok(file: string): number {
-  const got = child.spawnSync("ttok", [], { input: fs.readFileSync(file) });
+  // the model is named, not left to the installed ttok: 1.0 counts with
+  // gpt-5 and 0.3 with gpt-3.5-turbo, and the second counts 4.5% less on
+  // Lean, so the same tree passes the caps under one and fails under the
+  // other. The caps are permanent, so the count they mean is pinned here.
+  const got = child.spawnSync("ttok", ["-m", "gpt-3.5-turbo"],
+    { input: fs.readFileSync(file) });
   const n = Number(got.stdout?.toString().trim() || NaN);
   if (got.status !== 0 || !(n > 0)) {
     throw new Error("ttok counted nothing for " + file + " (pipx install ttok)");
