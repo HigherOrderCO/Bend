@@ -2826,9 +2826,11 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
 // namespace, else as is. An effect source is read once, in one namespace.
+// effect_srcs splices a C source's backslash-newlines first, as C does even
+// in a comment; JS does not.
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  return src.replace(/\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
     }
@@ -2852,7 +2854,10 @@ function effect_srcs(ext: string, miss: string): string[] {
     }
     seen.set(path, m);
   }
-  return [...seen].map(([p, m]) => c_ids(fs.readFileSync(p, "utf8"), m));
+  return [...seen].map(([p, m]) => {
+    const src = fs.readFileSync(p, "utf8");
+    return c_ids(ext === ".c" ? src.replace(/\\[ \t]*\r?\n/g, "") : src, m);
+  });
 }
 
 // C
