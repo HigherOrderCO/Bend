@@ -179,7 +179,10 @@ const OPERATIONS = new Map(Object.entries({
     bit: [["$0", "map_bit(e, $0, $1)"]],
   },
   Bool: tpl_ops("or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
-  String: { append: [undefined, "($0 + $1)"], length: [undefined, "[...str_out($0)].length"] },
+  String: {
+    append: [undefined, "($0 + $1)"], contains: [undefined, "string_contains($0, $1)"],
+    length: [undefined, "[...str_out($0)].length"],
+  },
   Array: {
     ...Object.fromEntries(Object.entries({
       new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
@@ -436,7 +439,7 @@ function f32_from_bits(u) {
 }
 
 function f32_read(s) {
-  const re = /^[\t\n\v\f\r ]*[+-]?((\d+\.?\d*|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
+  const re = /^[\t\n\v\f\r ]*[+-]?((\d+(?:\.\d*)?|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
   const v = f32_round(s.replace(/inf\w*/i, "Infinity"));
   return re.test(s) ? {$: ${js_tag("Some")}, value: v} : {$: ${js_tag("None")}};
 }
@@ -445,13 +448,23 @@ const f32_round = ${Bend.f32_round};
 
 const char_new = ${char_new};
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, at = 0) {
+  return s[at] === "\uDC00" ? 4 : s.codePointAt(at) > 0xFFFF ? 2 : 1;
 }
 
 function char_code(s) {
   return s.length < 4 ? s.codePointAt(0)
     : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+}
+
+function string_contains(s, p) {
+  // A match must start at a Char boundary, not inside a packed U32 code.
+  for (let at = 0; at <= s.length; at += char_len(s, at)) {
+    if (s.startsWith(p, at)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function str_out(s) {
@@ -590,7 +603,7 @@ function lit_call(s: Of<"Lit">): HTerm | null {
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
   return s.$ !== "Lit" ? s
-    : memo(FL.memo.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
+    : memo(FL.steps, Bend.term_key(s), () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -598,10 +611,12 @@ function term_strip(t: HTerm): HTerm {
 }
 
 function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
-  return memo(FL.memo.opens, t, () => {
-    const ps = (t.$ === "Lam" ? [t.k] : t.k).map((k) => probe(k));
-    return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
-  });
+  const got = FL.memo.opens.get(t);
+  if (got !== undefined) return got;
+  const ps = (t.$ === "Lam" ? [t.k] : t.k).map((k) => probe(k));
+  const opened = { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
+  FL.memo.opens.set(t, opened);
+  return opened;
 }
 
 function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
@@ -618,37 +633,39 @@ function let_live(t: Of<"Let">): boolean[] {
 }
 
 function term_spine(tm: HTerm): Spine {
-  return memo(FL.memo.spines, tm, () => {
-    const apps: Of<"App">[] = [];
-    let h = tm;
-    let c = term_force(tm);
-    while (c.$ === "Ann" || c.$ === "App") {
-      if (c.$ === "App") {
-        apps.push(c);
-        h = c.f;
-      }
-      c = term_force(c.$ === "App" ? c.f : c.x);
+  const got = FL.memo.spines.get(tm);
+  if (got !== undefined) return got;
+  const apps: Of<"App">[] = [];
+  let h = tm;
+  let c = term_force(tm);
+  while (c.$ === "Ann" || c.$ === "App") {
+    if (c.$ === "App") {
+      apps.push(c);
+      h = c.f;
     }
-    apps.reverse();
-    const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
-    const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
-    const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
-    const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
-    const all = apps.map((a) => a.x);
-    const args = all.filter((_, i) => live[i]);
-    const def = c.$ === "Ref" && intr_of(c.k) === undefined
-      && fun_runs(tld) ? c.k : null;
-    const need = def === null ? 0 : fun_of(def).lays.length;
-    const a = apps[live.lastIndexOf(true)];
-    const m = { h, t: c, all, args, tld, k: null, xs: args };
-    if (def !== null && args.length === need) {
-      return { ...m, k: def, b: (c as Of<"Ref">).b };
-    }
-    if (args.length > need && (def !== null || c.$ !== "Ref")) {
-      return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
-    }
-    return m;
-  });
+    c = term_force(c.$ === "App" ? c.f : c.x);
+  }
+  apps.reverse();
+  const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
+  const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
+  const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
+  const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
+  const all = apps.map((a) => a.x);
+  const args = all.filter((_, i) => live[i]);
+  const def = c.$ === "Ref" && intr_of(c.k) === undefined
+    && fun_runs(tld) ? c.k : null;
+  const need = def === null ? 0 : fun_of(def).lays.length;
+  const a = apps[live.lastIndexOf(true)];
+  const m: Spine = { h, t: c, all, args, tld, k: null, xs: args };
+  if (def !== null && args.length === need) {
+    m.k = def;
+    m.b = (c as Of<"Ref">).b;
+  } else if (args.length > need && (def !== null || c.$ !== "Ref")) {
+    m.k = CLO_APPLY;
+    m.xs = [a.f, a.x];
+  }
+  FL.memo.spines.set(tm, m);
+  return m;
 }
 
 function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
@@ -725,6 +742,8 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
   return Bend.pmap_get(u, p.i) ?? 0;
 }
 
+const ADD = (a: number, b: number) => a + b;
+
 function term_uses(tm: HTerm): Bend.PMap<number> {
   const got = FL.memo.uses.get(tm);
   if (got !== undefined) return got;
@@ -734,7 +753,7 @@ function term_uses(tm: HTerm): Bend.PMap<number> {
     const p = probe_of(t);
     if (p !== DUMMY) uses = Bend.pmap_set(USE0, p.i, 1);
   } else {
-    const add = t.$ === "Mat" ? Math.max : (a: number, b: number) => a + b;
+    const add = t.$ === "Mat" ? Math.max : ADD;
     for (const x of term_kids(t)) uses = Bend.pmap_union(uses, term_uses(x), add);
   }
   FL.memo.uses.set(tm, uses);
@@ -961,7 +980,8 @@ function lay_node(k: QName): Lay {
 
 // An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
-  return ty_holds(A, (t) => ty_tag(t, "Var App")) ? v.lay : lay_of(A);
+  return A && memo(FL.opens, scoped_key(A), () =>
+    ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
 function lay_eq(a: Lay, b: Lay): boolean {
@@ -1360,6 +1380,7 @@ function file_new(book: Bend.Book, js: boolean) {
     holds: new Map<string, Lay>(),
     hold: new Map<string, boolean>(),
 
+    steps: new Map<string, HTerm>(), opens: new Map<string, boolean>(),
     srcs: new Map<QName, Set<QName> | null>(), loops: new Map<QName, QName[]>(),
     flats: new Map<QName, boolean>(), funs: new Map<QName, Fun>(), brws: new Map<QName, boolean[]>(),
 
@@ -1369,7 +1390,7 @@ function file_new(book: Bend.Book, js: boolean) {
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
       uses: new Map<HTerm, Bend.PMap<number>>(), folds: new Map<HTerm, HTerm | null>(),
-      spines: new Map<HTerm, Spine>(), steps: new Map<HTerm, HTerm>(),
+      spines: new Map<HTerm, Spine>(),
     },
   };
 }
@@ -1520,9 +1541,6 @@ function spare_flush(sc: Scope): void {
 
 // Seg
 // ===
-
-// A segment enters by popping its frame and reading its
-// parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: QName, ret: Lay, vals: Val[], frame: Seg["frame"] = null): Seg {
   return {
@@ -1796,9 +1814,10 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // Bind
 // ====
 
-// A binding counts its uses: the last takes the value, an earlier one
-// shares it. A shared box of a flat type unboxes first, so its words copy,
-// not its node. A frame slot holding a shared word takes the wrapped one.
+// A binding counts its uses: the last takes the value, an earlier
+// one shares it. A fresh binding of a shared box of a flat type
+// unboxes before its first share, so its words copy, not its node.
+// A share may wrap its word: a frame slot holding it takes the new one.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -1808,8 +1827,11 @@ function bind_pop(sc: Scope, x: HTerm): Val {
     return b.val;
   }
   bind_set(sc, p, b, b.n - 1);
+  const fr = sc.seg.frame;
   val_owned(sc, b.val).forEach((w) => {
-    file_push(sc, `${w} = term_keep(e, ${w}, 1);`);
+    const s = fr?.pop === 0 ? fr.at[sc.seg.params.indexOf(w)] : undefined;
+    const to = s === undefined ? "" : `STK(${s}) = `;
+    file_push(sc, `${to}${w} = term_keep(e, ${w}, 1);`);
     facts_hot(sc, b.A, true);
   });
   return b.val;
@@ -1872,8 +1894,7 @@ function memo_gc(): void {
 // A pure main prints through a descriptor of its type, a node per (type,
 // layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
 // (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
-// then an (offset, node) per field). An IO main has none; an unprintable
-// type (a function, a Type, an erased or dependent field) refuses the build.
+// then an (offset, node) per field).
 
 function show_main(): (number | QName)[] | null {
   const main = FL.book.tlds[entry()];
@@ -4073,8 +4094,7 @@ INLINE Term term_word(Env e, Term w) {
 // ===
 
 // A block owns one allocation in its class (an ARR 2^c Terms, a BUF 2^c
-// u32). Matching ANode is blk_half twice (the high call frees the source);
-// ANode{l, r} is blk_node; Array.clone is blk_copy.
+// u32). Matching ANode is blk_half twice (the high call frees the source).
 
 #define BLK_ALLOC(n, w) \
   u64 n = heap_alloc(e, w); \
@@ -5182,8 +5202,6 @@ static void gpu_pass(u64* H) {
 // task g to ring_flip(g), at row g at most, and a grow's cur tasks land in
 // rows 0 to cur - 1. A slow grow deals task g to row g % CUBE_T.
 
-// Between turns, each ring's pending tasks move back to slot 0.
-
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5462,7 +5480,6 @@ static void io_spawn(Term m) {
 
 // io_park stays in deadline order (time 0, none, sorts last; ties keep
 // their park order), so io_wait wakes due timers in the order they expire.
-// It links both ways, so io_park_cut drops a waiter in O(1).
 static void io_park_add(IoWork* w) {
   IoWork* p = io_park;
   if (p == NULL || p->time - 1 <= w->time - 1) {
@@ -5615,7 +5632,6 @@ static Term io_str(Env e, const char* p, u64 n) {
   return s;
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8.
 #ifdef ${base_cid("Con")}
 
 static Term io_list(Env e, const char* p, u64 n) {
@@ -6165,9 +6181,6 @@ function cli(argv) {
 
 // Show
 // ====
-
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = char_code(s);

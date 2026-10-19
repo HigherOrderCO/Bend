@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :ffi_absent BEND_CID_ffi_absent
+// bend-ids end
 // Make io_sys initialization fail once, as on a host without bun:ffi.
 function ffi_absent_run() {
   const prior = Object.getOwnPropertyDescriptor(globalThis, "BEND_SYS");
@@ -12,7 +16,7 @@ function ffi_absent_run() {
       throw new Error("no ffi on this host");
     },
   });
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
-io_eff(CID(ffi_absent), ffi_absent_run);
+io_eff(BEND_CID_ffi_absent, ffi_absent_run);
