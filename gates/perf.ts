@@ -205,24 +205,47 @@ function view_draw(cells: Cell[], chks: Chk[], pins: Map<string, Pin>,
 function pin_read(): [Map<string, Pin>, Map<string, number>] {
   const pins = new Map<string, Pin>();
   const cpins = new Map<string, number>();
-  const rows = (file: string): [string, string[]][] => {
+  // the pin's columns are named, and a drift is an error, not a number:
+  // the file is hand-edited, and a swapped SEQ and PAR would compare a
+  // run against the other lane's time, and a lost column would leave the
+  // run unchecked. the charts read the record pins the same way, and
+  // they name their columns too.
+  const rows = (file: string, heads: string[]): [string, string[]][] => {
+    let text = "";
     try {
-      return fs.readFileSync(file, "utf8").split("\n").flatMap((line) => {
-        const row = /^\| (\S+)\s*\|(.*)\|$/.exec(line);
-        return row === null || row[1] === "bench" || row[2].startsWith("-")
-          ? [] : [[row[1], row[2].split("|").map((c) => c.trim())]];
-      });
+      text = fs.readFileSync(file, "utf8");
     } catch {
       return [];
     }
+    return text.split("\n").flatMap((line) => {
+      const row = /^\| (\S+)\s*\|(.*)\|$/.exec(line);
+      if (row === null || row[2].startsWith("-")) {
+        return [];
+      }
+      const cells = row[2].split("|").map((c) => c.trim());
+      if (row[1] === heads[0]) {
+        if (cells.join(",") !== heads.slice(1).join(",")) {
+          throw new Error(file + ": columns drifted from ["
+            + heads.join(", ") + "] -- repin");
+        }
+        return [];
+      }
+      if (cells.length !== heads.length - 1) {
+        throw new Error(file + ": " + row[1] + " has " + String(cells.length)
+          + " columns, not " + String(heads.length - 1) + " -- repin");
+      }
+      return [[row[1], cells]];
+    });
   };
   const num = (c: string): number => Number(/[\d.]+/.exec(c)?.[0] ?? 0);
-  for (const [b, c] of rows(path.join(RUNTIME, "_pin_", HW + ".txt"))) {
+  for (const [b, c] of rows(path.join(RUNTIME, "_pin_", HW + ".txt"),
+    ["bench", "COMPILER", "SEQ-CPU", "PAR-CPU", "PAR-GPU", "OUTPUT"])) {
     const cell = (i: number): number[] => c[i].split(/\s+/).map(num);
     pins.set(b, { comp: num(c[0]), secs: [1, 2, 3].map((i) => cell(i)[0]),
       mems: [1, 2, 3].map((i) => cell(i)[1]), out: c[4] });
   }
-  for (const [b, c] of rows(path.join(CHECKER, "_pin_", HW + ".txt"))) {
+  for (const [b, c] of rows(path.join(CHECKER, "_pin_", HW + ".txt"),
+    ["bench", "CHECKER"])) {
     cpins.set(b, num(c[0]));
   }
   return [pins, cpins];
