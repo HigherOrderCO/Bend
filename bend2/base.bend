@@ -1837,33 +1837,12 @@ def F32.max(a: F32, b: F32) -> F32:
 def F32.clamp(x: F32, lo: F32, hi: F32) -> F32:
   F32.min(F32.max(x, lo), hi)
 
-# Keep endpoints exact. For opposite signs, the weighted sum avoids an
-# overflowing difference when finite endpoints bound an interpolation.
-def F32.lerp.mix(+a: F32, b: F32, +t: F32, opposite: Bool) -> F32:
-  match opposite:
-    case True{}:
-      F32.add(F32.mul(a, F32.sub(1.0, t)), F32.mul(b, t))
-    case False{}:
-      F32.add(a, F32.mul(F32.sub(b, a), t))
-
-def F32.lerp.end(+a: F32, +b: F32, t: F32, one: Bool) -> F32:
-  match one:
-    case True{}:
-      b
-    case False{}:
-      F32.lerp.mix(a, b, t, Bool.xor(F32.is_lt(a, 0.0), F32.is_lt(b, 0.0)))
-
-def F32.lerp.start(a: F32, b: F32, +t: F32, zero: Bool) -> F32:
-  match zero:
-    case True{}:
-      a
-    case False{}:
-      F32.lerp.end(a, b, t, F32.is_eq(t, 1.0))
-
+# The weighted sum is exact at both endpoints and does not overflow between
+# finite endpoints of opposite signs, as b - a can.
 def F32.lerp(a: F32, b: F32, t: F32) -> F32:
   match t:
     case F32{+z}:
-      F32.lerp.start(a, b, F32{z}, F32.is_eq(F32{z}, 0.0))
+      F32.add(F32.mul(a, F32.sub(1.0, F32{z})), F32.mul(b, F32{z}))
 
 def F32.square(a: F32) -> F32:
   match a:
