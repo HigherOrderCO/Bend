@@ -36,11 +36,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : b
-#|- observed : b (consumed more than once)
+#|- message  : b is used 2 times (at 35:15, 35:23), but a plain binding is used at most once
 #|Location: main
-#|33 | def main():
-#|34>|   b = mk()
-#|   |   ^
-#|35 |   U32.add(use(b), use(b))
+#|34 |   b = mk()
+#|35>|   U32.add(use(b), use(b))
+#|   |                       ^
+#|36 |
+#|Note: a +b binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

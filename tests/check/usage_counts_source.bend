@@ -23,11 +23,11 @@ def duplicate(t): (z => {z : Ty(z)})(Box{consume(t), t})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : t
-#|- observed : t (consumed more than once)
+#|- message  : t is used 2 times (at 22:50, 22:54), but a plain binding is used at most once
 #|Location: duplicate
 #|21 | law duplicate: Res -> Box
 #|22>| def duplicate(t): (z => {z : Ty(z)})(Box{consume(t), t})
-#|   |               ^
+#|   |                                                      ^
 #|23 |
+#|Note: a +t binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

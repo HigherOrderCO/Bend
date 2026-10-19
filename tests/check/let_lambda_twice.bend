@@ -16,11 +16,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : k0
-#|- observed : k0 (consumed more than once)
+#|- message  : k0 is used 2 times (at 15:7, 15:14), but a plain binding is used at most once
 #|Location: main
-#|13 | def main():
-#|14>|   k0 = {(x => x) : U32 -> U32}
-#|   |   ^^
-#|15 |   P12{k0(1), k0(2)}
+#|14 |   k0 = {(x => x) : U32 -> U32}
+#|15>|   P12{k0(1), k0(2)}
+#|   |              ^^
+#|16 |
+#|Note: a +k0 binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

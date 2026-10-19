@@ -27,11 +27,11 @@ def main(): 0
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x
-#|- observed : x (consumed more than once)
+#|- message  : x is used 2 times (at 18:9, 18:12), but a plain binding is used at most once
 #|Location: use2
-#|16 |
-#|17>| def use2(x):
-#|   |          ^
-#|18 |   MkTwo{x, x}
+#|17 | def use2(x):
+#|18>|   MkTwo{x, x}
+#|   |            ^
+#|19 |
+#|Note: a +x binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

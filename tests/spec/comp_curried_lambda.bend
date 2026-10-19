@@ -28,11 +28,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x
-#|- observed : x (consumed more than once)
+#|- message  : x is used 2 times (at 21:4, 21:8), but a plain binding is used at most once
 #|Location: helper
-#|19 |
-#|20>| def helper(x):
-#|   |            ^
-#|21 |   (x * x : U32)
+#|20 | def helper(x):
+#|21>|   (x * x : U32)
+#|   |        ^
+#|22 |
+#|Note: a +x binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

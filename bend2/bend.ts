@@ -288,7 +288,7 @@ export type TermOf<B> = (
   | { $: "Qua"; q: Quant }                                                         // &1, &2
   | { $: "Min"; a: TermOf<B>; b: TermOf<B> }                                       // a <&> b
   | { $: "All"; q: Quant; k: Name; i: number; A: TermOf<B>; B: BodyOf<B> }         // @x:A -> B
-  | { $: "Lam"; k: Name; i: number; f: BodyOf<B>; q?: Quant }                      // x => f
+  | { $: "Lam"; k: Name; i: number; f: BodyOf<B>; q?: Quant; fx?: Name }             // x => f
   | { $: "App"; f: TermOf<B>; x: TermOf<B> }                                       // f(x)
   | { $: "ADT"; k: Name; x: TermOf<B>[]; r: Name[] }                               // A<x0,x1,...>
   | { $: "Ctr"; k: Name; x: TermOf<B>[] }                                          // A{x0,x1,...}
@@ -323,7 +323,7 @@ export type Ann = { q: Quant; k: Name; T: HTerm };
 export type Ctx = PMap<Ann>;
 
 // Body
-export type PVar  = { $: "PVar"; k: Name; i: number; q: Quant; s?: Span };
+export type PVar  = { $: "PVar"; k: Name; i: number; q: Quant; s?: Span; fx?: Name };
 export type PCtr  = { $: "PCtr"; k: Name; x: Patt[]; s?: Span };
 export type Patt  = PVar | PCtr;
 export type Case  = { p: Patt[]; f: Body };
@@ -737,9 +737,10 @@ export function term_higher(tm: LTerm, env: Env = null): HTerm {
     }
     case "Lam": {
       const b = tm;
-      return Lam(b.k, b.i, (x: HTerm) => {
+      const l = Lam(b.k, b.i, (x: HTerm) => {
         return term_higher(b.f, list_set(env, b.i, x));
       }, b.s, b.q);
+      return b.fx === undefined ? l : { ...l, fx: b.fx };
     }
     case "Typ": {
       return Typ(term_higher(tm.g, env), tm.s);
@@ -799,7 +800,8 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
     }
     case "Lam": {
       const x: HTerm = Var(tm.k, d);
-      return Lam(tm.k, d, term_lower(tm.f(x), d + 1), tm.s, tm.q);
+      const l = Lam(tm.k, d, term_lower(tm.f(x), d + 1), tm.s, tm.q);
+      return tm.fx === undefined ? l : { ...l, fx: tm.fx };
     }
     case "App": {
       return App(term_lower(tm.f, d), term_lower(tm.x, d), tm.s);
@@ -1190,7 +1192,7 @@ const ESCAPES: Record<string, U32> = {
 };
 
 export function term_key(tm: LTerm): string {
-  return JSON.stringify(tm, (k, v) => k === "s" ? undefined : v);
+  return JSON.stringify(tm, (k, v) => k === "s" || k === "fx" ? undefined : v);
 }
 
 function f32_show(x: number): string {
@@ -2685,10 +2687,10 @@ export function match_flatten(m: Match, vars: PVar[], fr: () => number): LTerm {
         const xq = patt_mark(x, m.r);
         const xs = c.x.map((q): PVar => {
           if (q.$ === "PVar") {
-            return { ...q, q: quant_join(q.q, xq) };
+            return { ...q, q: quant_join(q.q, xq), fx: x.k };
           }
           const i = fr();
-          return { $: "PVar", k: "_" + String(i), i, q: xq, s: q.s };
+          return { $: "PVar", k: "_" + String(i), i, q: xq, fx: x.k, s: q.s };
         });
         const kx: Patt = { $: "PCtr", k: c.k, x: xs, s: x.s };
         const ps = m.r.flatMap((row): Rows => {
@@ -2717,13 +2719,20 @@ export function match_flatten(m: Match, vars: PVar[], fr: () => number): LTerm {
       }
     } else {
       const t = match_flatten(m, vars.slice(1), fr);
-      return Lam(x.k, x.i, t, x.s, x.q);
+      return lam(x, t);
     }
   }
 }
 
 export function patt_mark(x: PVar, rows: Rows): Quant {
   return rows.map((row) => row.p[0]).reduce((q, p) => p.$ === "PVar" ? quant_join(q, p.q) : q, x.q);
+}
+
+// a pattern binder carries the parameter it came from: using it twice is
+// fixed by marking that parameter +, not the field it names
+function lam(v: PVar, f: LTerm): LTerm {
+  const t = Lam(v.k, v.i, f, v.s, v.q);
+  return v.fx === undefined ? t : { ...t, fx: v.fx };
 }
 
 export function patt_term(q: Patt, s?: Span): LTerm {
@@ -2765,7 +2774,7 @@ export function body_flatten(b: Body, vars: PVar[], fr: () => number): LTerm {
       } else {
         const v = vars[0];
         const f = body_flatten(b, vars.slice(1), fr);
-        return Lam(v.k, v.i, f, v.s, v.q);
+        return lam(v, f);
       }
     }
   }
@@ -3475,9 +3484,76 @@ export function term_check_kind(book: Book, lhs: LHS, T: HTerm, q: Quant, k: Nam
   }
 }
 
-export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Quant, s: Span | undefined, def?: Name): Uses {
+// where a use is, as the caret shows it: line and column, both 1-based
+function span_at(s: Span): string {
+  return String(s.file.str.slice(0, s.beg).split("\n").length) + ":" + String(parse_col(s.file.str, s.beg));
+}
+
+// the checked body's value positions that mention binder i. a type
+// annotation's type is skipped, as the measure skips it.
+function term_uses_at(tm: LTerm, i: number, out: Span[]): void {
+  switch (tm.$) {
+    case "Var": {
+      if (tm.i === i && tm.s !== undefined) {
+        out.push(tm.s);
+      }
+      return;
+    }
+    case "Ann": return term_uses_at(tm.x, i, out);
+    case "Sub": return term_uses_at(tm.f, i, out);
+    case "Let": {
+      for (const v of tm.v) {
+        term_uses_at(v, i, out);
+      }
+      return term_uses_at(tm.f, i, out);
+    }
+    case "Lam": return term_uses_at(tm.f, i, out);
+    case "App": {
+      term_uses_at(tm.f, i, out);
+      return term_uses_at(tm.x, i, out);
+    }
+    case "ADT":
+    case "Ctr": {
+      for (const x of tm.x) {
+        term_uses_at(x, i, out);
+      }
+      return;
+    }
+    case "Mat": {
+      term_uses_at(tm.h, i, out);
+      return term_uses_at(tm.m, i, out);
+    }
+    case "Eql": {
+      term_uses_at(tm.a, i, out);
+      return term_uses_at(tm.b, i, out);
+    }
+    case "Min": {
+      term_uses_at(tm.a, i, out);
+      return term_uses_at(tm.b, i, out);
+    }
+    case "Rwt": {
+      term_uses_at(tm.e, i, out);
+      term_uses_at(tm.p, i, out);
+      return term_uses_at(tm.f, i, out);
+    }
+    default: {
+      return;
+    }
+  }
+}
+
+export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Quant, s: Span | undefined, def?: Name, fx?: Name, body?: LTerm): Uses {
   const u = pmap_get(us, i) ?? None();
   if (quant_join(u, q).$ !== q.$) {
+    if (q.$ === "Lone" && u.$ === "Many" && body !== undefined) {
+      const at: Span[] = [];
+      term_uses_at(body, i, at);
+      if (at.length >= 2) {
+        const nte = "Note: a +" + k + " binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied)."
+          + (fx === undefined || fx.startsWith("_") ? "" : "\nNote: " + k + " is bound by a pattern: put the + on the matched parameter, +" + name_key(fx) + ".");
+        throw Err(book, ctx, k + " is used " + String(at.length) + " times (at " + at.map(span_at).join(", ") + "), but a plain binding is used at most once", undefined, at[1], def, nte);
+      }
+    }
     let obs = quant_show(u) + k;
     if (u.$ === "Many") {
       obs = k + " (consumed more than once)";
@@ -3519,7 +3595,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       }
       const f_ctx = ctx_bind(ctx, d, q, tm.k, t_wnf.A);
       const f_chk = term_check(book, f_lhs, tm.f(x), qt, t_wnf.B(x), f_ctx, d+1);
-      return Check(Lam(tm.k, d, f_chk.tm, tm.s), ty, uses_close(book, ctx, f_chk.us, d, tm.k, q, tm.s, lhs.def));
+      return Check(Lam(tm.k, d, f_chk.tm, tm.s), ty, uses_close(book, ctx, f_chk.us, d, tm.k, q, tm.s, lhs.def, tm.fx, f_chk.tm));
     }
     // Γ ⊢ vj : Aj ~ vuj  (each value in Γ: the binders are parallel)
     // Γ ⊢ Aj : Kind(qj)
@@ -3545,7 +3621,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const f_chk = term_check(book, lhs, tm.f(xs), qt, ty, f_ctx, d + n);
       let fu = f_chk.us;
       for (let j = 0; j < n; j++) {
-        fu = uses_close(book, ctx, fu, d + j, tm.k[j], tm.q[j], tm.s, lhs.def);
+        fu = uses_close(book, ctx, fu, d + j, tm.k[j], tm.q[j], tm.s, lhs.def, undefined, f_chk.tm);
       }
       return Check(Let(tm.k, xs.map((_, j) => d + j), vx, f_chk.tm, tm.s, tm.q), ty, uses_add(us, fu));
     }

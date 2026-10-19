@@ -21,11 +21,11 @@ def dup(q):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : q
-#|- observed : q (consumed more than once)
+#|- message  : q is used 2 times (at 20:5, 20:15), but a plain binding is used at most once
 #|Location: dup
-#|18 | 
-#|19>| def dup(q):
-#|   |         ^
-#|20 |   P{q <&> &2, q <&> &2}
+#|19 | def dup(q):
+#|20>|   P{q <&> &2, q <&> &2}
+#|   |               ^
+#|21 |
+#|Note: a +q binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

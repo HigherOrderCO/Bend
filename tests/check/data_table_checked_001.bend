@@ -44,11 +44,11 @@ def main(): delta(MkBox6{argument => delta(MkBox6{argument})})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : box
-#|- observed : box (consumed more than once)
+#|- message  : box is used 2 times (at 38:12, 38:17), but a plain binding is used at most once
 #|Location: delta
-#|36 | 
-#|37>| def delta(box):
-#|   |           ^^^
-#|38 |   delta.go(box, box)
+#|37 | def delta(box):
+#|38>|   delta.go(box, box)
+#|   |                 ^^^
+#|39 |
+#|Note: a +box binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

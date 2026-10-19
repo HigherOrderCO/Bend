@@ -18,11 +18,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x
-#|- observed : x (consumed more than once)
+#|- message  : x is used 2 times (at 11:4, 11:8), but a plain binding is used at most once
 #|Location: f
-#| 9 | 
-#|10>| def f(x):
-#|   |       ^
-#|11 |   (x + x : U32)
+#|10 | def f(x):
+#|11>|   (x + x : U32)
+#|   |        ^
+#|12 |
+#|Note: a +x binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

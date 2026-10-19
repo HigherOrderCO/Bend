@@ -48,11 +48,12 @@ def main(): Z{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : p
-#|- observed : p (consumed more than once)
+#|- message  : p is used 2 times (at 29:16, 29:19), but a plain binding is used at most once
 #|Location: grow
-#|27 |   match t:
-#|28>|     case S{p}:
-#|   |            ^
-#|29 |       S{append(p, p)}
+#|28 |     case S{p}:
+#|29>|       S{append(p, p)}
+#|   |                   ^
+#|30 |     case t:
+#|Note: a +p binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
+#|Note: p is bound by a pattern: put the + on the matched parameter, +t.
 #|exit 1

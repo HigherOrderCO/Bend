@@ -62,11 +62,11 @@ def main(): twice((2, 3))
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : p
-#|- observed : p (consumed more than once)
+#|- message  : p is used 2 times (at 56:11, 56:17), but a plain binding is used at most once
 #|Location: leak
-#|54 | 
-#|55>| def leak(p):
-#|   |          ^
-#|56 |   leak.go(p, la(p))
+#|55 | def leak(p):
+#|56>|   leak.go(p, la(p))
+#|   |                 ^
+#|57 |
+#|Note: a +p binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

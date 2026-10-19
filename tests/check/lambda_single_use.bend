@@ -17,13 +17,13 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : k
-#|- observed : k (consumed more than once)
+#|- message  : k is used 2 times (at 16:7, 16:10), but a plain binding is used at most once
 #|Context:
 #|- k0 : @_:Unit -> @_:U32 -> U32
 #|Location: main
-#|14 |   k0 = {(d => x => x) : Unit -> U32 -> U32}
-#|15>|   k = k0(Unit{})
-#|   |   ^
-#|16 |   P12{k, k}
+#|15 |   k = k0(Unit{})
+#|16>|   P12{k, k}
+#|   |          ^
+#|17 |
+#|Note: a +k binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1
