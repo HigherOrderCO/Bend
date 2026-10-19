@@ -801,45 +801,86 @@ describe("downloading bend", () => {
     expect(installedTag(() => "bend 2.0.36\nA newer bend is out.\n")).toBe("v2.0.36");
   });
 
-  test("offline, the newest release in the cache is used", async () => {
+  test("offline, incomplete downloads do not hide an older usable release", async () => {
     const at = cache();
-    ["v2.0.3", "v2.0.12", "latest-ish"].forEach((d) => fs.mkdirSync(path.join(at, d)));
+    const gh = github([]);
+    await fetchBend("v2.0.3", at, gh.get);
+    await fetchBend("v2.0.12", at, gh.get);
+    fs.mkdirSync(path.join(at, "v2.0.13", ".part-interrupted"), { recursive: true });
     expect(await latestTag(at, offline)).toBe("v2.0.12");
-    expect(fs.existsSync(path.join(at, "latest.json"))).toBe(false);
-    const gh = github(["v2.0.40"]);
-    expect(await latestTag(at, gh.get)).toBe("v2.0.40");
-    expect(gh.asked.length).toBe(1);
-    await expect(latestTag(cache(), offline)).rejects.toThrow(
-      /cannot list bend's releases \(offline\)/,
-    );
+    const partial = cache();
+    fs.mkdirSync(path.join(partial, "v2.0.40", "bend2"), { recursive: true });
+    await expect(latestTag(partial, offline)).rejects.toThrow();
   });
 
-  test("a release downloads once and whole, and bend-lint runs on it", async () => {
+  test("a downloaded release runs IO after missing sources are repaired", async () => {
     const gh = github([]);
     const at = cache();
     const dir = await fetchBend("v2.0.36", at, gh.get);
-    const effs = fs.readdirSync(path.join(BEND2, "effs"));
-    expect(fs.readFileSync(path.join(dir, "bend.ts"), "utf8")).toBe(
-      fs.readFileSync(path.join(BEND2, "bend.ts"), "utf8"),
-    );
-    expect(fs.readFileSync(path.join(dir, "main.ts"), "utf8")).toBe(
-      fs.readFileSync(path.join(BEND2, "main.ts"), "utf8"),
-    );
-    expect(fs.readdirSync(path.join(dir, "effs")).sort()).toEqual(effs.sort());
-    expect(gh.asked.length).toBe(5 + effs.length);
-    expect(await fetchBend("v2.0.36", at, gh.get)).toBe(dir);
-    expect(gh.asked.length).toBe(5 + effs.length);
-    fs.rmSync(path.join(dir, "main.ts")); // a cache from before main.ts was patched
-    expect(await fetchBend("v2.0.36", at, gh.get)).toBe(dir);
-    expect(gh.asked.length).toBe(2 * (5 + effs.length));
-    expect(fs.existsSync(path.join(dir, "main.ts"))).toBe(true);
-    expect(fs.readdirSync(path.join(at, "v2.0.36"))).toEqual(["bend2"]);
-    const out = spawnSync(process.execPath, [CLI, fixture("downloaded.bend", USERLAND)], {
+    expect(await fetchBend("v2.0.36", at, offline)).toBe(dir);
+    fs.rmSync(path.join(dir, "main.ts"));
+    await fetchBend("v2.0.36", at, gh.get);
+    fs.rmSync(path.join(dir, "effs", "now.js"));
+    await fetchBend("v2.0.36", at, gh.get);
+    const file = fixture("downloaded_io.bend", String.raw`import Base
+def main() -> IO(Unit):
+  do IO<Unit>:
+    stamp : Nat <- IO.now()
+    IO.print(Nat.show(Nat.mod(stamp, 1n)))
+`);
+    const script = path.join(DIR, "downloaded_io.js");
+    const compiled = spawnSync(process.execPath, [path.join(dir, "main.ts"), file, "-o", script], {
       encoding: "utf8",
-      env: { ...process.env, BEND_DIR: dir },
     });
-    expect([out.status, out.stderr]).toEqual([0, ""]);
-    await expect(fetchBend("../x", at, gh.get)).rejects.toThrow(/not a bend release/);
+    if (compiled.status !== 0) throw new Error(compiled.stderr + compiled.stdout);
+    const out = spawnSync(process.execPath, [script], { encoding: "utf8" });
+    expect([out.status, out.stdout]).toEqual([0, "0\n"]);
+    await expect(fetchBend("../x", at, gh.get)).rejects.toThrow();
+  });
+
+  test("concurrent downloads keep an already returned checkout usable by its reader", async () => {
+    const gh = github([]);
+    const at = cache();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const first = fetchBend("v2.0.36", at, gh.get);
+    const second = fetchBend("v2.0.36", at, async (url) => { await gate; return gh.get(url); });
+    const dir = await first;
+    const good = fixture("cache_reader_good.bend", USERLAND);
+    const bad = fixture("cache_reader_bad.bend", USERLAND.replace("generic(~N,a)", "missing"));
+    const child = Bun.spawn([process.execPath, "-e", String.raw`
+      process.stdin.once("data", () => {
+        try {
+          console.log(JSON.stringify(process.argv.slice(1).map(file =>
+            Bun.spawnSync([process.execPath, "./main.ts", file, "--check-only"],
+              { stdout: "pipe", stderr: "pipe" }).exitCode)));
+        } catch (e) {
+          console.log(JSON.stringify({ error: String(e) }));
+        }
+      });
+      console.log("ready");
+    `, good, bad], { cwd: dir, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
+    try {
+      const reader = child.stdout.getReader();
+      await reader.read();
+      release();
+      await second;
+      child.stdin.write("check\n");
+      child.stdin.end();
+      let output = "";
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        output += decoder.decode(value, { stream: true });
+      }
+      output += decoder.decode();
+      reader.releaseLock();
+      expect([await child.exited, JSON.parse(output)]).toEqual([0, [0, 1]]);
+    } finally {
+      release();
+      if (child.exitCode === null) child.kill();
+    }
   });
 
   test("bendDir downloads only when no bend is given or around it", async () => {

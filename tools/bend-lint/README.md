@@ -64,7 +64,9 @@ source it tries, in order:
 
 Downloads are cached in `~/.cache/bend-lint/`. `XDG_CACHE_HOME` moves that, and
 on Windows it's under `LOCALAPPDATA`. With no network it falls back to the
-newest cached release.
+newest complete cached release, ignoring interrupted downloads. Completeness
+includes Base's host-effect files. Missing files trigger a fresh download;
+concurrent downloads keep already returned checkout directories in place.
 
 ## Rules included
 
