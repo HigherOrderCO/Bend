@@ -179,11 +179,12 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, U32.log2 and Map.msb.u, as intr_of
-  // skips an op with no JS
+  // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
+  // as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
   u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
   map_msb_u: { C: "map_msb_u($0, $1)" },
+  map_bit: { C: ["$0", "map_bit(e, $0, $1)"] },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -249,7 +250,6 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
-  map_bit: { C: ["$0", "map_bit(e, $0, $1)"] },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -4022,6 +4022,8 @@ INLINE u64 term_peek(DEV u64* H, Term t) {
   return term_loc(t);
 }
 
+// Base's Map.bit, reading the key in place: 33 bits a char, a presence bit
+// then the code MSB first, false past the end
 INLINE u64 map_bit(Env e, Term key, u64 pos) {
   for (u64 i = pos / 33; i > 0 && term_aux(key) == CID(SCon); i -= 1) {
     key = e.mem[term_peek(e.mem, key) + 1];
