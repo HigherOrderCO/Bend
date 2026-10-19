@@ -740,7 +740,10 @@ export function term_higher(tm: LTerm, env: Env = null): HTerm {
       const l = Lam(b.k, b.i, (x: HTerm) => {
         return term_higher(b.f, list_set(env, b.i, x));
       }, b.s, b.q);
-      return b.fx === undefined ? l : { ...l, fx: b.fx };
+      if (b.fx !== undefined) {
+        Object.defineProperty(l, "fx", { value: b.fx, enumerable: false });
+      }
+      return l;
     }
     case "Typ": {
       return Typ(term_higher(tm.g, env), tm.s);
@@ -801,7 +804,10 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
     case "Lam": {
       const x: HTerm = Var(tm.k, d);
       const l = Lam(tm.k, d, term_lower(tm.f(x), d + 1), tm.s, tm.q);
-      return tm.fx === undefined ? l : { ...l, fx: tm.fx };
+      if (tm.fx !== undefined) {
+        Object.defineProperty(l, "fx", { value: tm.fx, enumerable: false });
+      }
+      return l;
     }
     case "App": {
       return App(term_lower(tm.f, d), term_lower(tm.x, d), tm.s);
@@ -1192,7 +1198,7 @@ const ESCAPES: Record<string, U32> = {
 };
 
 export function term_key(tm: LTerm): string {
-  return JSON.stringify(tm, (k, v) => k === "s" || k === "fx" ? undefined : v);
+  return JSON.stringify(tm, (k, v) => k === "s" ? undefined : v);
 }
 
 function f32_show(x: number): string {
@@ -2732,7 +2738,10 @@ export function patt_mark(x: PVar, rows: Rows): Quant {
 // fixed by marking that parameter +, not the field it names
 function lam(v: PVar, f: LTerm): LTerm {
   const t = Lam(v.k, v.i, f, v.s, v.q);
-  return v.fx === undefined ? t : { ...t, fx: v.fx };
+  if (v.fx !== undefined) {
+    Object.defineProperty(t, "fx", { value: v.fx, enumerable: false });
+  }
+  return t;
 }
 
 export function patt_term(q: Patt, s?: Span): LTerm {
