@@ -1,6 +1,7 @@
 // Safe
 //
 // --verdict runs source checking, safe_book, then bendtt.lean.
+// A book rejected by source checking never reaches the kernel.
 // The kernel trusts no exporter output.
 //
 // Checked Def.e body nodes have types; terms inside types do not. Pass
@@ -9,7 +10,8 @@
 // applied definitions. Export function values η-long.
 //
 // Encode D<ps> as Σt:<tags> -> D.arms(ps,t). Each arm is a Σ field chain
-// ending in <()>. Preserve field quantities; recursive fields name D.
+// ending in <()>. Preserve field quantities; recursive fields refer through
+// the name D.
 // k{x,y} becomes (.k,x,y,()). Matches split the tag/fields pair, then the
 // tag, fields, and unit. Defaults bind the pair. Empty D also emits the
 // checked D.efq(ps):D(ps)-><>.
@@ -23,8 +25,8 @@
 //
 // Emit live dependencies first; type dependencies may follow. Bodyless
 // laws, natives, and foreign fills use checked opaque models.
-// Out-of-scope items, their dependents, and items with no kernel definition
-// fail --verdict.
+// Omit out-of-scope definitions and all definitions that depend on them.
+// These omissions, and items with no kernel definition, fail --verdict.
 
 import * as child from "node:child_process";
 import * as crypto from "node:crypto";
@@ -265,7 +267,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     let G: O | null | undefined;
     let ps: Binder[] = [];
     const kc = new Map<HTerm, O>();
-    const pick = tld.$ === "Def" && tld.x > 0 ? inst_pick(k) : null;
+    const choice = tld.$ === "Def" && tld.x > 0 ? inst_pick(k) : null;
     const col = (v: HTerm) => kc.get(v) ?? kc.set(v, term(scope_nil(), v, false)).get(v) as O;
     const go = (T: HTerm, cs: Cols, d: number): O => {
       const j = cs.length;
@@ -309,7 +311,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
       if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
         oos("a specialized parameter whose type names a parameter");
       }
-      const f = pick === null ? null : fit(k, pick[j], F.A);
+      const f = choice === null ? null : fit(k, choice[j], F.A);
       const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (f === null ? "" : B.term_key(B.term_lower(f)));
       const kept = consts.get(key);
       if (kept !== undefined) {
@@ -362,9 +364,9 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
       put(names, key, n);
       todo.push([k, cols]);
     }
-    const why = fail.get(n);
-    if (why !== undefined && live) {
-      oos(why);
+    const reason = fail.get(n);
+    if (reason !== undefined && live) {
+      oos(reason);
     }
     if (m !== null) {
       put(seen, key);
@@ -471,9 +473,15 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
   }
 
   // Model
-  // Try constructors in declaration order without repeating datatype keys
-  // on a path. Reuse lambda bodies by substitution. On failure, retry
-  // preferring a live codomain parameter. Read opaque definitions at their models in mb.
+  // Build λs around codomain models. Use Unit for a kind and {==} for an
+  // equation that converts in mb. For a datatype, try constructors in
+  // declaration order; each field needs a model. Do not repeat datatype
+  // keys on a path. If no constructor works, use the first non-erased λ
+  // variable whose type converts to the target type.
+  // If this search fails, retry with that variable before constructors.
+  // Projection models can satisfy {a == sub(add(a,b),b)}; constant models
+  // can satisfy {add(a,b) == add(b,a)}. Read opaque definitions at their
+  // models in mb.
 
   function model(T: HTerm): HTerm | null {
     for (const proj of [false, true]) {
@@ -492,6 +500,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
             return tld?.$ === "ADT" && tld.n === 0 ? B.ADT("Unit", []) : null;
           }
           case "All": {
+            // Search the body once. Rebind it by substitution at each λ use.
             const x: HTerm = B.Var(F.k, d);
             const t = model_at(F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]]);
             return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
@@ -576,7 +585,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     }
     const l = s.D;
     const q = s.kq[cv[0]] ?? 1;
-    const f = convoy_bind(scope_move(scope_bind(s, undefined, q), cv[0], l), cv.slice(1), t, fs);
+    const f = convoy_bind(scope_move(scope_hide(s, q), cv[0], l), cv.slice(1), t, fs);
     return lams([[q, l]], f);
   }
 
@@ -597,8 +606,8 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
       return tree(s2, x.f(B.Var(x.k, s.d)), fs);
     }
     if (v !== null && (x.$ === "Mat" || x.$ === "Efq")) {
-      const [arm, vs] = pick(x, v);
-      return tree({ ...s, cols: [...vs, ...s.cols.slice(1)] }, arm, fs);
+      const [body, vs] = pick(x, v);
+      return tree({ ...s, cols: [...vs, ...s.cols.slice(1)] }, body, fs);
     }
     if (x.$ !== "Lam" && x.$ !== "Mat" && x.$ !== "Efq") {
       if (all !== null) {
@@ -635,7 +644,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
         return wrap(Prj(swi({ ...s1, dry }, x, T, fs2, [])));
       }
       const l = s.D;
-      const sw = swi(scope_bind({ ...s1, dry, again: true }, undefined, q), x, T, fs2, cv);
+      const sw = swi(scope_hide({ ...s1, dry, again: true }, q), x, T, fs2, cv);
       const app = cv.reduce<O>((f, y) => App(s.kq[y] ?? 1, f, Var(y)), App(q, Prj(sw), Var(l)));
       return wrap(Lam(q, l, app));
     };
@@ -645,18 +654,18 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     const o = mat([], s.dry || s.again);
     const us = o_uses(o);
     const use = (l: number) => us.get(l) ?? 0;
-    const data = (l: number) => s.c.some((b) => b.o.$ === "Var" && b.o.l === l && b.T !== null && kind(s, b.T) === 2);
+    const data = (l: number) => s.c.some((b) => b?.o.$ === "Var" && b.o.l === l && b.T !== null && kind(s, b.T) === 2);
     const cv0 = s.kq.flatMap((k, l) => k === 1 && l < s.D && use(l) > 1 && !data(l) ? [l] : []);
     // a default's tag and fields go together: the fields' type names the tag
     const cv1 = [...new Set(cv0.flatMap((l) => s.tags.includes(l) ? [l, l + 1] : s.tags.includes(l - 1) ? [l - 1, l] : [l]))];
     // Convoy dependent variables too, at their own quantities, so their types
     // do not retain outside levels. A default binder contributes two levels.
     const cv = s.c.reduce<number[]>((vs, b, i) => {
-      if (vs.length === 0 || b.T === null) {
+      if (vs.length === 0 || b === undefined || b.T === null) {
         return vs;
       }
       const ls = [...o_uses(b.o).keys()].filter((l) => !vs.includes(l));
-      const js = ls.some((l) => us.has(l)) ? s.c.flatMap((x, j) => j < i && [...o_uses(x.o).keys()].some((l) => vs.includes(l)) ? [j] : []) : [];
+      const js = ls.some((l) => us.has(l)) ? s.c.flatMap((x, j) => j < i && x !== undefined && [...o_uses(x.o).keys()].some((l) => vs.includes(l)) ? [j] : []) : [];
       return js.length > 0 && mentions(B.term_lower(b.T, s.d), (k) => js.includes(k)) ? [...vs, ...ls] : vs;
     }, cv1).sort((a, b) => a - b);
     if (s.dry) {
@@ -678,7 +687,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
         }
         // tags remain, but a live tag in scope is of the empty enum
         const q = quant(all.q);
-        const f = convoy_bind(scope_bind(scope_bind(s)), cv, (s2) => s2.empty[0], fs);
+        const f = convoy_bind(scope_hide(scope_hide(s)), cv, (s2) => s2.empty[0], fs);
         return Lam(q, s.D, Lam(q, s.D + 1, f));
       }
       case "Mat": {
@@ -698,7 +707,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
         }
         const q = quant(all.q);
         const [lt, la] = [s.D, s.D + 1];
-        const s2 = scope_bind(scope_bind(s, undefined, q), undefined, q);
+        const s2 = scope_hide(scope_hide(s, q), q);
         const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Source<"Lam">;
         const pair = Tup(1, Var(lt), Var(la));
         const s2e = no_ctr(all.A) ? { ...s2, empty: [...s2.empty,
@@ -750,12 +759,12 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
       const G = all_of(U);
       return G === null || (kind(s, wnf(G.A)) === 2 && data(G.B(B.Var(G.k, -1))));
     };
-    const arm = (k: Name, U: HTerm, xs: HTerm[]): HTerm => {
+    const build = (k: Name, U: HTerm, xs: HTerm[]): HTerm => {
       const G = all_of(U);
-      return G === null ? x.f(B.Ann(B.Ctr(k, xs), F)) : B.Lam(G.k, 0, (v) => arm(k, G.B(v), [...xs, v]));
+      return G === null ? x.f(B.Ann(B.Ctr(k, xs), F)) : B.Lam(G.k, 0, (v) => build(k, G.B(v), [...xs, v]));
     };
     const cs = (book.tlds[F.k] as ADT).c.filter((c) => !F.r.includes(c.k)).map((c): [Name, HTerm] => [c.k, fill(c.T, F.x)]);
-    return cs.every(([, U]) => data(U)) ? B.Ann(cs.reduceRight<HTerm>((m, [k, U]) => B.Mat(k, arm(k, U, []), m), B.Efq()), all) : null;
+    return cs.every(([, U]) => data(U)) ? B.Ann(cs.reduceRight<HTerm>((m, [k, U]) => B.Mat(k, build(k, U, []), m), B.Efq()), all) : null;
   }
 
   function all_of(T: HTerm | null) {
@@ -981,11 +990,11 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     }
     const k = item_ref("\t" + g.k, ps.slice(0, n).map((p) => p[3]), live);
     const a = { ...s, sub: live && k === s.self };
-    const args = (xs: Arg[], qs: Q[]) => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
+    const vals = (xs: Arg[], qs: Q[]) => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
       v !== null ? [] : [[qs[j] ?? q, arg_term(a, x, A, live && (qs[j] ?? q) > 0)]]);
     const sel = Tup(1, Lab(name_tt(g.k)), UV);
-    const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : Tup(1, Lab(name_tt(m)), Tup(1, sel, UV))] as [Q, O],
-      ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => App(q, f, x), Ref(k));
+    const x = [...vals(ps.slice(0, n), g.qs), [1, m === g.k ? sel : Tup(1, Lab(name_tt(m)), Tup(1, sel, UV))] as [Q, O],
+      ...vals(ps.slice(n), [])].reduce<O>((f, [q, x]) => App(q, f, x), Ref(k));
     return Ann(x, term(s, R, false));
   }
 
@@ -1005,7 +1014,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     const sel = (f: (m: Name) => O): O => Prj(mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
       : Prj(Prj(mats([name_tt(g.k)], () => unit(unit(f(g.ms[i]))))))));
     const l0 = s.D;
-    const s0 = scope_bind(s, undefined, 1);
+    const s0 = scope_hide(s, 1);
     const mode = sel((m) => {
       const r = rest(s0, m);
       return alls(r.ps, term(r.s, r.T, false));
@@ -1051,12 +1060,12 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
   // live self-call arguments for descent unless A's quantities differ.
   function arg_term(s: Scope, x: HTerm, A: HTerm, live: boolean): O {
     const [y, T] = open(x);
-    const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
-    const all = tree || y.$ === "Ctr" ? null : all_of(A);
+    const is_tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
+    const all = is_tree || y.$ === "Ctr" ? null : all_of(A);
     if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(T, A, s.d))) {
       return term(s, eta(x, all), live);
     }
-    return term(s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
+    return term(s, T === null && (is_tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
   }
 
   // Kernel function quantities must match exactly; source fit permits
@@ -1114,13 +1123,13 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
 
   // Rebuild inlined self-call constructor arguments at each use's depth and
   // mode so the kernel can recognize columns.
-  function let_term(s: Scope, x: Source<"Let">, live: boolean, put: Set<number> = new Set()): O {
+  function let_term(s: Scope, x: Source<"Let">, live: boolean, inlined: Set<number> = new Set()): O {
     let s2 = s;
     const ls: Array<[Q, number, O, number]> = [];
     for (let j = 0; j < x.k.length; j++) {
       const q = quant(x.q[j]);
       const V = open(x.v[j])[1];
-      if (put.has(j)) {
+      if (inlined.has(j)) {
         s2 = scope_alias(s2, Efq(), V, x.v[j]);
         continue;
       }
@@ -1141,7 +1150,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     const f = term(s2, (x.f as (xs: HTerm[]) => HTerm)(xs), live);
     const more = ls.filter(([, l, v]) => live && v.$ !== "App" && v.$ !== "Ref" && self_arg(f, s.self, l)).map(([, , , j]) => j);
     if (more.length > 0) {
-      return let_term(s, x, live, new Set([...put, ...more]));
+      return let_term(s, x, live, new Set([...inlined, ...more]));
     }
     return ls.reduceRight<O>((b, [q, l, v]) => Let(q === 1 && uses(b, l) > 1 ? 2 : q, l, v, b), f);
   }
@@ -1178,32 +1187,32 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
 
   // Count live uses by level in one walk, recording 0 for type-only or q=0
   // uses. Cache each term's counts so surrounding walks reuse them.
-  function o_uses(o: O, live: boolean = true, out?: Map<number, number>): Map<number, number> {
+  function o_uses(o: O, live: boolean = true, counts?: Map<number, number>): Map<number, number> {
     const kept = use_counts.get(o);
-    if (out === undefined && kept === undefined) {
+    if (counts === undefined && kept === undefined) {
       use_counts.set(o, o_uses(o, true, new Map()));
     }
-    if (out === undefined) {
+    if (counts === undefined) {
       return use_counts.get(o) as Map<number, number>;
     }
     if (kept !== undefined) {
-      kept.forEach((n, l) => out.set(l, (out.get(l) ?? 0) + (live ? n : 0)));
-      return out;
+      kept.forEach((n, l) => counts.set(l, (counts.get(l) ?? 0) + (live ? n : 0)));
+      return counts;
     }
     switch (o.$) {
-      case "Var": return out.set(o.l, (out.get(o.l) ?? 0) + (live ? 1 : 0));
-      case "Ann": return o_uses(o.T, false, o_uses(o.x, live, out));
-      case "Let": return o_uses(o.f, live, o_uses(o.v, live && o.q > 0, out));
-      case "All": case "Sig": return o_uses(o.B, false, o_uses(o.A, false, out));
-      case "Lam": return o_uses(o.f, live, out);
-      case "App": return o_uses(o.x, live && o.q > 0, o_uses(o.f, live, out));
-      case "Tup": return o_uses(o.b, live, o_uses(o.a, live && o.q > 0, out));
-      case "Prj": return o_uses(o.h, live, out);
-      case "Mat": return o_uses(o.m, live, o_uses(o.h, live, out));
-      case "Min": return o_uses(o.b, live, o_uses(o.a, live, out));
-      case "Eql": return o_uses(o.T, false, o_uses(o.b, false, o_uses(o.a, false, out)));
-      case "Rwt": return o_uses(o.f, live, o_uses(o.P, false, o_uses(o.e, live, out)));
-      default: return out;
+      case "Var": return counts.set(o.l, (counts.get(o.l) ?? 0) + (live ? 1 : 0));
+      case "Ann": return o_uses(o.T, false, o_uses(o.x, live, counts));
+      case "Let": return o_uses(o.f, live, o_uses(o.v, live && o.q > 0, counts));
+      case "All": case "Sig": return o_uses(o.B, false, o_uses(o.A, false, counts));
+      case "Lam": return o_uses(o.f, live, counts);
+      case "App": return o_uses(o.x, live && o.q > 0, o_uses(o.f, live, counts));
+      case "Tup": return o_uses(o.b, live, o_uses(o.a, live && o.q > 0, counts));
+      case "Prj": return o_uses(o.h, live, counts);
+      case "Mat": return o_uses(o.m, live, o_uses(o.h, live, counts));
+      case "Min": return o_uses(o.b, live, o_uses(o.a, live, counts));
+      case "Eql": return o_uses(o.T, false, o_uses(o.b, false, o_uses(o.a, false, counts)));
+      case "Rwt": return o_uses(o.f, live, o_uses(o.P, false, o_uses(o.e, live, counts)));
+      default: return counts;
     }
   }
 
@@ -1292,22 +1301,28 @@ function scope_nil(): Scope {
   return { c: [], d: 0, D: 0, cols: [], self: "", empty: [], sub: false, kq: [], tags: [], dry: false, again: false };
 }
 
-// Source bindings fill c in level order.
+// Bind source level d to o, or to v when specialized or inlined.
 function scope_alias(s: Scope, o: O, T: HTerm | null, v?: HTerm): Scope {
-  return { ...s, c: [...s.c, { o, T, v }], d: s.d + 1 };
+  const c = s.c.slice();
+  c[s.d] = { o, T, v };
+  return { ...s, c, d: s.d + 1 };
 }
 
-// An undefined T hides the binder; null binds an unknown source type.
-function scope_bind(s: Scope, T?: HTerm | null, q?: Q): Scope {
+// Bind both source and kernel variables; null means an unknown type.
+function scope_bind(s: Scope, T: HTerm | null, q?: Q): Scope {
+  const s2 = scope_hide(s, q);
+  s2.c = s.c.slice();
+  s2.c[s.d] = { o: Var(s.D), T, v: undefined };
+  s2.d += 1;
+  return s2;
+}
+
+// Bind a kernel variable with no source variable. q is tentative.
+function scope_hide(s: Scope, q?: Q): Scope {
   const s2 = { ...s, D: s.D + 1 };
   if (q !== undefined) {
     s2.kq = s.kq.slice();
     s2.kq[s.D] = q;
-  }
-  if (T !== undefined) {
-    const o = Var(s.D);
-    s2.c = [...s.c, { o, T, v: undefined }];
-    s2.d += 1;
   }
   return s2;
 }
@@ -1315,7 +1330,7 @@ function scope_bind(s: Scope, T?: HTerm | null, q?: Q): Scope {
 function scope_move(s: Scope, a: number, b: number): Scope {
   const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? Var(b) : o)
     : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, is_o(v) ? mv(v) : v])) as O;
-  return { ...s, c: s.c.map((x) => ({ ...x, o: mv(x.o) })), empty: s.empty.map(mv),
+  return { ...s, c: s.c.map((x) => x === undefined ? x : { ...x, o: mv(x.o) }), empty: s.empty.map(mv),
     tags: s.tags.flatMap((t) => t === a ? [t, b] : [t]) };
 }
 
