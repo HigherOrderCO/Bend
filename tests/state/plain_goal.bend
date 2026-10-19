@@ -38,8 +38,7 @@ def ones_twos(n):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : ones(n)
-#|- observed : twos(n)
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- n : Nat
 #|Location: ones_twos
@@ -47,4 +46,6 @@ def ones_twos(n):
 #|37>|   {==}
 #|   |   ^^^^
 #|38 |
+#|- left     : ones(n)  =>  ones(n)
+#|- right    : twos(n)  =>  twos(n)
 #|exit 1

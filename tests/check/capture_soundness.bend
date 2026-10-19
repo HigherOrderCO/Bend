@@ -44,8 +44,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : b
-#|- observed : a
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- f : @s:(@a:Bit -> @b:Bit -> Bit) -> @e:(@a:Bit -> @b:Bit -> {b == s(b, a) : Bit}) -> {Zb{} == s(Zb{}, Ob{}) : Bit}
 #|- a : Bit
@@ -55,4 +54,6 @@ def main():
 #|37>|   f(a => b => b, a => b => {==})
 #|   |                            ^^^^
 #|38 |
+#|- left     : b  =>  b
+#|- right    : a  =>  a
 #|exit 1

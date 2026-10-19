@@ -10,8 +10,7 @@ def quad_id(x: Nat) -> {M.quad(x) == x : Nat}:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : M.double(M.double(x))
-#|- observed : x
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- x : Nat
 #|Location: quad_id
@@ -19,4 +18,6 @@ def quad_id(x: Nat) -> {M.quad(x) == x : Nat}:
 #| 9>|   {==}
 #|   |   ^^^^
 #|10 |
+#|- left     : M.quad(x)  =>  M.double(M.double(x))
+#|- right    : x  =>  x
 #|exit 1

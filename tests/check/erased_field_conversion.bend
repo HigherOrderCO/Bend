@@ -23,11 +23,12 @@ def main(): Ua{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : Mka{Unit10, Ua{}}
-#|- observed : Mka{Empty10, Ua{}}
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: q
-#|16 | 
+#|16 |
 #|17>| def q(): {==}
 #|   |          ^^^^
 #|18 |
+#|- left     : Mka{Unit10, Ua{}}  =>  Mka{Unit10, Ua{}}
+#|- right    : Mka{Empty10, Ua{}}  =>  Mka{Empty10, Ua{}}
 #|exit 1

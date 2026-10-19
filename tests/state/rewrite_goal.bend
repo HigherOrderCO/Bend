@@ -48,8 +48,7 @@ def spec_thm(n, x):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : S{plus1(p, x)}
-#|- observed : plus1(p, S{x})
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- p : MN
 #|- x : MN
@@ -58,4 +57,6 @@ def spec_thm(n, x):
 #|47>|       {==}
 #|   |       ^^^^
 #|48 |
+#|- left     : S{plus1(p, x)}  =>  S{plus1(p, x)}
+#|- right    : plus1(p, S{x})  =>  plus1(p, S{x})
 #|exit 1

@@ -15,11 +15,12 @@ def main(): 0
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x => y => x
-#|- observed : x => y => y
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: bad
-#| 8 | 
+#| 8 |
 #| 9>| def bad(): {==}
 #|   |            ^^^^
 #|10 |
+#|- left     : x => y => x  =>  x => y => x
+#|- right    : x => y => y  =>  x => y => y
 #|exit 1

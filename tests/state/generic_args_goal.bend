@@ -22,8 +22,7 @@ def swap_swap(p):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : swap(Nat, Nat, swap(Nat, Nat, p))
-#|- observed : p
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- p : Sigma<&1, &1, Nat, _ => Nat>
 #|Location: swap_swap
@@ -31,4 +30,6 @@ def swap_swap(p):
 #|21>|   {==}
 #|   |   ^^^^
 #|22 |
+#|- left     : swap(Nat, Nat, swap(Nat, Nat, p))  =>  swap(Nat, Nat, swap(Nat, Nat, p))
+#|- right    : p  =>  p
 #|exit 1

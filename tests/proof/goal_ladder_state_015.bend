@@ -60,8 +60,7 @@ def add_comm(a, b):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : S{add(p, b)}
-#|- observed : S{add(b, p)}
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- p : N
 #|- b : N
@@ -70,4 +69,6 @@ def add_comm(a, b):
 #|59>|       {==}
 #|   |       ^^^^
 #|60 |
+#|- left     : S{add(p, b)}  =>  S{add(p, b)}
+#|- right    : S{add(b, p)}  =>  S{add(b, p)}
 #|exit 1

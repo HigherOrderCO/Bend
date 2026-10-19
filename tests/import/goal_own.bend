@@ -9,8 +9,7 @@ def main() -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : M.double(M.double(x))
-#|- observed : x
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- x : Nat
 #|Location: quad_id
@@ -18,4 +17,6 @@ def main() -> Nat:
 #| 9>|   {==}
 #|   |   ^^^^
 #|10 |
+#|- left     : quad(x)  =>  M.double(M.double(x))
+#|- right    : x  =>  x
 #|exit 1

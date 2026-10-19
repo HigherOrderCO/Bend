@@ -30,8 +30,7 @@ def add_zero(a):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : Sh{add(p, Zh{})}
-#|- observed : Sh{p}
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- p : Nh
 #|Location: add_zero
@@ -39,4 +38,6 @@ def add_zero(a):
 #|29>|       {==}
 #|   |       ^^^^
 #|30 |
+#|- left     : add(Sh{p}, Zh{})  =>  Sh{add(p, Zh{})}
+#|- right    : Sh{p}  =>  Sh{p}
 #|exit 1

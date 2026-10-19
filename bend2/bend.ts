@@ -3668,7 +3668,22 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
         throw Err(book, ctx, ty, "non-inferrable term", tm.s, lhs.def);
       }
       if (!term_compare("EQ", book, t_wnf.a, t_wnf.b, d)) {
-        throw Err(book, ctx, t_wnf.a, t_wnf.b, tm.s, lhs.def);
+        const file = tm.s?.file;
+        const bnd  = ctx_scope(ctx);
+        const show = (x: HTerm): string => {
+          const s = expr_show(book, x, bnd, file);
+          if (s.length <= 100) {
+            return s;
+          }
+          const w = term_show(term_lower(term_wnf(book, x)), -1, bnd, file);
+          return w.length <= 100 ? w : w.slice(0, 97) + "...";
+        };
+        const lft  = term_show(term_lower(t_wnf.a), -1, bnd, file);
+        const rgt  = term_show(term_lower(t_wnf.b), -1, bnd, file);
+        const lval = show(t_wnf.a);
+        const rval = show(t_wnf.b);
+        const nte  = "- left     : " + lft + "  =>  " + lval + "\n- right    : " + rgt + "  =>  " + rval;
+        throw Err(book, ctx, "{==} needs both sides to compute to the same value", undefined, tm.s, lhs.def, nte);
       }
       return Check(tm, ty, uses_nil());
     }

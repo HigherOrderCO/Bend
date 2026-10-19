@@ -12,11 +12,12 @@ def main() -> {Nat.add(3n, 0n) == 3n : Nat}:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : Nat.add(add0~n, 0n)
-#|- observed : add0~n
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: add0
 #|7 | def add0(~n: Nat) -> {Nat.add(n, 0n) == n : Nat}:
 #|8>|   {==}
 #|  |   ^^^^
 #|9 |
+#|- left     : Nat.add(add0~n, 0n)  =>  Nat.add(add0~n, 0n)
+#|- right    : add0~n  =>  add0~n
 #|exit 1

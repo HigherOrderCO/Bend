@@ -16,8 +16,7 @@ def f(x):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x^0
-#|- observed : NS{x^0}
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- x : N
 #|- x : U32
@@ -26,4 +25,6 @@ def f(x):
 #|15>|   x => {==}
 #|   |        ^^^^
 #|16 |
+#|- left     : x^0  =>  x^0
+#|- right    : NS{x^0}  =>  NS{x^0}
 #|exit 1
