@@ -1249,6 +1249,9 @@ function name_suggest(book: Book, k: Name): Name[] {
     if (onm.startsWith("_") || nm.startsWith("_")) {
       continue;
     }
+    if (Math.abs(o.length - k.length) > 2) {
+      continue;
+    }
     const full = dist(name_key(k), name_key(o));
     const d = dist(nm, onm);
     if (full <= 2 && (d <= 1 || nm[0] === onm[0])) {
