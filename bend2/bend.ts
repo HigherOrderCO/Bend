@@ -3678,7 +3678,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
           const w = term_show(term_lower(term_wnf(book, x)), -1, bnd, file);
           return w.length <= 100 ? w : w.slice(0, 97) + "...";
         };
-        const raw = (x: HTerm): string => term_show(term_lower(x), -1, bnd, file).replace(/\^\d+/g, "");
+        const raw = (x: HTerm): string => term_show(term_lower(x, bnd.length), -1, bnd, file);
         const lft  = raw(t_wnf.a);
         const rgt  = raw(t_wnf.b);
         const lval = show(t_wnf.a);
