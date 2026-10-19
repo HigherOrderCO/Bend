@@ -3498,9 +3498,25 @@ function span_at(s: Span): string {
   return String(s.file.str.slice(0, s.beg).split("\n").length) + ":" + String(parse_col(s.file.str, s.beg));
 }
 
-// the checked body's value positions that mention binder i. a type
-// annotation's type is skipped, as the measure skips it.
-function term_uses_at(tm: LTerm, i: number, out: Span[]): void {
+// a constructor's field quantities: an erased field is dead, so a
+// mention in it is not a use
+function ctr_fields(book: Book, k: Name, fs: Map<Name, Quant[]>): Quant[] {
+  const hit = fs.get(k);
+  if (hit !== undefined) {
+    return hit;
+  }
+  const ctr = book_ctr(book, k);
+  const doms = ctr === null ? [] : tele_unbind(book, ctr.T).doms;
+  const qs = doms.slice(Math.max(0, doms.length - (ctr?.n ?? 0))).map(([q]) => q);
+  fs.set(k, qs);
+  return qs;
+}
+
+// the checked body's value positions that mention binder i, as the
+// measure counts them: a type position (an annotation's type, an
+// equation's endpoints, a rewrite's motive, a type application) is
+// dead, and so is an erased field.
+function term_uses_at(book: Book, tm: LTerm, i: number, out: Span[], fs: Map<Name, Quant[]>): void {
   switch (tm.$) {
     case "Var": {
       if (tm.i === i && tm.s !== undefined) {
@@ -3508,42 +3524,39 @@ function term_uses_at(tm: LTerm, i: number, out: Span[]): void {
       }
       return;
     }
-    case "Ann": return term_uses_at(tm.x, i, out);
-    case "Sub": return term_uses_at(tm.f, i, out);
+    case "Ann": return term_uses_at(book, tm.x, i, out, fs);
+    case "Sub": return term_uses_at(book, tm.f, i, out, fs);
     case "Let": {
       for (const v of tm.v) {
-        term_uses_at(v, i, out);
+        term_uses_at(book, v, i, out, fs);
       }
-      return term_uses_at(tm.f, i, out);
+      return term_uses_at(book, tm.f, i, out, fs);
     }
-    case "Lam": return term_uses_at(tm.f, i, out);
+    case "Lam": return term_uses_at(book, tm.f, i, out, fs);
     case "App": {
-      term_uses_at(tm.f, i, out);
-      return term_uses_at(tm.x, i, out);
+      term_uses_at(book, tm.f, i, out, fs);
+      return term_uses_at(book, tm.x, i, out, fs);
     }
-    case "ADT":
     case "Ctr": {
-      for (const x of tm.x) {
-        term_uses_at(x, i, out);
+      const qs = ctr_fields(book, tm.k, fs);
+      for (let j = 0; j < tm.x.length; j++) {
+        if (qs[j]?.$ !== "None") {
+          term_uses_at(book, tm.x[j], i, out, fs);
+        }
       }
       return;
     }
     case "Mat": {
-      term_uses_at(tm.h, i, out);
-      return term_uses_at(tm.m, i, out);
-    }
-    case "Eql": {
-      term_uses_at(tm.a, i, out);
-      return term_uses_at(tm.b, i, out);
+      term_uses_at(book, tm.h, i, out, fs);
+      return term_uses_at(book, tm.m, i, out, fs);
     }
     case "Min": {
-      term_uses_at(tm.a, i, out);
-      return term_uses_at(tm.b, i, out);
+      term_uses_at(book, tm.a, i, out, fs);
+      return term_uses_at(book, tm.b, i, out, fs);
     }
     case "Rwt": {
-      term_uses_at(tm.e, i, out);
-      term_uses_at(tm.p, i, out);
-      return term_uses_at(tm.f, i, out);
+      term_uses_at(book, tm.e, i, out, fs);
+      return term_uses_at(book, tm.f, i, out, fs);
     }
     default: {
       return;
@@ -3556,7 +3569,7 @@ export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Q
   if (quant_join(u, q).$ !== q.$) {
     if (q.$ === "Lone" && u.$ === "Many" && body !== undefined) {
       const at: Span[] = [];
-      term_uses_at(body, i, at);
+      term_uses_at(book, body, i, at, new Map());
       if (at.length >= 2) {
         const nte = "Note: a +" + k + " binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied)."
           + (fx === undefined || fx.startsWith("_") ? "" : "\nNote: " + k + " is bound by a pattern: put the + on the matched parameter, +" + name_key(fx) + ".");
