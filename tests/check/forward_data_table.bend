@@ -27,7 +27,7 @@ def main(): 0
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : x is used 2 times (at 18:9, 18:12), but a plain binding is used at most once
+#|- message  : x appears 2 times (at 18:9, 18:12), but a plain binding is used at most once
 #|Location: use2
 #|17 | def use2(x):
 #|18>|   MkTwo{x, x}

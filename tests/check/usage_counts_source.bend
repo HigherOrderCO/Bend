@@ -23,7 +23,7 @@ def duplicate(t): (z => {z : Ty(z)})(Box{consume(t), t})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : t is used 2 times (at 22:50, 22:54), but a plain binding is used at most once
+#|- message  : t appears 2 times (at 22:50, 22:54), but a plain binding is used at most once
 #|Location: duplicate
 #|21 | law duplicate: Res -> Box
 #|22>| def duplicate(t): (z => {z : Ty(z)})(Box{consume(t), t})

@@ -44,7 +44,7 @@ def main(): delta(MkBox6{argument => delta(MkBox6{argument})})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : box is used 2 times (at 38:12, 38:17), but a plain binding is used at most once
+#|- message  : box appears 2 times (at 38:12, 38:17), but a plain binding is used at most once
 #|Location: delta
 #|37 | def delta(box):
 #|38>|   delta.go(box, box)

@@ -62,7 +62,7 @@ def main(): twice(Inr{2})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : e is used 2 times (at 56:11, 56:17), but a plain binding is used at most once
+#|- message  : e appears 2 times (at 56:11, 56:17), but a plain binding is used at most once
 #|Location: leak
 #|55 | def leak(e):
 #|56>|   leak.go(e, la(e))

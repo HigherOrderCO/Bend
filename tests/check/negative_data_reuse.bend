@@ -25,7 +25,7 @@ def main(): omega(Ln{t => t})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : f is used 2 times (at 17:7, 17:12), but a plain binding is used at most once
+#|- message  : f appears 2 times (at 17:7, 17:12), but a plain binding is used at most once
 #|Location: omega
 #|16 |     case Ln{f}:
 #|17>|       f(Ln{f})

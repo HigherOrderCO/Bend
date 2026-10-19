@@ -18,7 +18,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : x is used 2 times (at 11:4, 11:8), but a plain binding is used at most once
+#|- message  : x appears 2 times (at 11:4, 11:8), but a plain binding is used at most once
 #|Location: f
 #|10 | def f(x):
 #|11>|   (x + x : U32)

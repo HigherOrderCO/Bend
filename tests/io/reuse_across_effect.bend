@@ -61,7 +61,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : xs is used 2 times (at 58:40, 59:40), but a plain binding is used at most once
+#|- message  : xs appears 2 times (at 58:40, 59:40), but a plain binding is used at most once
 #|Context:
 #|- t : Tree
 #|Location: main

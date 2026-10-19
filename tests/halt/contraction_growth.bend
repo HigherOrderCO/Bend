@@ -48,7 +48,7 @@ def main(): Z{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : p is used 2 times (at 29:16, 29:19), but a plain binding is used at most once
+#|- message  : p appears 2 times (at 29:16, 29:19), but a plain binding is used at most once
 #|Location: grow
 #|28 |     case S{p}:
 #|29>|       S{append(p, p)}

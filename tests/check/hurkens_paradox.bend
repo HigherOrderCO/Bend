@@ -111,7 +111,7 @@ def main(): Uu{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : f is used 2 times (at 44:44, 44:51), but a plain binding is used at most once
+#|- message  : f appears 2 times (at 44:44, 44:51), but a plain binding is used at most once
 #|Context:
 #|- x : Type
 #|Location: tauinner

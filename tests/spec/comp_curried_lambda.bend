@@ -28,7 +28,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : x is used 2 times (at 21:4, 21:8), but a plain binding is used at most once
+#|- message  : x appears 2 times (at 21:4, 21:8), but a plain binding is used at most once
 #|Location: helper
 #|20 | def helper(x):
 #|21>|   (x * x : U32)

@@ -2735,7 +2735,9 @@ export function patt_mark(x: PVar, rows: Rows): Quant {
 }
 
 // a pattern binder carries the parameter it came from: using it twice is
-// fixed by marking that parameter +, not the field it names
+// fixed by marking that parameter +, not the field it names. the mark is
+// a hidden property: a term copied by its own props loses it, and the
+// note then leaves the name out.
 function lam(v: PVar, f: LTerm): LTerm {
   const t = Lam(v.k, v.i, f, v.s, v.q);
   if (v.fx !== undefined) {
@@ -3576,7 +3578,7 @@ export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Q
       if (at.length >= 2) {
         const nte = "Note: a +" + k + " binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied)."
           + (fx === undefined || fx.startsWith("_") ? "" : "\nNote: " + k + " is bound by a pattern: put the + on the matched parameter, +" + name_key(fx) + ".");
-        throw Err(book, ctx, k + " is used " + String(at.length) + " times (at " + at.map(span_at).join(", ") + "), but a plain binding is used at most once", undefined, at[1], def, nte);
+        throw Err(book, ctx, k + " appears " + String(at.length) + " times (at " + at.map(span_at).join(", ") + "), but a plain binding is used at most once", undefined, at[1], def, nte);
       }
     }
     let obs = quant_show(u) + k;

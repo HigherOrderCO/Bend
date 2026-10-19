@@ -22,7 +22,7 @@ def main(): Type
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : f is used 2 times (at 16:7, 16:14), but a plain binding is used at most once
+#|- message  : f appears 2 times (at 16:7, 16:14), but a plain binding is used at most once
 #|Context:
 #|- A : Type
 #|Location: delta

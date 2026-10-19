@@ -21,7 +21,7 @@ def dup(q):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : q is used 2 times (at 20:5, 20:15), but a plain binding is used at most once
+#|- message  : q appears 2 times (at 20:5, 20:15), but a plain binding is used at most once
 #|Location: dup
 #|19 | def dup(q):
 #|20>|   P{q <&> &2, q <&> &2}

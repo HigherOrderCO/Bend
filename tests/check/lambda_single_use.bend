@@ -17,7 +17,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : k is used 2 times (at 16:7, 16:10), but a plain binding is used at most once
+#|- message  : k appears 2 times (at 16:7, 16:10), but a plain binding is used at most once
 #|Context:
 #|- k0 : @_:Unit -> @_:U32 -> U32
 #|Location: main

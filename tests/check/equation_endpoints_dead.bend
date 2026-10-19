@@ -9,7 +9,7 @@ def f(x: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : x is used 2 times (at 8:11, 8:14), but a plain binding is used at most once
+#|- message  : x appears 2 times (at 8:11, 8:14), but a plain binding is used at most once
 #|Location: f
 #|7 |   y = {x == x : Nat}
 #|8>|   Nat.add(x, x)

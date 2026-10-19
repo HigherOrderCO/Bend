@@ -36,7 +36,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : b is used 2 times (at 35:15, 35:23), but a plain binding is used at most once
+#|- message  : b appears 2 times (at 35:15, 35:23), but a plain binding is used at most once
 #|Location: main
 #|34 |   b = mk()
 #|35>|   U32.add(use(b), use(b))

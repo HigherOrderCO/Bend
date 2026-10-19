@@ -11,7 +11,7 @@ def main() -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : x is used 2 times (at 7:5, 7:5), but a plain binding is used at most once
+#|- message  : x appears 2 times (at 7:5, 7:5), but a plain binding is used at most once
 #|Location: app~0
 #|6 | def app(~f: Nat -> Nat, x: Nat) -> Nat:
 #|7>|   f(x)

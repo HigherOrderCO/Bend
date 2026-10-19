@@ -12,7 +12,7 @@ def twice(n: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : p is used 2 times (at 11:15, 11:18), but a plain binding is used at most once
+#|- message  : p appears 2 times (at 11:15, 11:18), but a plain binding is used at most once
 #|Location: twice
 #|10 |     case 1n+p:
 #|11>|       Nat.add(p, p)

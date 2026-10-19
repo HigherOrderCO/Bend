@@ -38,7 +38,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : a is used 2 times (at 37:8, 37:11), but a plain binding is used at most once
+#|- message  : a appears 2 times (at 37:8, 37:11), but a plain binding is used at most once
 #|Location: main
 #|36 |   a = mk()
 #|37>|   use2(a, a)

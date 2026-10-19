@@ -16,7 +16,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : k0 is used 2 times (at 15:7, 15:14), but a plain binding is used at most once
+#|- message  : k0 appears 2 times (at 15:7, 15:14), but a plain binding is used at most once
 #|Location: main
 #|14 |   k0 = {(x => x) : U32 -> U32}
 #|15>|   P12{k0(1), k0(2)}
