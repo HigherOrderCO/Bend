@@ -6,6 +6,7 @@ def hidden(n: U32) -> U32:
 
 def answer() -> IO(U32):
   import "./foreign_only_fid.c"
+  import "./foreign_only_fid.js"
 
 def main() -> IO(Unit):
   do IO<Unit>:

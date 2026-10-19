@@ -6,6 +6,7 @@ class Counter {
   value() { return this.#CID(10); }
 }
 function answer() {
+  if (FID(helper) !== "helper") throw new Error("wrong foreign function name");
   return $CID(9) + πCID(10) + joined‍CID(9) + new Counter().value();
 }
 io_eff(CID(answer), answer);

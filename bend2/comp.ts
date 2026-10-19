@@ -2839,11 +2839,12 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // effect_src splices a C source's backslash-newlines first, as C does even
 // in a comment; JS does not.
 
-const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$#\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
+const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
 
 function c_ids(src: string, m = "", use?: (p: string, k: Name) => void): string {
-  const replace = (t: string, p?: string, k?: string): string => {
-    if (!p || !k) {
+  const replace = (t: string, p: string | undefined, k: string | undefined, at: number): string => {
+    // '#' starts a private JS name, but C's ## may paste an ID macro.
+    if (!p || !k || (FL.js && src[at - 1] === "#")) {
       return t;
     }
     const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.book.ctrs
@@ -2857,7 +2858,7 @@ function c_ids(src: string, m = "", use?: (p: string, k: Name) => void): string 
       ? js_tag(q) : q) : name_id(p + "_", q);
   };
   if (use) {
-    for (const [t, p, k] of src.matchAll(ID_WORDS)) replace(t, p, k);
+    for (const hit of src.matchAll(ID_WORDS)) replace(hit[0], hit[1], hit[2], hit.index);
     return src;
   }
   return src.replace(ID_WORDS, replace);
@@ -2877,7 +2878,7 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
     const raw = fs.readFileSync(path, "utf8");
     const src = FL.js ? raw : raw.replace(/\\[ \t]*\r?\n/g, "");
     FL.effs.set(path, [m, src]);
-    c_ids(src, m, (p, q) => {
+    if (!FL.js) c_ids(src, m, (p, q) => {
       const d = FL.book.tlds[q];
       if (p === "FID" && fun_runs(d)) {
         src_add(q);
