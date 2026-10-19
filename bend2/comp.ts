@@ -2862,7 +2862,7 @@ function c_ids(src: string, m = ""): string {
       || q in FL.book.tlds || FL.ids.has(p + "_" + q))
       ?? die(`${p}(${k}) names no constructor or def`);
     return FL.js ? JSON.stringify(p === "CID" && q in FL.book.ctrs
-      ? js_tag(q) : Bend.name_key(q)) : name_id(p + "_", q);
+      ? js_tag(q) : q) : name_id(p + "_", q);
   });
 }
 
@@ -3251,7 +3251,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   block(sc, `function ${name_id("$", k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
-      return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
+      return file_push(sc, `return { $: ${JSON.stringify(k)
         }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
         }], kont: (x) => ${params.at(-1)}(${host(K?.$ === "All" ? K.A : null,
         "x")}) };`);

@@ -204,6 +204,8 @@ definition named `lib.value` are distinct. Use `app["lib:value"]` for the
 former and `app["lib.value"]` for the latter.
 Keys are escaped as JavaScript strings, including quotes or backslashes in
 an imported module's name.
+Foreign JS `CID`/`FID` definition names keep the same separator; constructor
+tags remain local to their declaring file.
 
 # References
 
