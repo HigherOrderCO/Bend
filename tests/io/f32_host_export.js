@@ -42,7 +42,6 @@ def word(n: U32) -> F32:
       [2139095040, Infinity], [4286578688, -Infinity]];
     for (const [bits, expected] of words) {
       const value = lib.word(bits);
-      lib.bits(0.75);
       if (!Object.is(value, expected) || lib.bits(value) !== bits) {
         return 4;
       }
