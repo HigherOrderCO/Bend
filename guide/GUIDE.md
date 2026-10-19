@@ -460,22 +460,20 @@ def main() -> IO(Unit):
   App.run(~U32, ~App{+s => (s, Pix{s}), tick}, "Hello", 256, 256, 0)
 ```
 
-`Image` is a quadtree: `Pix{color}` paints a square; `Qua{tl, tr, bl, br}`
-splits it four ways. Build recursively, optionally in parallel. Events:
-`Key`, `Mouse`, `Move`, `Look`, `Scroll`, `Close`.
-`Scroll{x, y, dx, dy}` gives pointer position and signed `F32` deltas toward
-the page's top/left; an X11 notch is 1. `Window.grab(window, True{})` hides
-and holds the pointer; motion becomes signed `F32` `Look{dx, dy}` in `Move`
-units. `False{}` or loss of focus releases it.
-`App.run` calls `view` then `tick` each frame until `tick` returns `None`.
-`view` returns affine state beside the image. Direct effects: `Window.open`,
-`Window.frame`, `Window.close`; sound: `Audio.open`, `Audio.write`, `Audio.close`.
-See `demos/app_pong_game_2d`.
-
-`Window.fullscreen(w, on)` returns `(window, result)`.
-Pass `True{}` to enter, `False{}` to exit; keep framing during transitions.
-Unsupported desktops/JS return `ENOTSUP`.
-
+An `Image` is a quadtree: `Pix{color}` paints a square, and `Qua{tl, tr, bl,
+br}` splits it in four, so a frame is drawn by recursion like everything else,
+in parallel if you want. Events are `Key`, `Mouse`, `Move`, `Look`, `Scroll`
+and `Close`. `Scroll{x, y, dx, dy}` is a wheel or trackpad under the pointer;
+its signed `F32` deltas scroll toward a page's top and left (a notch is 1 on
+X11). For a first-person camera, `Window.grab(window, True{})` hides and holds
+the cursor, and the mouse's motion comes as `Look{dx, dy}` (signed `F32`, in
+`Move`'s units) until `Window.grab(window, False{})` or the window losing focus
+lets it go.
+`App.run` opens a window and calls `view` then `tick` once per frame, until
+`tick` answers `None`. Since the state is affine, `view` must hand it back next
+to the image. Underneath are `Window.open`, `Window.frame` and `Window.close`,
+and `Audio.open`, `Audio.write` and `Audio.close` for sound. See
+`demos/app_pong_game_2d` for a complete one.
 
 ### The Base Library
 
