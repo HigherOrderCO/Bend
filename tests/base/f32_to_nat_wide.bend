@@ -7,9 +7,15 @@ def main() -> IO(Unit):
     IO.print(Nat.show(F32.to_nat(4294967296.0)))
     IO.print(Nat.show(F32.to_nat(4294967808.0)))
     IO.print(Nat.show(F32.to_nat(281474959933440.0)))
+    IO.print(Nat.show(F32.to_nat(281474976710656.0)))
+    IO.print(Nat.show(F32.to_nat(100000000000000000000.0)))
+    IO.print(Nat.show(F32.to_nat(F32.div(1.0, 0.0))))
 
 #|42
 #|0
 #|4294967296
 #|4294967808
 #|281474959933440
+#|0
+#|0
+#|0

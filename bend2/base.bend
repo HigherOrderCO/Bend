@@ -1856,6 +1856,7 @@ def F32.from_nat(n: Nat) -> F32:
   U32.to_f32(U32.from_nat(n))
 
 # Preserve the direct cast below 2^32; wider Nats need both word halves.
+# Past 2^48-1 no Nat fits, so the direct cast gives 0.
 def F32.to_nat.wide(+a: F32, wide: Bool) -> Nat:
   match wide:
     case False{}:
@@ -1868,7 +1869,9 @@ def F32.to_nat.wide(+a: F32, wide: Bool) -> Nat:
 def F32.to_nat(a: F32) -> Nat:
   match a:
     case F32{+x}:
-      F32.to_nat.wide(F32{x}, F32.is_ge(F32{x}, 4294967296.0))
+      +wide = Bool.and(F32.is_ge(F32{x}, 4294967296.0),
+        F32.is_lt(F32{x}, 281474976710656.0))
+      F32.to_nat.wide(F32{x}, wide)
 
 # Char
 # ----
