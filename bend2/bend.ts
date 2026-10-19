@@ -3722,28 +3722,26 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
     const [raw, args] = term_unapply(term_strip(x_inf.tm));
     const head = term_strip(raw);
     const tld = head.$ === "Ref" ? book.tlds[head.k] : undefined;
-    if (tld?.$ === "Def") {
+    // a foreign def is an effect operation: its continuation is passed
+    // by the do block, not written, and a template's ~ arguments are
+    // erased in its type but written at the call
+    if (tld?.$ === "Def" && tld.i === undefined && tld.x === 0) {
       const doms  = tele_unbind(book, tld.T).doms;
       const total = doms.filter(([q]) => q.$ !== "None").length;
       if (args.length < total) {
         const file = tm.s?.file;
         const miss: string[] = [];
-        let ok = true;
         let bnd = ctx_scope(ctx);
         let cur: HTerm = o_wnf;
         const want = total - args.length;
         for (let j = 0; j < 8 && miss.length < want && cur.$ === "All"; j++) {
           if (cur.q.$ !== "None") {
-            if (miss.length === 0 && term_wnf(book, cur.A).$ === "All") {
-              ok = false;
-              break;
-            }
-            miss.push(cur.k + " : " + expr_show(book, cur.A, bnd, file).replace(/\^\d+/g, ""));
+            miss.push(cur.k + " : " + expr_show(book, cur.A, bnd, file));
           }
           bnd = bnd.concat([cur.k]);
           cur = term_wnf(book, cur.B(Var(cur.k, cur.i)));
         }
-        if (ok && miss.length > 0) {
+        if (miss.length > 0) {
           nte = "Note: " + name_show(file, head.k) + " takes " + String(total) + " argument" + (total === 1 ? "" : "s") + ", " + String(args.length) + " given (missing " + miss.join(", ") + (miss.length < want ? ", ..." : "") + ").";
         }
       }
