@@ -179,11 +179,12 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, U32.log2 and Map.msb.u, as intr_of
-  // skips an op with no JS
+  // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
+  // as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
   u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
   map_msb_u: { C: "map_msb_u($0, $1)" },
+  map_bit: { C: ["$0", "map_bit(e, $0, $1)"] },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -4019,6 +4020,17 @@ INLINE u64 term_peek(DEV u64* H, Term t) {
     return w64_load(&H[term_loc(t)]) >> 24;
   }
   return term_loc(t);
+}
+
+// Base's Map.bit, reading the key in place: 33 bits a char, a presence bit
+// then the code MSB first, false past the end
+INLINE u64 map_bit(Env e, Term key, u64 pos) {
+  for (u64 i = pos / 33; i > 0 && term_aux(key) == CID(SCon); i -= 1) {
+    key = e.mem[term_peek(e.mem, key) + 1];
+  }
+  if (term_aux(key) != CID(SCon)) return 0;
+  u64 off = pos % 33;
+  return off == 0 || (((u32)e.mem[term_peek(e.mem, key)] >> (32 - off)) & 1);
 }
 
 #define blk_shr(t) (BLK_SHR && term_rfc(t))
