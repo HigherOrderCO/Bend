@@ -15,5 +15,5 @@ def f(xs: List<&2, U32 & U32>) -> List<&2, U32 & U32>:
 #|6>| def f(xs: List<&2, U32 & U32>) -> List<&2, U32 & U32>:
 #|  |                    ^^^^^^^^^
 #|7 |   xs
-#|Note: A & B is Sigma<&1, &1, ..>, which is Type. Write +Sigma<A, _ => B> for a pair that is Data.
+#|Note: A & B is Sigma<&1, &1, ..>, which is Type. Write +Sigma<A, _ => B> (or Sigma<&2, &2, A, _ => B>) for a pair that is Data.
 #|exit 1

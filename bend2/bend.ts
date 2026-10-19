@@ -3724,7 +3724,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
     if (s.$ === "ADT" && s.k === "Sigma" && s.x.length >= 4
         && s.x[0].$ === "Qua" && s.x[0].q.$ === "Lone"
         && s.x[1].$ === "Qua" && s.x[1].q.$ === "Lone") {
-      nte = "Note: A & B is Sigma<&1, &1, ..>, which is Type. Write +Sigma<A, _ => B> for a pair that is Data.";
+      nte = "Note: A & B is Sigma<&1, &1, ..>, which is Type. Write +Sigma<A, _ => B> (or Sigma<&2, &2, A, _ => B>) for a pair that is Data.";
     }
   }
   throw Err(book, ctx, ty, x_inf.ty, tm.s, lhs.def, nte);
