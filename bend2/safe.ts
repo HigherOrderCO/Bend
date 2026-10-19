@@ -498,7 +498,7 @@ function def_emit(e: Safe, k: QName, cols: Cols, n: QName, tld: Def): void {
 function arm(e: Safe, s: Scope, k: QName, cols: Cols, vs: Array<[Q, O]>): O {
   const tld = e.book.tlds[k] as Def;
   const ps = tld.x === 0 ? null : new Map(cols.slice(0, tld.x).map((v, j) => [B.name_gen(k, "param", j), v]));
-  const t0 = B.checked_higher(tld.e as B.LTerm);
+  const t0 = B.term_higher(tld.e as B.LTerm, null, true);
   let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
   let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
   let j = 0;
@@ -608,7 +608,7 @@ function inst_pick(e: Safe, k: QName): HTerm[] | null {
   };
   for (const n of e.book.tmps.values()) {
     if (B.name_parent(n) !== k) continue;
-    const xs = (e.book.tlds[n] as Def).args!.map(x => B.checked_higher(x));
+    const xs = (e.book.tlds[n] as Def).args!.map(x => B.term_higher(x, null, true));
     if (fits(B.scope_mapper(v => v)(e.book.tlds[k].T), xs)) return xs;
   }
   return null;
@@ -618,7 +618,7 @@ function inst_pick(e: Safe, k: QName): HTerm[] | null {
 function fit(e: Safe, k: QName, x: HTerm, T: HTerm): HTerm | null {
   try {
     const copy = B.scope_mapper(v => v);
-    return B.checked_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, copy(x), B.Lone(), copy(T), B.ctx_nil(), 0).tm);
+    return B.term_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, copy(x), B.Lone(), copy(T), B.ctx_nil(), 0).tm, null, true);
   } catch (err) {
     if ((err as B.Err).$ !== "Err") {
       throw err;
@@ -1138,7 +1138,7 @@ function spine(e: Safe, s: Scope, t: HTerm, live: boolean): O {
   }
   // bend2's instance of a template is the template at its ~ arguments
   const g = e.book.tlds[f.k];
-  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args.map(x => B.checked_higher(x)), ...xs]] : [f.k, xs];
+  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args.map(x => B.term_higher(x, null, true)), ...xs]] : [f.k, xs];
   const tld = e.book.tlds[k] ?? oos("an unknown name " + B.name_display(e.book, k));
   if (tld.$ === "Def" && ys.length < tld.x) {
     oos("a template " + B.name_display(e.book, k) + " short of its ~ arguments");
@@ -1226,7 +1226,7 @@ function regroup(e: Safe, key: string): never {
 // helper must shrink a live lead parameter
 function group_new(e: Safe, k: QName, hs: QName[]): Group | null {
   const lead = Math.min(...hs.map((h) => {
-    const t = B.term_lower(B.checked_higher((e.book.tlds[h] as Def).e as B.LTerm));
+    const t = B.term_lower(B.term_higher((e.book.tlds[h] as Def).e as B.LTerm, null, true));
     let n = 0;
     for (let x = t; x.$ === "Ann" || x.$ === "Lam"; x = x.$ === "Ann" ? x.x : x.f) {
       n += x.$ === "Lam" ? 1 : 0;

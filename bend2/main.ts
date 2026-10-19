@@ -1000,7 +1000,7 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
         term_refs(Bend.term_lower(c.T), rs);
       }
       if (t.$ === "Def" && t.e !== undefined) {
-        term_refs(Bend.term_lower(Bend.checked_higher(t.e)), rs);
+        term_refs(Bend.term_lower(Bend.term_higher(t.e, null, true)), rs);
       }
       for (const r of rs) {
         (uses[r] ??= []).push(k);

@@ -789,8 +789,15 @@ function term_at(value: HTerm, span?: Span): HTerm {
     ? value : { ...value, s: span };
 }
 
-// Children in one environment share annotation copies; binder applications do not.
-export function term_higher(tm: LTerm, env: Env = null, copy?: (term: HTerm) => HTerm): HTerm {
+// copy=true starts checked annotation copying for env; children share its copier,
+// while binder applications start a new one.
+export function term_higher(tm: LTerm, env: Env = null, copy: boolean | ((term: HTerm) => HTerm) = false): HTerm {
+  if (copy === true) {
+    copy = scope_mapper(v => {
+      if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
+      return term_higher(v, env, copy);
+    });
+  }
   switch (tm.$) {
     case "Var": {
       if (tm.i < 0) return copy ? copy(tm) : tm;
@@ -811,20 +818,20 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (term: HTerm) => 
       return Ref(tm.k, tm.s, tm.b);
     case "Sub": {
       const e = list_set(env, tm.i, (s?: Span) => term_higher(patt_term(tm.v, s), env, copy));
-      return copy ? checked_higher(tm.f, e) : term_higher(tm.f, e);
+      return term_higher(tm.f, e, !!copy);
     }
     case "Let": return Let(tm.k, tm.i, tm.v.map(x => term_higher(x, env, copy)), (xs: HTerm[]) => {
       let e = env;
       for (let j = 0; j < xs.length; j++) e = list_set(e, tm.i[j], xs[j]);
-      return copy && e !== env ? checked_higher(tm.f, e) : term_higher(tm.f, e, copy);
+      return term_higher(tm.f, e, copy && e !== env ? true : copy);
     }, tm.s, tm.q);
     case "All": return All(tm.q, tm.k, tm.i, term_higher(tm.A, env, copy), (x: HTerm) => {
       const e = list_set(env, tm.i, x);
-      return copy ? checked_higher(tm.B, e) : term_higher(tm.B, e);
+      return term_higher(tm.B, e, !!copy);
     }, tm.s);
     case "Lam": return Lam(tm.k, tm.i, (x: HTerm) => {
       const e = list_set(env, tm.i, x);
-      return copy ? checked_higher(tm.f, e) : term_higher(tm.f, e);
+      return term_higher(tm.f, e, !!copy);
     }, tm.s, tm.q);
     case "App": {
       const f = term_higher(tm.f, env, copy), x = term_higher(tm.x, env, copy);
@@ -840,15 +847,6 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (term: HTerm) => 
     case "Ann": return Ann(term_higher(tm.x, env, copy), term_higher(tm.T, env, copy), tm.s);
     default: return tm;
   }
-}
-
-// Requires checker-owned output; transport the cells captured by its annotations.
-export function checked_higher(term: LTerm, env: Env = null): HTerm {
-  const copy = scope_mapper(v => {
-    if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
-    return term_higher(v, env, copy);
-  });
-  return term_higher(term, env, copy);
 }
 
 export function term_lower(term: HTerm, d: number = 0): LTerm {
@@ -3331,9 +3329,9 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
 // ordinary typing never consults the usage measure: resource accounting
 // rides alongside the type judgment, it does not steer it. a checked term
 // returns first-order: an LTerm built bottom-up, every node Ann-wrapped
-// with its type in a share cell (Infer, Check), so no type is lowered
-// and no closure survives; a consumer that needs HOAS calls
-// checked_higher, which transports the cells with their bindings; goals
+// with its type in a share cell (Infer, Check), so no type is lowered.
+// A consumer that needs HOAS calls term_higher with copy=true, which
+// transports the cells with their bindings; goals
 // always compute on source terms. lhs is the def's
 // own equation, rebuilt as the tree walks; lhs.qs holds the def's
 // parameter quantities, read off its type once, so descent can skip

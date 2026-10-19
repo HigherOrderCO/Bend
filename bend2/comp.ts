@@ -1201,7 +1201,7 @@ function fun_of(k: QName): Fun {
       return { n: 0, h: null, live: [], lays: [BOX, BOX], ret: BOX };
     }
     const doms = tele_unbind(tld.T).doms;
-    const h = tld.e ? Bend.checked_higher(tld.e) : null;
+    const h = tld.e ? Bend.term_higher(tld.e, null, true) : null;
     const n = tld.n + (h === null ? 0
       : Math.min(def_raise(h, tld.n), doms.length - tld.n));
     const live = doms.slice(0, n).filter(dom_live);
