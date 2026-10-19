@@ -1808,10 +1808,12 @@ def F32.max(a: F32, b: F32) -> F32:
 def F32.clamp(x: F32, lo: F32, hi: F32) -> F32:
   F32.min(F32.max(x, lo), hi)
 
+# The weighted sum is exact at both endpoints and does not overflow between
+# finite endpoints of opposite signs, as b - a can.
 def F32.lerp(a: F32, b: F32, t: F32) -> F32:
-  match a:
-    case F32{+x}:
-      F32.add(F32{x}, F32.mul(F32.sub(b, F32{x}), t))
+  match t:
+    case F32{+z}:
+      F32.add(F32.mul(a, F32.sub(1.0, F32{z})), F32.mul(b, F32{z}))
 
 def F32.square(a: F32) -> F32:
   match a:
