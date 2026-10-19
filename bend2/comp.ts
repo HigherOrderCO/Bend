@@ -6326,7 +6326,11 @@ function io_out(fd, data) {
   const fs = require("fs");
   for (let at = 0; at < data.length;) {
     try {
-      at += fs.writeSync(fd, data.subarray(at));
+      const n = fs.writeSync(fd, data.subarray(at));
+      if (n === 0) {
+        throw new Error("bend: a write made no progress");
+      }
+      at += n;
     } catch (e) {
       if (e.code === "EAGAIN" || e.code === "EINTR") {
         continue;
