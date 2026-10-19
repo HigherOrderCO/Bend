@@ -976,7 +976,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
   // Annotate group calls because the kernel infers an unreduced mode.
   function group_call(s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, live: boolean): O {
     const n = g.qs.length;
-    if (ps.length < (book.tlds[m] as Def).n || ps.slice(n).some((p) => p[3] !== null)) {
+    if (ps.length < Math.max(book.tlds[m].n, n) || ps.slice(n).some((p) => p[3] !== null)) {
       oos("a partial or specialized call to " + m + ", mutually recursive");
     }
     const k = item_ref("\t" + g.k, ps.slice(0, n).map((p) => p[3]), live);
@@ -997,7 +997,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Map<Name, [Name, 
     const rest = (s1: Scope, m: Name) => {
       const tld = book.tlds[m];
       const nx = tld.$ === "Def" ? tld.x : 0;
-      const r = tele_open(s1, tld.T, lead, tld.n);
+      const r = tele_open(s1, tld.T, lead, Math.max(tld.n, lead.length));
       const qs = B.tele_unbind(book, tld.T).doms.map(([q]) => quant(q));
       return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
     };

@@ -11,11 +11,13 @@ function udp_recv_from_with(socket, max, k, read, at) {
   }
   const sys = io_sys();
   const fd = socket;
-  const b = new Uint8Array(Number(max));
+  // IPv4's 65535-byte packet has at least 20 IP and 8 UDP header bytes.
+  const size = Math.min(Number(max), 65507);
+  const b = new Uint8Array(size);
   const peer = new Uint8Array(16);
   const len = new Uint32Array([16]);
   const go = () => {
-    const got = sys.recvfrom(fd, sys.ptr(b), Number(max), 0, sys.ptr(peer),
+    const got = sys.recvfrom(fd, sys.ptr(b), size, 0, sys.ptr(peer),
       sys.ptr(len));
     const n = Number(got);
     if (n < 0) {

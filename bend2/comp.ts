@@ -81,6 +81,7 @@ type File = {
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
+  holds: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
@@ -178,8 +179,11 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
+  // C only: a JS file runs Base's U32.pow, U32.log2 and Map.msb.u, as intr_of
+  // skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
+  u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
+  map_msb_u: { C: "map_msb_u($0, $1)" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -200,7 +204,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     C:  "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
     JS: "cmp_new($0, $1)",
   },
-  u32_to_f32: { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0)" },
+  u32_to_f32: { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0 >>> 0)" },
   u32_to_nat: { C: "((u64)$0)", JS: "$0" },
   u32_from_nat: { C: "((u64)(u32)($0))", JS: "($0 >>> 0)" },
   ...tpl_ops("f32_", "add:+ sub:- mul:* div:/",
@@ -384,6 +388,12 @@ INLINE u64 nat_mul(Env e, u64 a, u64 b) {
   return nat_chk(e, b != 0 && a > NAT_IMM / b ? NAT_IMM + 1 : a * b);
 }
 
+INLINE u64 map_msb_u(u64 n, u32 x) {
+  if (n == 0 || x == 0) return 0;
+  u64 width = 32 - CLZ(x);
+  return n < width ? n : width;
+}
+
 #if DEVICE
 
 #define f32_show(e, x) (err_post(e.mem, ERR_FIDS), 0)
@@ -490,7 +500,10 @@ function nat_chk(n) {
 }
 
 function nat_in(n) {
-  return Number.isInteger(n) && n >= 0 && n <= 2 ** 53 ? n : nat_chk(1 / 0);
+  if (!Number.isInteger(n) || n < 0 || n > 2 ** 53) {
+    throw "bend: expected a Nat host number: an integer from 0 to 2^53";
+  }
+  return n;
 }
 
 function f32_show(x) {
@@ -905,12 +918,12 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words.
 function ty_holds(A: HTerm | null,
-  p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
+  p: Name | ((t: HTerm | null) => boolean), seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
     return ty_holds(t.f(DUMMY), p, seen);
   }
-  if (p(t)) {
+  if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
   }
   if (t?.$ !== "ADT" || WORDS[t.k]) {
@@ -974,8 +987,7 @@ function lay_of(A: HTerm | null): Lay {
     Bend.term_key(Bend.term_lower(t)), (key) => {
     const tld = FL.book.tlds[t.k];
     if (t.k === "Array" || t.k === "IO.OP" || tld?.$ !== "ADT"
-      || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F,
-        (u) => u?.$ === "ADT" && u.k === t.k)))) {
+      || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F, t.k)))) {
       return BOX;
     }
     FL.lays.set(key, BOX);
@@ -1071,6 +1083,16 @@ function ctr_live(ctr: Bend.Ctr, xs?: HTerm[]): Dom[] {
 
 function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
   return ctr_live(ctr, xs).map(([, , A]) => A);
+}
+
+function lay_holds(A: HTerm | null, lay: Lay, fam: Name): Lay {
+  if (lay.arms) {
+    return lay_pack(Object.entries(lay.arms).map(([k, lays]) =>
+      [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) =>
+        memo(FL.holds, fam + " " + Bend.term_key(Bend.term_lower(F)),
+          () => lay_holds(F, lays[i], fam)))]));
+  }
+  return lay === BOX && !ty_holds(A, fam) ? W32 : lay;
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
@@ -1446,6 +1468,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
+    holds: new Map(),
     lay_ids: new Map(),
     memo: {
       opens: new Map(),
@@ -2826,9 +2849,11 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
 // namespace, else as is. An effect source is read once, in one namespace.
+// effect_srcs splices a C source's backslash-newlines first, as C does even
+// in a comment; JS does not.
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  return src.replace(/\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
     }
@@ -2852,7 +2877,10 @@ function effect_srcs(ext: string, miss: string): string[] {
     }
     seen.set(path, m);
   }
-  return [...seen].map(([p, m]) => c_ids(fs.readFileSync(p, "utf8"), m));
+  return [...seen].map(([p, m]) => {
+    const src = fs.readFileSync(p, "utf8");
+    return c_ids(ext === ".c" ? src.replace(/\\[ \t]*\r?\n/g, "") : src, m);
+  });
 }
 
 // C
@@ -2919,12 +2947,14 @@ export function compile_book(book: Bend.Book): string {
   const arg = val_new([""], W64);
   const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
     seg_new(CLO_APPLY, BOX, [arg, arg])];
-  const cids = new Map<Name, number>();
-  const cid = (k: Name, n: number) =>
-    cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
+  const cids = new Map<Name, number[]>();
+  const cid = (k: Name, n: number, d = 0) =>
+    cids.set(k, [n > WIDE ? 240 + Math.log2(n) : n, Number(FL.hot.has(k)), d]);
   for (const k of FL.srcs.keys()) {
     for (const c of (FL.book.tlds[k] as Bend.ADT).c ?? []) {
-      cid(c.k, lay_node(c.k).ks.length);
+      const lay = lay_node(c.k), n = lay.ks.length;
+      const at = lay_holds(tele_unbind(c.T).ret, lay, k).ks.lastIndexOf("box");
+      cid(c.k, n, at < 0 ? 0 : n - 1 - at);
     }
   }
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
@@ -2932,7 +2962,7 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.fid)), [...FL.segs, { fid: seg_fid(CLO_APPLY),
     refs: FL.clos }].flatMap((s) => [...s.refs].map((r) => [r, s.fid])));
   if (entries.some((s) => s.params.length > WIDE)
-    || [...cids.values()].some((n) => n > 255)) {
+    || [...cids.values()].some(([n]) => n > 255)) {
     die("an arity over " + WIDE);
   }
   const defs = [[...cids.keys()].map(cid_mac),
@@ -2944,12 +2974,12 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.params.length));
   const rs = [...Array(n).keys()].map((i) => "r" + i);
   const ws = n > 6 ? [...rs.slice(0, 6), "rp", ...rs.slice(6)] : rs;
-  defs.push(`CONSTV u8 FID_T[][3] = { ${entries.map((s) =>
-    `{ ${s.params.length}, ${s.frame === null ? 0
-      : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
-      | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) =>
-    `{ ${n}, ${Number(FL.hot.has(k))} }`).join(", ")} };`,
+  defs.push(`CONSTV Fid FID_T[] = { ${entries.map((s) => `{ ${[s.params.length,
+    s.frame === null ? 0 : s.params.length - s.frame.at.length,
+    FL.bangs.has(s.def), !forky.has(s.fid)].map(Number).join(", ")} }`)
+    .join(", ")} };`,
+  `CONSTV Cid CID_T[] = { ${[...cids.values()].map((r) =>
+    `{ ${r.join(", ")} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3486,6 +3516,7 @@ typedef uint64_t u64;
 typedef uint32_t u32;
 typedef uint8_t  u8;
 #endif
+typedef unsigned short u16;
 typedef float f32;
 
 typedef u64 Term;
@@ -3553,6 +3584,8 @@ enum { ERR_RING = 1, ERR_TAGS, ERR_HEAP, ERR_FIDS, ERR_NATS, ERR_RFCS,
 #define H_BUMP       0
 #define H_CAP        1
 #define H_CURSOR     LINE
+#define H_FRONT      (H_CURSOR + 1)
+#define H_GROUPS     (H_CURSOR + 2)
 #define H_ROOT_DONE  (2 * LINE)
 #define H_ERROR_CODE (3 * LINE)
 #define H_ROOT_WORD  (4 * LINE)
@@ -3621,16 +3654,19 @@ static const char* CLI_HELP =
 // Tables
 // ======
 
+typedef struct { u8 ar, resw, bangs, nofk; } Fid;
+typedef struct { u8 ar, hot; u16 spine; } Cid;
+
 ${tabs}
 
 #define TAB_AT(T, S, I) T[S < I ? S : I]
 
-#define fid_arity(x) ((u32)FID_T[x][0])
-#define fid_resw(x)  ((u32)FID_T[x][1])
-#define fid_bangs(x) ((bool)(FID_T[x][2] & 1))
-#define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
-#define cid_arity(x) ((u32)CID_T[x][0])
-#define cid_hot(x)   ((bool)CID_T[x][1])
+#define fid_arity(x) FID_T[x].ar
+#define fid_resw(x)  FID_T[x].resw
+#define fid_bangs(x) FID_T[x].bangs
+#define fid_nofk(x)  FID_T[x].nofk
+#define cid_arity(x) CID_T[x].ar
+#define cid_hot(x)   CID_T[x].hot
 
 // A32
 // ===
@@ -3884,6 +3920,11 @@ INLINE void heap_free(Env e, u32 cls, u64 loc) {
   if (err_peek(e.mem)) {
     return;
   }
+#ifdef BEND_POISON // a later read of a freed block fails
+  for (u64 i = 1; i < 1ull << cls; i += 1) {
+    e.mem[loc + i] = RFC_BIT | TAG_CTR << 56 | LOC_MASK;
+  }
+#endif
   e.mem[loc]       = ALC_AT(e, cls);
   ALC_AT(e, cls)   = loc;
   ALC_LEN(e, cls) += 1ull << cls;
@@ -3996,6 +4037,9 @@ INLINE u32 blk_span(Term t) {
   return blk_wcls(term_tag(t) == TAG_ARR, blk_cls(t));
 }
 
+// A node's first word holds its frame; free it before its last live child.
+// Swap the spine to the end for cell-by-cell list drops. Ends <256 fit the frame;
+// a wider end goes in the trivial last cell, then the counter.
 FAR void term_drop(Env e, Term t) {
   DEV u64* H = e.mem;
   u64  cur = 0;
@@ -4020,12 +4064,27 @@ FAR void term_drop(Env e, Term t) {
       } else {
         u32 aux = (u32)term_aux(t);
         u64 loc = term_loc(t);
-        u32 n   = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
-          : fid_arity(aux) - (tag == TAG_CLO);
-        u32 cls = tag == TAG_ARR ? 64 | blk_cls(t)
+        u32 n = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
+          : fid_arity(aux) - (tag == TAG_CLO),
+          cls = tag == TAG_ARR ? 64 | blk_cls(t)
           : n > ${WIDE} ? 64 | (n - 240)
-          : cls_fit(tag == TAG_TSK ? n + 2 : n);
-        c0 = H[loc];
+          : cls_fit(tag == TAG_TSK ? n + 2 : n),
+          w = cls < 64 ? n : 1u << (cls & 63),
+          d = tag == TAG_CTR ? CID_T[aux].spine : 0, m = w;
+        if (d) {
+          u64 end = loc + w - 1;
+          Term f = H[end - d];
+          H[end - d] = H[end];
+          H[end] = f;
+        }
+        while (m && term_triv(H[loc + m - 1])) --m;
+        if (m < 256) {
+          n   = m;
+          cls &= 63;
+        } else if (m < w) {
+          H[loc + w - 1] = m;
+        }
+        c0 = m ? H[loc] : 0;
         H[loc] = cur;
         cur = loc | ((u64)n << 48) | ((u64)cls << 56);
       }
@@ -4043,26 +4102,25 @@ FAR void term_drop(Env e, Term t) {
       if (arr) {
         cls &= 63;
         n   = 1u << cls;
-        if (i == 2) {
-          j = (u32)H[loc + 1];
-        }
+        Term z = H[loc + (i > 1 ? 1 : n - 1)];
+        n = i > 1 ? z >> 32 : term_triv(z) ? (u32)z : n;
+        j = i > 1 ? (u32)z : i;
       }
-      if (j < n) {
-        Term c = j == 0 ? c0 : H[loc + j];
-        if (arr && j > 0) {
-          H[loc + 1] = j + 1;
+      Term c = j == 0 ? c0 : H[loc + j];
+      if (j + 1 >= n) {
+        cur = H[loc];
+        heap_free(e, cls, loc);
+      } else {
+        if (arr && j) {
+          H[loc + 1] = (u64)n << 32 | (j + 1);
         }
         if (!arr || i < 2) {
           cur += 1ull << 40;
         }
-        if (!term_triv(c)) {
-          t = c;
-          break;
-        }
-      } else {
-        u64 up = H[loc];
-        heap_free(e, cls, loc);
-        cur = up;
+      }
+      if (!term_triv(c)) {
+        t = c;
+        break;
       }
     }
   }
@@ -4271,6 +4329,25 @@ INLINE void ring_push(DEV u64* H, u32 r, Term tsk) {
 
 INLINE u32 ring_flip(u32 i) {
   return (i % CUBE_T << CUBE_LOG) + i / CUBE_T;
+}
+
+// A turn's five dispatches (x, y, z) sit at H_GROUPS, before H_ROOT_DONE.
+typedef char turn_fits[H_GROUPS + 8 <= H_ROOT_DONE ? 1 : -1];
+
+#define TURN_ROWS(at) ((at) % 4 == 0 ? 1 : CUBE_G)
+
+INLINE u32 turn_groups(u64 f, u32 at) {
+  bool run = f != 0 && (at == 2 ? f >= CUBE_T : at == 1 ? f < LANES
+    : at == 4 || f < CUBE_T);
+  return run ? TURN_ROWS(at) : 0;
+}
+
+INLINE void turn_set(DEV u64* H, u64 f) {
+  DEV u32* g = (DEV u32*)(H + H_GROUPS);
+  H[H_FRONT] = f;
+  for (u32 i = 0; i < 15; i += 1) {
+    g[i] = i % 3 != 0 ? 1 : turn_groups(f, i / 3);
+  }
 }
 
 #define ring_pick(b, s, c) ((b) + (s) * (a32_add(c, 1) & (CUBE_T - 1)))
@@ -4580,14 +4657,23 @@ kernel void bend_dev(DEV u64* H [[buffer(0)]], constant u32& pass [[buffer(1)]],
   u32 row [[threadgroup_position_in_grid]],
   u32 lane [[thread_position_in_threadgroup]]) {
 #else
-extern "C" __global__ void bend_dev(DEV u64* H, u32 pass) {
-  extern __shared__ u32 vote[];
+extern "C" __global__ void bend_dev(DEV u64* H, u32 pass, u32 at) {
+  __shared__ u32 vote[3];
   u32 grids = gridDim.x;
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
 #endif
+#ifndef __METAL_VERSION__
+  if (!turn_groups(H[H_FRONT], at)) {
+    return;
+  }
+#endif
   if (pass == 2) {
     bank_pack(H, lane);
+    if (lane == 0) {
+      turn_set(H, root_done(H) || err_seen(H) ? 0
+        : a32_exch(a32_at(H, H_CURSOR), 0));
+    }
     return;
   }
   u32 stride = grids == 1 ? CUBE_G : 1;
@@ -4897,17 +4983,13 @@ static void gpu_note(const char* path) {
 
 #if BEND_METAL || BEND_CUDA
 
-static void gpu_kernel(u32 pass, u32 groups);
+static void gpu_kernel(u32 pass, u32 at);
 
-static void gpu_run(u32 f) {
-  if (f < CUBE_T) {
-    gpu_kernel(0, 1);
+// Dispatch at runs pass {0, 0, 1, 3, 2}[at] on TURN_ROWS(at) groups.
+static void gpu_run(void) {
+  for (u32 i = 0; i < 5; i += 1) {
+    gpu_kernel((u32[]){ 0, 0, 1, 3, 2 }[i], i);
   }
-  if (f < LANES) {
-    gpu_kernel(0, CUBE_G);
-  }
-  gpu_kernel(f < CUBE_T ? 3 : 1, CUBE_G);
-  gpu_kernel(2, 1);
 }
 
 #endif
@@ -4996,26 +5078,46 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
-  [gpu_enc setComputePipelineState:gpu_pso];
-  [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+static void gpu_kernel(u32 pass, u32 at) {
   [gpu_enc setBytes:&pass length:sizeof pass atIndex:1];
-  [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
-  [gpu_enc dispatchThreadgroups:MTLSizeMake(groups, 1, 1)
+  [gpu_enc dispatchThreadgroupsWithIndirectBuffer:gpu_buf
+    indirectBufferOffset:H_GROUPS * 8 + at * 12
     threadsPerThreadgroup:MTLSizeMake(CUBE_T, 1, 1)];
   [gpu_enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
 }
 
-static void gpu_pass(u32 f) {
-  @autoreleasepool {
-    id<MTLCommandBuffer> cb = [gpu_que commandBuffer];
-    gpu_enc = [cb computeCommandEncoder];
-    gpu_run(f);
-    [gpu_enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
-    if ([cb error]) {
-      gpu_fail([cb error]);
+// A bang gives each round its own command buffer, GPU_DEEP in flight, each
+// waiting on the last through one event, until the pack empties the
+// frontier. A round queued past that dispatches no groups.
+
+#define GPU_DEEP 3
+
+static id<MTLEvent> gpu_ev;
+static u64          gpu_ev_at;
+
+static void gpu_pass(u64* H) {
+  id<MTLCommandBuffer> cb[GPU_DEEP] = { nil };
+  gpu_ev = gpu_ev ? gpu_ev : [gpu_dev newEvent];
+  for (u32 i = 0, left = GPU_DEEP; left != 0; i += 1) {
+    @autoreleasepool {
+      id<MTLCommandBuffer> c = cb[i % GPU_DEEP];
+      [c waitUntilCompleted];
+      if ([c error]) {
+        gpu_fail([c error]);
+      }
+      left -= left < GPU_DEEP || ((volatile u64*)H)[H_FRONT] == 0;
+      cb[i % GPU_DEEP] = c = left == GPU_DEEP ? [gpu_que commandBuffer] : nil;
+      if (c) {
+        [c encodeWaitForEvent:gpu_ev value:gpu_ev_at];
+        gpu_enc = [c computeCommandEncoder];
+        [gpu_enc setComputePipelineState:gpu_pso];
+        [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+        [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
+        gpu_run();
+        [gpu_enc endEncoding];
+        [c encodeSignalEvent:gpu_ev value:++gpu_ev_at];
+        [c commit];
+      }
     }
   }
 }
@@ -5154,18 +5256,24 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
-  void* args[] = { &CORPUS, &pass };
-  if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, TG_HOLD * 8, NULL,
+static void gpu_kernel(u32 pass, u32 at) {
+  void* args[] = { &CORPUS, &pass, &at };
+  if (cuLaunchKernel(gpu_pso, TURN_ROWS(at), 1, 1, CUBE_T, 1, 1, 0, NULL,
     args, NULL) != CUDA_SUCCESS) {
     err_fail("device launch failed");
   }
 }
 
-static void gpu_pass(u32 f) {
-  gpu_run(f);
-  if (cuCtxSynchronize() != CUDA_SUCCESS) {
-    err_fail("device fault");
+// A bang launches 1, 2, 4 .. 64 rounds between syncs, until the pack
+// empties the frontier. A pass launched past that returns at once.
+static void gpu_pass(u64* H) {
+  for (u32 n = 1; H[H_FRONT] != 0; n = n < 32 ? 2 * n : 64) {
+    for (u32 i = 0; i < n; i += 1) {
+      gpu_run();
+    }
+    if (cuCtxSynchronize() != CUDA_SUCCESS) {
+      err_fail("device fault");
+    }
   }
 }
 
@@ -5175,7 +5283,7 @@ static void gpu_pass(u32 f) {
 #define gpu_make(p) true
 #define gpu_span()  0
 #define gpu_load(b)
-#define gpu_pass(f)
+#define gpu_pass(H)
 
 #endif
 
@@ -5213,16 +5321,17 @@ static void ring_rewind(u64* H, u32 rows) {
 }
 
 static void cube_run(u64* H, bool gpu) {
-  for (;;) {
-    u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
-    if (root_done(H)) {
-      return;
-    }
+  u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
+  if (gpu) {
+    turn_set(H, f);
+  }
+  while (!root_done(H)) {
     if (f == 0) {
       err_fail("frontier drained without a result");
     }
     if (gpu) {
-      gpu_pass(f);
+      gpu_pass(H);
+      f = (u32)H[H_FRONT];
     } else {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
@@ -5236,7 +5345,7 @@ static void cube_run(u64* H, bool gpu) {
         pool_turn(true, rows);
       }
       pool_turn(false, rows);
-      f = a32_load(a32_at(H, H_CURSOR));
+      f = a32_exch(a32_at(H, H_CURSOR), 0);
       ring_rewind(H, f > rows ? f : rows);
     }
     u32 ec = a32_load(a32_at(H, H_ERROR_CODE));
@@ -5244,6 +5353,7 @@ static void cube_run(u64* H, bool gpu) {
       err_post(H, ec);
     }
   }
+  a32_store(a32_at(H, H_CURSOR), 0);
 }
 
 // Corpus

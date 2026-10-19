@@ -55,13 +55,11 @@ static void chan_queue(ChanRow* row, IoWork* tail) {
   row->wait = tail == NULL ? 0 : io_hand((u64)(uintptr_t)tail);
 }
 
-// Cuts w from the queue q (a ring whose tail is *q), a row's waiters.
+// Removes w from a row's doubly linked waiter ring. *q is the tail.
 static void chan_cut(IoWork** q, IoWork* w) {
-  IoWork* p = *q;
-  while (p->next != w) {
-    p = p->next;
-  }
+  IoWork* p = w->prev;
   p->next = w->next;
+  w->next->prev = p;
   if (*q == w) {
     *q = p != w ? p : NULL;
   }
@@ -98,7 +96,9 @@ static Term chan_park(ChanRow* row, IoWork* w, Term hand, Term item, u64 at) {
     w->made = (intptr_t)t;
   }
   IoWork* queue = chan_tail(row);
+  w->prev = queue == NULL ? w : queue;
   io_push(&queue, w);
+  w->next->prev = w;
   chan_queue(row, queue);
   return IO_PARK;
 }
@@ -107,6 +107,9 @@ static Term chan_park(ChanRow* row, IoWork* w, Term hand, Term item, u64 at) {
 static Term chan_wake(Env e, ChanRow* row, Term x) {
   IoWork* queue = chan_tail(row);
   IoWork* a = io_pop(&queue);
+  if (queue != NULL) {
+    queue->next->prev = queue;
+  }
   chan_queue(row, queue);
   Term    item = a->item;
   if (a->made != 0) {

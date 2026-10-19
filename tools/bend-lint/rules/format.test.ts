@@ -221,6 +221,36 @@ def main() -> String:
     );
   });
 
+  test("dedented arm bodies do not move later cases into the outer match", async () => {
+    for (const [matchIndent, tabWidth, columns] of [
+      [6, 4, [8, 16, 16, 8]],
+      [2, 2, [4, 6, 6, 4]],
+    ] as const) {
+      const source =
+        "import Base\ndef g(a: Bool, b: Bool) -> Nat:\n" +
+        "  match a:\n    case True{}:\n" +
+        " ".repeat(matchIndent) + "match b:\n" +
+        "        case True{}:\n  10n\n          case False{}:\n  20n\n" +
+        "    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{})\n";
+      const output = await fixed(source, { tabWidth, wrapAtWidth: "never" });
+      expect(
+        output.split("\n").filter((line) => line.trimStart().startsWith("case "))
+          .map((line) => line.indexOf("case")),
+      ).toEqual([...columns]);
+    }
+  });
+
+  test("an empty nested match leaves the following arm in its outer match", async () => {
+    const output = await fixed(
+      "import Base\ndef g(a: Bool, b: Empty) -> Nat:\n" +
+      "  match a:\n    case True{}:\n      match b:\n    case False{}:\n      7n\n",
+    );
+    expect(
+      output.split("\n").filter((line) => line.trimStart().startsWith("case "))
+        .map((line) => line.indexOf("case")),
+    ).toEqual([4, 4]);
+  });
+
   test("law/proof and unsafe syntax are preserved", async () => {
     await fixed(
       "import Base\nlaw same:\n  for x: U32\n  {x == x : U32}\ndef same(x):\n  {==}\n@unsafe\ndef identity(x: U32) -> U32:\n  x\ndef main() -> U32:\n  identity(1)\n",
