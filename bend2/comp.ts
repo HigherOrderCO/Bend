@@ -3779,38 +3779,27 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// the stdio lock API is POSIX and -std=c11 does not ask for it, so the
-// two calls the trap needs are declared here (both are in libc, on glibc
-// and on macOS)
+// the stdio lock API is POSIX and -std=c11 does not ask for it: both
+// calls are in libc, on glibc and on macOS
 extern int  ftrylockfile(FILE*);
 extern void funlockfile (FILE*);
 
-// err_write sends the whole line to fd 2 with one write, never stdio: a
-// fault while another thread holds a stdio lock must not hang the process
-// instead of ending it (write is async-signal-safe, so a signal handler
-// may call it), and a line under PIPE_BUF cannot interleave with another
-// thread's line. a short write is resumed and EINTR retried, so the
-// numbered line is never cut.
+// err_write sends the line to fd 2 in one write: write is
+// async-signal-safe (a fault may call it), and a line under PIPE_BUF
+// cannot interleave with another thread's line. a short write is
+// resumed and EINTR retried, so the line is never cut.
 static void err_write(const char* msg) {
-  char buf[256];
+  char buf[128];
   const char* m = msg == NULL ? "(null)" : msg;
   size_t n = strlen(m);
-  if (n > sizeof(buf) - 8) {
-    n = sizeof(buf) - 8;
-  }
+  if (n > sizeof(buf) - 8) { n = sizeof(buf) - 8; }
   memcpy(buf, "bend: ", 6);
   memcpy(buf + 6, m, n);
   buf[6 + n] = '\n';
   n += 7;
   for (size_t off = 0; off < n; ) {
     ssize_t w = write(2, buf + off, n - off);
-    if (w < 0) {
-      if (errno == EINTR) {
-        continue;
-      }
-      break;
-    }
-    off += (size_t)w;
+    if (w < 0) { if (errno != EINTR) { break; } } else { off += (size_t)w; }
   }
 }
 
@@ -3825,16 +3814,11 @@ static void err_post(u64* H, u32 code) {
 }
 
 static void err_trap(int sig) {
-  // a fault loses what the program already printed unless stdout is
-  // flushed: it is buffered when it goes to a pipe or a file. the flush
-  // is taken only when the lock is free: ftrylockfile never waits, and
-  // the stdio locks are recursive, so a fault on the thread that holds
-  // the lock flushes fine, while another thread's lock is skipped
-  // rather than waited for (a hang is worse than a lost line).
-  if (ftrylockfile(stdout) == 0) {
-    fflush(stdout);
-    funlockfile(stdout);
-  }
+  // a fault loses what the program printed unless stdout is flushed (it
+  // is buffered when it goes to a pipe): the flush is taken only when
+  // the lock is free, so a fault never waits (a hang is worse than a
+  // lost line)
+  if (ftrylockfile(stdout) == 0) { fflush(stdout); funlockfile(stdout); }
   err_write(ERR_TEXT[ERR_DEEP]);
   _exit(1);
 }
