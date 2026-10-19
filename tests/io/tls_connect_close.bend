@@ -22,4 +22,5 @@ def main():
 #|12>|     h : Socket <- IO.try(Socket, TLS.connect("example.com", 443))
 #|   |                                  ^^^^^^^^^^^
 #|13 |     x : Unit <- TLS.close(h)
+#|Note: did you mean TCP.connect?
 #|exit 1
