@@ -142,9 +142,6 @@ Hints:
 
 Bend works best on the back-end, on Linux or macOS.
 
-For HTML entrypoints, `bend page.html -o dist` bundles external and inline modules.
-Inline modules keep their page's error locations without shadowing real files.
-
 # Examples
 
 ### Syntax == Python + dependent types
