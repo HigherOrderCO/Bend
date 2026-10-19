@@ -202,36 +202,36 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
 // State
 // =====
 
-// The comptime twins promise the same C up to FID names. Keep every other
-// byte, naming each FID by its numeric declaration. Only tmpl may declare
-// a List.map instance: without it, the twins match without the template.
+// The comptime twins must produce the same C after private globals are
+// named by their numeric ids. Only tmpl checks a List.map specialization.
 async function comptime_run(): Promise<Fail[]> {
   const fail = (probe: string, want: string, got: string): Fail[] =>
     [{ name: "comptime_tmpl", probe, want, got }];
-  const emit = async (file: string): Promise<string> => {
+  const emit = async (file: string): Promise<{ map: boolean; c: string }> => {
     const book = Bend.book_nil();
-    await Bend.book_load(book, path.join(TESTS, "comptime", file + ".bend"),
-      "", new Map());
+    await Bend.book_load(book, path.join(TESTS, "comptime", file + ".bend"), new Map());
     Bend.book_valid(book);
-    return Comp.compile_book(book);
+    const parent = Bend.name_source(Bend.BASE_ID, "List.map");
+    const map = [...book.tmps.values()].some((k) => {
+      const t = book.tlds[k];
+      return Bend.name_parent(k) === parent && t?.$ === "Def" && t.e !== undefined;
+    });
+    return { map, c: Comp.compile_book(book) };
   };
-  // main awaits this only after the shards, so a twin that fails to check
-  // must fail here, not reject (its shard fails it too)
-  let c: string[];
+  let twins: { map: boolean; c: string }[];
   try {
-    c = [await emit("hand"), await emit("tmpl")];
+    twins = [await emit("hand"), await emit("tmpl")];
   } catch {
     return fail("C matches hand", "both twins compile", "a twin fails");
   }
-  const maps = c.map((s) => /^#define FID_List_map\w* /m.test(s));
+  const maps = twins.map((t) => t.map);
   if (maps[0] || !maps[1]) {
-    return fail("only tmpl declares List.map", "false true",
-      maps.join(" "));
+    return fail("only tmpl checks a List.map instance", "false true", maps.join(" "));
   }
-  const [hand, tmpl] = c.map((s) => {
-    const ids = new Map([...s.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
-      .map((m) => [m[1], "FID_" + m[2]]));
-    return s.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k).split("\n");
+  const [hand, tmpl] = twins.map(({ c }) => {
+    const ids = new Map([...c.matchAll(/^#define ((CID_)?b0_g\d+) (\d+)$/gm)]
+      .map((m) => [m[1], (m[2] ? "CID_" : "FID_") + m[3]]));
+    return c.replace(/\b(?:CID_b0_g\d+|b0_g\d+)\b/g, (k) => ids.get(k) ?? k).split("\n");
   });
   for (let i = 0; i < hand.length || i < tmpl.length; ++i) {
     if (hand[i] !== tmpl[i]) {
@@ -242,14 +242,12 @@ async function comptime_run(): Promise<Fail[]> {
   return [];
 }
 
-// After comparing the comptime twins, check the four state fixtures.
-// A process may compile many books (the bun loader, io_run), and none may
-// leave state for the next: #976 kept every book's probes, with the same
-// bytes. Each fixture loads and checks twice. Its first copy's C and JS
-// are the baseline (compiled after the earlier fixtures' baselines, not in
-// a fresh process); its second copy must match them, bytes and probes left,
-// at every step: C, C, JS, C, normalization, JS, C, the next fixture (+),
-// C, JS. It builds and runs nothing: the shards run these programs.
+// A process may compile many books (the bun loader, io_run). Compile two
+// separately checked copies to catch stale state crossing compilations,
+// normalization and other books. The first copies establish the baselines;
+// each later emission is compared by hash. Byte equality is a cheap check
+// for these fixtures, not a compatibility promise for private symbols.
+// It builds and runs nothing: the shards run these programs.
 async function state_run(): Promise<Fail[]> {
   const fails = await comptime_run();
   const files = ["reg/borrow_loop", "run/harness_cache_compile",

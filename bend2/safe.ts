@@ -157,9 +157,9 @@ const UV: O = { $: "Lab", k: UNIT };
 // a Nat literal longer than this goes out as arithmetic on shorter ones
 const NAT_MAX = 4096;
 
-// a model search's work: a step per type it visits and per character of
-// the datatype keys it builds, in rounds of doubling depth from
-// MODEL_DEPTH
+// a model search's work: a step per type it visits plus each datatype
+// term's structural size (names cost one), in rounds of doubling depth
+// from MODEL_DEPTH
 const MODEL_FUEL = 1 << 22;
 const MODEL_DEPTH = 8;
 
@@ -364,9 +364,9 @@ function root_emit(e: Safe, k: QName): [QName[], QName | null] {
 // Item
 // ====
 
-// book name k and each specialized argument paired with its column
+// book name k and its specialized prefix; trailing runtime columns do not count
 function item_key(k: QName, cols: Cols): string {
-  return JSON.stringify([k, cols.flatMap((v, j) => v === null ? [] : [[j, B.term_key(B.term_lower(v))]])]);
+  return JSON.stringify([k, cols.flatMap(v => v === null ? [] : [B.term_key(B.term_lower(v))])]);
 }
 
 // item_ref, with a failure kept as the item's reason
@@ -644,19 +644,11 @@ function model_by(e: Safe, T: HTerm, proj: boolean): HTerm | null {
 // a datatype's key on the path: binders inside it count from d, so a
 // field under a ∀ meets the same datatype again
 function model_key(F: HTerm, d: number): { key: string; size: number } {
-  const at = (i: number): unknown => i >= d ? "^" + (i - d) : i;
-  const go = (t: B.LTerm): B.LTerm => {
-    const out = { ...t } as unknown as Record<string, unknown>;
-    for (const k of B.term_children[t.$]) {
-      const v = out[k];
-      out[k] = Array.isArray(v) ? v.map(go) : v === undefined ? v : go(v as B.LTerm);
-    }
-    if (t.$ === "Var" || t.$ === "Lam" || t.$ === "All") out.i = at(t.i);
-    if (t.$ === "Let") out.i = t.i.map(at);
-    return out as unknown as B.LTerm;
-  };
-  const t = go(B.term_lower(F, d));
-  return { key: B.term_key(t), size: B.term_size(t) };
+  const t = B.term_lower(F, d);
+  const at = (i: number): number | string => i >= d ? "^" + (i - d) : i;
+  const key = JSON.stringify(t, (k, v) => k === "s" ? undefined
+    : k === "i" ? Array.isArray(v) ? v.map(at) : at(v) : v);
+  return { key, size: B.term_size(t) };
 }
 
 function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm, HTerm]>, proj: boolean, probe: Probe): HTerm | null {

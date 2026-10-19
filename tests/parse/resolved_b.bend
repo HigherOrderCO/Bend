@@ -1,4 +1,4 @@
-# These same-spelled operators expose a second lookup of resolved names.
+# These names also occur in resolved_a, with different values and operators.
 type Box<-T: Type> is Type:
   Wrap{x: T}
 
@@ -26,19 +26,5 @@ type Id is Type:
 def Id.pure(x: Quant) -> Id:
   MkId{x}
 
-def Id.bind(-A: Type, v: Id, f: A -> Id) -> Id:
-  v
-
-def F(x: Quant) -> Type:
-  Quant
-
-def F.add(x: Quant, y: Quant) -> Quant:
-  y
-
-def calc(~T: Type) -> Quant:
-  (&1 + &2 : T)
-
-def add(x: Quant, y: Quant) -> Quant:
-  y
-
-#|All terms check.
+#|ALL PROOFS CHECK
+#|Use --verdict for mathematical validity.

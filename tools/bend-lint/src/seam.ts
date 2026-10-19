@@ -86,7 +86,7 @@ export type Unstable = { Bend: typeof BendModule; book: Book; raw: (fact: Fact) 
 export type Operations = Omit<
   RuleContext,
   "sources" | "root" | "options" | "facts" | "prior" | "diag"
->;
+> & { definition(fact: Fact): string };
 
 export type Checked = {
   book: Book;
@@ -662,10 +662,9 @@ const matches = (m: Loaded, book: Book, f: FactFilter, t: LTerm, def: QName): bo
   if (f.kinds?.length && !f.kinds.includes(t.$)) return false;
   if (f.names?.length && !f.names.includes(kindOf(m, book, t).name)) return false;
   if (!f.defs?.length) return true;
-  for (let owner: QName | null = def; owner !== null; owner = m.Bend.name_parent(owner)) {
-    if (f.defs.includes(sourceName(m, book, owner))) return true;
-  }
-  return false;
+  if (f.defs.includes(sourceName(m, book, def))) return true;
+  const template = m.Bend.name_parent(def);
+  return template !== null && f.defs.includes(sourceName(m, book, template));
 };
 
 // bend's words for a failed check, its location aside (a finding has its
@@ -910,6 +909,10 @@ export const operations = (m: Loaded, run: Checked): Operations => {
   const { Bend } = m;
   let byTerm: Map<LTerm, Fact> | undefined;
   return {
+    definition: (fact) => {
+      const r = raw(fact);
+      return Bend.name_display(r.bok, r.def, r.spn?.file);
+    },
     view: (fact): View => {
       const r = raw(fact);
       const t = Bend.term_strip(r.tm);

@@ -1,4 +1,4 @@
-# the same lambda under a bare domain: the instance app~0 is app's body at
+# the same lambda under a bare domain: the instance is app's body at
 # it, where the duplicated x is consumed twice, and the usage rule rejects
 # it there, at the binder's span (a use points at its binder)
 import Base

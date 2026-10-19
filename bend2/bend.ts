@@ -258,17 +258,12 @@ export const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 // Source spellings satisfy SOURCE_NAME; internal labels and roles are fixed.
 // File ids are escaped; separators stay structural.
 export function name_source(file: FileId, text: Name, category: Category = "def"): QName {
-  if (!file || !text) throw Error("empty file or declaration name");
   return file + (category === "ctr" ? ":#" : ":") + text;
 }
 
 export function name_internal(text: Name): QName { return "!" + text; }
 
-export function name_gen(owner: QName, role: string, member: number | bigint): QName {
-  const n = BigInt(member);
-  if (n < 0n) throw Error("negative member position");
-  return owner + "~" + role + ":" + n;
-}
+export function name_gen(owner: QName, role: string, member: number): QName { return owner + "~" + role + ":" + member; }
 
 let next_name = 0n;
 export function name_fresh(owner: QName, role: string): QName { return owner + "~" + role + ":@" + next_name++; }
@@ -359,7 +354,7 @@ export type BodyOf<B> = B extends [infer T] ? T : B;
 export type LetsOf<B> = BodyOf<B> extends Function ? (xs: TermOf<B>[]) => TermOf<B> : BodyOf<B>;
 export type SubsOf<B> = BodyOf<B> extends Function ? TermOf<NoInfer<B>> : HTerm;
 export type TermOf<B> = (
-  | { $: "Var"; k: Name; i: number; v?: SubsOf<B>; slot?: Slot }                   // x
+  | { $: "Var"; k: Name; i: number; v?: SubsOf<B>; slot?: HTerm }                  // x
   | { $: "Ref"; k: QName; raw?: Name; issue?: string; b?: Bool }                   // x
   | { $: "Sub"; i: number; v: Patt; f: TermOf<B> }                                 // x <- v; f
   | { $: "Let"; k: Name[]; i: number[]; q: Quant[]; v: TermOf<B>[]; f: LetsOf<B> } // x y = v w; f
@@ -386,7 +381,6 @@ export type TermOf<B> = (
 export type LTerm = TermOf<[LTerm]>;
 export type HBody = (x: HTerm) => HTerm;
 export type HTerm = TermOf<HBody>;
-export type Slot = { owner: object; value: HTerm };
 
 // Env
 export type Env = List<HTerm | ((s?: Span) => HTerm)>;
@@ -892,56 +886,49 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
 
 type Variable = Extract<HTerm, { $: "Var" }>;
 
-// Binder callbacks perform substitution and weak normalization, not checking or
-// compiler analysis. A private probe carries its replacement; a surrounding
-// mapper's probe remains rigid until that owner sees it. Each application owns
-// its copied cells, while roots in one context share a memo table.
-// refs stays fixed; targets are inserted unchanged.
+// Copy Bend's terms, substituting free variables/refs. Mark each binder's new
+// argument so only variables already in the term are substituted. Each binder
+// application owns its cells; roots in one environment share copied cells.
 export function scope_mapper(free: (v: Variable) => HTerm, refs?: Map<QName, HTerm | null>): (term: HTerm) => HTerm {
-  const owner = {}, visiting = new Set<HTerm>();
-  const probe = (value: HTerm): Variable => ({ $: "Var", k: "_", i: 0, slot: { owner, value } });
+  const probe = (slot: HTerm): Variable => ({ $: "Var", k: "_", i: 0, slot });
   function context(): (term: HTerm) => HTerm {
     const memo = new WeakMap<HTerm, HTerm>();
     const go = (t: HTerm): HTerm => {
       if (t.$ === "Ref") return refs?.get(t.k) ?? t;
       const old = memo.get(t);
       if (old !== undefined) return old;
-      if (visiting.has(t)) throw Error("cyclic scoped term");
-      visiting.add(t);
-      try {
-        let out: HTerm;
-        switch (t.$) {
-          case "Var": {
-            if (t.slot !== undefined) out = t.slot.owner === owner ? term_at(t.slot.value, t.s) : t;
-            else if (t.v === undefined) out = term_at(free(t), t.s);
-            else {
-              const value = go(t.v);
-              out = t.i < 0 ? { ...t, i: -1, v: value } : value;
-            }
-            break;
+      let out: HTerm;
+      switch (t.$) {
+        case "Var": {
+          if (t.slot !== undefined) out = term_at(t.slot, t.s);
+          else if (t.v === undefined) out = term_at(free(t), t.s);
+          else {
+            const value = go(t.v);
+            out = t.i < 0 ? { ...t, i: -1, v: value } : value;
           }
-          case "Sub": throw Error("uneliminated substitution");
-          case "Lam": out = { ...t, f: (x: HTerm) => context()(t.f(probe(x))) }; break;
-          case "All": out = { ...t, A: go(t.A), B: (x: HTerm) => context()(t.B(probe(x))) }; break;
-          case "Let": out = { ...t, v: t.v.map(go), f: (xs: HTerm[]) => context()(t.f(xs.map(probe))) }; break;
-          case "App": {
-            const f = go(t.f), x = go(t.x);
-            out = f.$ === "Lam" ? f.f(x) : { ...t, f, x };
-            break;
-          }
-          case "Typ": out = Typ(go(t.g), t.s); break;
-          case "Min": out = Min(go(t.a), go(t.b), t.s); break;
-          case "ADT": out = ADT(t.k, t.x.map(go), t.s, t.r); break;
-          case "Ctr": out = Ctr(t.k, t.x.map(go), t.s); break;
-          case "Mat": out = Mat(t.k, go(t.h), go(t.m), t.s); break;
-          case "Eql": out = Eql(go(t.a), go(t.b), go(t.T), t.s); break;
-          case "Rwt": out = Rwt(go(t.e), go(t.p), go(t.f), t.s); break;
-          case "Ann": out = Ann(go(t.x), go(t.T), t.s); break;
-          default: out = t;
+          break;
         }
-        memo.set(t, out);
-        return out;
-      } finally { visiting.delete(t); }
+        case "Sub": throw Error("uneliminated substitution");
+        case "Lam": out = { ...t, f: (x: HTerm) => context()(t.f(probe(x))) }; break;
+        case "All": out = { ...t, A: go(t.A), B: (x: HTerm) => context()(t.B(probe(x))) }; break;
+        case "Let": out = { ...t, v: t.v.map(go), f: (xs: HTerm[]) => context()(t.f(xs.map(probe))) }; break;
+        case "App": {
+          const f = go(t.f), x = go(t.x);
+          out = f.$ === "Lam" ? f.f(x) : { ...t, f, x };
+          break;
+        }
+        case "Typ": out = Typ(go(t.g), t.s); break;
+        case "Min": out = Min(go(t.a), go(t.b), t.s); break;
+        case "ADT": out = ADT(t.k, t.x.map(go), t.s, t.r); break;
+        case "Ctr": out = Ctr(t.k, t.x.map(go), t.s); break;
+        case "Mat": out = Mat(t.k, go(t.h), go(t.m), t.s); break;
+        case "Eql": out = Eql(go(t.a), go(t.b), go(t.T), t.s); break;
+        case "Rwt": out = Rwt(go(t.e), go(t.p), go(t.f), t.s); break;
+        case "Ann": out = Ann(go(t.x), go(t.T), t.s); break;
+        default: out = t;
+      }
+      memo.set(t, out);
+      return out;
     };
     return go;
   }
@@ -1042,6 +1029,7 @@ const BEND_LIB         = path.resolve(process.env.BEND_LIB ?? path.join(os.homed
 export const BEND_HUB  = process.env.BEND_HUB ?? "https://hub.bend-lang.com";
 
 export const NAMED = /^([a-z][a-z0-9-]{0,63})@((?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){3})$/;
+export const IMPORT_LINE = /^import\s+(\S+)(?:\s+as\s+([A-Za-z_]\w*))?\s*(?:#.*)?$/;
 
 async function hub_get(book: Book, sub: string, hash: string, spn?: Span): Promise<string> {
   const res = await fetch(BEND_HUB + "/" + sub, { signal: AbortSignal.timeout(30000) }).catch(() => null);
@@ -1131,7 +1119,7 @@ export async function book_load(book: Book, file: string, seen: Map<string, File
       if (!/^import(\s|$)/.test(line)) {
         break;
       }
-      const m   = /^import\s+(\S+)(?:\s+as\s+([A-Za-z_]\w*))?\s*(?:#.*)?$/.exec(line);
+      const m   = IMPORT_LINE.exec(line);
       const beg = at + lines[i].indexOf(m?.[1] ?? line);
       const sp  = { file: source, beg, end: beg };
       if (m === null || (m[2] === undefined && m[1] !== "Base")) {
@@ -2621,8 +2609,6 @@ export function parse_def(p: Parse, u: Bool): void {
 }
 
 export function parse_book(book: Book, file: File, src = file.str): void {
-  const al = Object.freeze(Object.fromEntries(Object.getOwnPropertyNames(file.al).map(k => [k, file.al[k]])));
-  file = Object.freeze({ ...file, al });
   book.files.set(file.ns, file);
   book.entry ||= file.ns;
   const p: Parse = {
@@ -3687,9 +3673,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const t_wnf = term_wnf(book, ty);
       if (t_wnf.$ !== "ADT") {
         const fam = book_ctr(book, tm.k) === null ? null : book_fam(book, tm.k);
-        let origin = tm.k;
-        for (let parent = name_parent(origin); parent !== null; parent = name_parent(origin)) origin = parent;
-        const file = name_file(origin), text = name_text(origin);
+        const file = name_file(tm.k), text = name_text(tm.k);
         const type = file === "" ? undefined : (book.tlds[name_source(file, text)]
           ?? (file === tm.s?.file.ns ? book.tlds[name_resolve(book, tm.s.file, text).k] : undefined));
         const nte = fam === null && type?.$ === "ADT" ? "Note: " + name_display(book, tm.k) + " is a datatype: write its arguments as <>" : undefined;
@@ -3868,9 +3852,6 @@ export function def_check(book: Book, k: QName, def: Def, z?: number): LTerm {
 }
 
 export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>, def: Def, sp: HTerm[], ctx: Ctx, d: number): QName {
-  if ((book.tlds[lhs.def] as Def).x > 0) {
-    throw Error("generic checking cannot publish template instances");
-  }
   const xs = sp.slice(0, def.x);
   if (xs.length < def.x) {
     throw Err(book, ctx, "a template applied to closed ~ arguments (a def parameter is not comptime)", tm, tm.s, lhs.def);
@@ -3944,21 +3925,12 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
 // closed ~ arguments, is minted and checked by its first live call
 // (infer-ref) while the caller is declared; it stays outside the order
 // (a seeded book keeps it), so it is no claim.
-// After an interpretation change, recheck original source v/T; the old
-// checked e contains cells computed under the previous interpretation.
 
 export function book_valid(book: Book, done: number = 0): void {
   const tlds = book.tlds;
   const last = new Map<QName, number>();
   for (let i = 0; i < book.order.length; i++) {
     last.set(book.order[i], i);
-  }
-
-  // Filling a law in the validated prefix changes its interpretation.
-  if (book.order.slice(0, done).some(k => last.get(k)! >= done)) done = 0;
-  if (done === 0) {
-    for (const k of book.tmps.values()) delete tlds[k];
-    book.tmps.clear();
   }
 
   book.tlds = Object.create(null);
@@ -3983,17 +3955,10 @@ export function book_valid(book: Book, done: number = 0): void {
           throw Err(book, ctx, "a kind (type " + name_display(book, k) + "<..> is Kind(g))", kind, kind.s ?? tld.T.s, k);
         }
         for (const ctr of tld.c) {
-          const fields = new Set<Name>();
           let tel: HTerm = ctr.T;
           let ctx = ctx_nil();
           for (let d = 0; d < tld.n + ctr.n; d++) {
             const t_all = tele_head(book, tel, ctx, ctr.k);
-            if (d >= tld.n) {
-              if (fields.has(t_all.k)) {
-                throw Err(book, ctx, "a fresh constructor field name", t_all.k, t_all.s, ctr.k);
-              }
-              fields.add(t_all.k);
-            }
             let goal: HTerm = Typ(Qua(t_all.q));
             if (d >= tld.n && t_all.q.$ === "Lone") {
               goal = kind;

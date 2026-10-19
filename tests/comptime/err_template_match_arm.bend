@@ -1,23 +1,17 @@
-# A function name cannot be a constructor arm; report its use in the template.
+# A template parameter cannot name a constructor arm.
 type Bit is Data:
   Off{}
-
-def id(x: Quant) -> Quant:
-  x
 
 def bad(~f: Quant -> Quant) -> Bit -> Bit:
   \{f: Off{}}
 
-def main() -> Bit -> Bit:
-  bad(~id)
-
+#|SOME PROOFS FAIL
 #|Error:
 #|- expected : a constructor of Bit (missing, or already matched)
-#|- observed : \{id: Off{}}
-#|Context:
-#|- f : @_:Quant -> Quant
-#|Location: bad~0
-#| 8 | def bad(~f: Quant -> Quant) -> Bit -> Bit:
-#| 9>|   \{f: Off{}}
-#|10 |
+#|- observed : \{f: Off{}}
+#|Location: bad
+#|5 | def bad(~f: Quant -> Quant) -> Bit -> Bit:
+#|6>|   \{f: Off{}}
+#|  |   ^^^^^^^^^^^
+#|7 |
 #|exit 1

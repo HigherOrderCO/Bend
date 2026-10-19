@@ -41,12 +41,14 @@ and ends with a newline. An empty header is allowed. Each declaration line
 binds a host alias to a Bend identity: `CID #K BEND_K` selects a constructor,
 `CID :f BEND_F` selects an effect def, and `FID :f BEND_F` selects a function
 id. Scoped source names always start with `#` or `:` to select their category;
-exact canonical identities, such as `Base:#Unit`, are also accepted. The runtime
+fixed Base identities, such as `Base:#Unit`, are also accepted. The runtime
 function ids are `FID !Clo.apply` and `FID !IO.emit`.
 Names resolve in the Bend file containing the foreign import, using its aliases
 and Base, just as names in a Bend body do. The law keeps its declaration identity.
-One physical foreign file emitted for several definitions must resolve its
-header identically in each importing scope. Unused definitions do not add scopes.
+One physical foreign file may serve several definitions in the same Bend file;
+importing it from different Bend files is rejected. Unused definitions do not
+add imports. Local file identities are not selectors: scoped names remain valid
+when a package moves.
 
 Host aliases start with `BEND_`, followed by letters or digits, with optional
 single underscores between nonempty groups. They must be distinct within the
@@ -123,8 +125,7 @@ is a number, a `Nat` a number, a `String` a string, a constructor
 `{$: BEND_K, field: value}`, a handle its host value (a descriptor).
 CID aliases contain the full canonical constructor or effect tag; JS FID
 aliases also contain identities, not callable functions. Constructor fields
-keep their source spelling; a leading `$` gains another `$` to leave `$`
-for the tag. Use computed properties for fields such as `__proto__`.
+keep their source spelling. Use computed properties for fields such as `__proto__`.
 It returns the answer the same way: `io_done(v)`, `io_fail(code)`,
 `io_tup(handle, result)`, `{$: BEND_UNIT}`. A `Nat` answer that is not a
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes

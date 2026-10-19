@@ -406,13 +406,13 @@ every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
 Base effects import `.js` and `.c` implementations with `bend-ids 1` headers
-and register handlers with `io_eff`; see [Effects](EFFECTS.md). Define your own
-effects the same way. Only the event loop runs host code; proofs, termination
-and the GPU never touch it.
+and register handlers with `io_eff`; see [Effects](EFFECTS.md). The event loop
+dispatches effects; helper threads may run blocking work. Proofs, termination
+checks and the GPU never run host code.
 
 A JS file can `import Game from "./game.bend"` with `bend2/main.ts` preloaded,
-or import the `game.mjs` produced by `-o game.mjs`, and call every non-IO def.
-Exports use canonical keys, with short aliases for entry definitions.
+or import the `game.mjs` produced by `-o game.mjs`. Exports are filled,
+non-template, non-IO source defs outside Base, with canonical keys and entry-file aliases.
 Constructors use canonical tags, e.g. `{$: "Base:#Some", value: x}`, and `Nat`
 is a number. Arrays cross without copying and are updated in place; copy
 an argument first if you need its original contents.

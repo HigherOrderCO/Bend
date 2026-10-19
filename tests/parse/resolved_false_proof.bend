@@ -5,11 +5,13 @@ import resolved_b.bend as resolved_a
 def theorem() -> {(&1 + &2 : X.Q) == &2 : Quant}:
   {==}
 
+#|SOME PROOFS FAIL
 #|Error:
 #|- expected : &1
 #|- observed : &2
 #|Location: theorem
 #|5 | def theorem() -> {(&1 + &2 : X.Q) == &2 : Quant}:
 #|6>|   {==}
+#|  |   ^^^^
 #|7 |
 #|exit 1

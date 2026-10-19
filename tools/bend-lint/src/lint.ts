@@ -90,7 +90,7 @@ export type DiagInit = {
 
 // The checker's facts a rule gets. A fact must match each list given; an
 // absent or empty list matches all. In defs, a template's instances
-// (generic~0) count as the template.
+// count as the template.
 export type FactFilter = {
   scope?: "file" | "program"; // file (the default): the linted file; program: its imports too, never Base
   kinds?: string[]; // the term's kind, annotations stripped: Var, Ref, App, ...
@@ -387,7 +387,7 @@ export async function lint(
           severity: d.severity ?? "warning",
           message: d.message,
           span: d.span,
-          def: d.def ?? (d.fact && ops.view(d.fact).owner),
+          def: d.def ?? (d.fact && ops.definition(d.fact)),
           fact: d.fact,
           fixes: d.fixes ?? [],
         }),

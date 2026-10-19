@@ -1041,14 +1041,14 @@ describe("lint", () => {
             return x?.$ === kind && (name === "" || x.k === name);
           })!;
         const generic = named("generic", "Var", "x");
-        const rawGeneric = loose(cx, generic);
-        expect(rawGeneric.bok.tlds[Bend.name_gen(rawGeneric.def, "param", 0)]).toBeDefined();
+        expect(cx.same(generic, cx.type(generic), cx.binder(generic)!)).toBe(true);
         expect(cx.view(generic).inst).toBe(false);
         const inst = cx.facts!.find((f) => {
           const v = cx.view(f);
           return v.inst && v.kind === "Var" && v.name === "x";
         })!;
         expect(cx.view(inst).inst).toBe(true);
+        expect(cx.show(inst, cx.type(inst))).toBe("N");
         expect(cx.view(inst).span).toEqual(cx.view(generic).span);
         expect(["erased", "once", "many"]).toContain(cx.view(generic).quantity);
         expect(loose(cx, generic).us.$).toBeDefined();
@@ -1119,6 +1119,11 @@ def main() -> N:
       run: (cx) => {
         const owners = [...new Set(cx.facts!.filter((f) => cx.view(f).inst).map((f) => cx.view(f).owner))];
         expect(owners.length).toBe(2);
+        const variables = cx.facts!.filter((f) => {
+          const v = cx.view(f);
+          return v.inst && v.kind === "Var" && v.name === "x";
+        });
+        expect(new Set(variables.map((f) => cx.show(f, cx.type(f))))).toEqual(new Set(["M", "N"]));
         expect(cx.body(owners[0])).not.toBe(cx.body(owners[1]));
         for (const owner of owners) {
           expect(cx.body(owner)).toBeDefined();
@@ -1137,6 +1142,29 @@ def main() -> N:
     }]);
     expect(result.ok).toBe(true);
     expect((await seen(file, { defs: ["generic"] })).length).toBeGreaterThan(0);
+  });
+
+  test("instance warnings show a readable definition and preserve explicit labels", async () => {
+    let owner = "";
+    const result = await lint(userland, [{
+      id: "test/instance-warning",
+      facts: { defs: ["generic"], kinds: ["Var"] },
+      run: (cx) => {
+        const fact = cx.facts!.find((f) => cx.view(f).inst)!;
+        const { span } = cx.view(fact);
+        owner = cx.view(fact).owner;
+        return [
+          cx.diag({ message: "instance", fact, span }),
+          cx.diag({ message: "explicit", fact, span, def: owner }),
+        ];
+      },
+    }]);
+    expect(result.ok).toBe(true);
+    expect(result.diags[0].def).toBe("generic~inst");
+    expect(render(result.diags[0])).toContain("\nLocation: generic~inst\n");
+    expect(render(result.diags[0])).not.toContain(owner);
+    expect(result.diags[1].def).toBe(owner);
+    expect(render(result.diags[1])).toContain("\nLocation: " + owner + "\n");
   });
 
   test("walk reaches every kind in checked bodies; an unknown kind fails", async () => {

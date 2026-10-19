@@ -13,9 +13,9 @@ import * as fs from "node:fs";
 import * as Bend from "./bend.ts";
 import {
   type HTerm, type Name, type QName,
-  name_source, name_gen, name_fresh, name_internal,
+  name_source, name_gen, name_internal,
   name_file, name_text, name_parent,
-  name_resolve, name_display, name_emit
+  name_resolve, name_display
 } from "./bend.ts";
 
 // Types
@@ -529,13 +529,12 @@ function arg_name(k: QName, i: number, live = false): QName {
 }
 
 function name_global(k: QName): string {
-  return memo(FL.symbols, k, () => name_parent(k) === null ? name_emit(k) : `b0_g${FL.symbols.size}`);
+  return memo(FL.symbols, k, () => `b0_g${FL.symbols.size}`);
 }
 
 function cid_mac(k: QName): string { return "CID_" + name_global(k); }
 function base_cid(k: string): string { return cid_mac(base(k, "ctr")); }
 function js_tag(k: string): string { return JSON.stringify(base(k, "ctr")); }
-function js_field(n: Name): string { return n.startsWith("$") ? "$" + n : n; }
 
 // Char
 // ====
@@ -1217,9 +1216,9 @@ function fun_of(k: QName): Fun {
   });
 }
 
-// A flat def's spin, one per layout of its erased arguments, takes and
-// returns words at those layouts if its self-calls pass them on.
-function fun_at(ck: Spine): Fun {
+// A flat def may specialize its erased arguments only when self-calls
+// pass them on unchanged; its body annotations share that specialization.
+function fun_at(ck: Spine): Fun | null {
   const f = fun_of(ck.k!);
   let [T, b] = [ck.tld!.T, f.h!];
   const doms = tele_unbind(T).doms;
@@ -1230,7 +1229,7 @@ function fun_at(ck: Spine): Fun {
     const s = term_strip(b);
     if (ps.length < ers.length) {
       if (s.$ !== "Lam") {
-        return f;
+        return null;
       }
       b = term_open(s).b;
       ps.push(...dom_live(d) ? [] : term_open(s).ps);
@@ -1248,7 +1247,7 @@ function fun_at(ck: Spine): Fun {
           const t = term_strip(a);
           return t.$ !== "Var" || probe_of(t) !== ps[j];
         });
-    }) ? f : { ...f, lays, ret };
+    }) ? null : { ...f, lays, ret };
 }
 
 function brw_of(k: QName): boolean[] {
@@ -1376,7 +1375,7 @@ function file_new(book: Bend.Book, js: boolean) {
     consts: new Map<Lay, Map<HTerm, Val>>(),
 
     teles: new Map<HTerm, { doms: Dom[]; ret: HTerm }>(),
-    fids: new Set<QName>(), effs: new Map<string, [Bend.File[], string]>(),
+    fids: new Set<QName>(), effs: new Map<string, [Bend.File, string]>(),
     holds: new Map<string, Lay>(),
     hold: new Map<string, boolean>(),
 
@@ -2162,9 +2161,11 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const T = ck.tld!.T;
   const doms = tele_unbind(T).doms;
   const flat = flat_of(k);
-  const f = flat ? fun_at(ck) : fun_of(k);
+  const spec = flat ? fun_at(ck) : null;
+  const f = spec ?? fun_of(k);
   const { n, h, lays, ret } = f;
-  const ers = ck.all.filter((_, i) => i < n && !dom_live(doms[i]));
+  const ers = flat && spec === null ? []
+    : ck.all.filter((_, i) => i < n && !dom_live(doms[i]));
   const ws = emit_args(sc, ck, tail && !flat, false, lays);
   if (!flat) {
     return emit_body({ ...sc, def: k }, h!, T, ers,
@@ -2207,7 +2208,7 @@ function emit_native(sc: Scope, k: QName, ers: HTerm[], f: Fun): string {
   // Array sharing can grow mid-pass; any fact growth discards the whole output.
   const key = JSON.stringify([f.lays, f.ret, arr_q("box")]) + scoped_key(Bend.Ref(k), ...ers);
   return seg_ref(sc, memo(FL.spun, key, () => {
-    const code = name_fresh(k, "native");
+    const code = name_gen(k, "native", FL.next++);
     FL.spun.set(key, code);
 
     const fuel = FUEL;
@@ -2268,7 +2269,7 @@ function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
     bind_pop(sc, p);
   });
   const words = live.flatMap(([, b]) => val_own(sc, b.val));
-  const name = name_fresh(sc.def, "clo");
+  const name = name_gen(sc.def, "clo", FL.next++);
   const clo = seg_clo(sc, name, words);
   const arg = val_new([name_local("x")], BOX);
   emit_body(seg_open(sc, name, BOX, null, live, arg, [x]), x, ty, [], [arg],
@@ -2422,7 +2423,7 @@ function emit_expr(sc: Scope, tm: HTerm, ty0: HTerm | null, at: Lay | null): Val
       }
       const m = term_spine(x);
       if (flat_call(x)) {
-        const dst = emit_dst(sc, fun_at(m).ret);
+        const dst = emit_dst(sc, (fun_at(m) ?? fun_of(m.k!)).ret);
         emit_fuse(sc, m, dst);
         return dst;
       }
@@ -2521,7 +2522,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
         bind_dead(sc, []);
         return emit_put(sc, dst, v);
       }
-      const f = sc.seg.native ? fun_at(ck) : fun_of(ck.k);
+      const f = (sc.seg.native ? fun_at(ck) : null) ?? fun_of(ck.k);
       const ret = f.ret;
       const once = FL.sites.get(ck.k) === 1 && !ck.b && !def_foreign(ck.tld)
         && (ret !== BOX || sc.seg.ret === BOX);
@@ -2544,7 +2545,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const o = term_open(x);
   const calls = x.v.map(term_spine);
   const fork = calls.length > 1;
-  const name = name_fresh(sc.def, "join");
+  const name = name_gen(sc.def, "join", FL.next++);
   let hold: Of<"Var">[] = [];
   if (fork) {
     spare_flush(sc);
@@ -2578,7 +2579,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   calls.forEach((c, i) => {
     const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
     const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
-    const kn = name_fresh(sc.def, "cont");
+    const kn = name_gen(sc.def, "cont", FL.next++);
     spare_flush(sc);
     const ws = vs.flatMap(([p, b]) =>
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
@@ -2731,7 +2732,7 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // =======
 
 // Only the explicit header is Bend syntax; the host body text stays unchanged.
-function foreign_src(src: string, scopes: Bend.File[], use?: (macro: string, key: QName) => void): string {
+function foreign_src(src: string, scope: Bend.File, use?: (macro: string, key: QName) => void): string {
   const start = src[0] === "\ufeff" ? 1 : 0;
   if (!src.startsWith("// bend-ids", start)) return src;
   const header = /^\/\/ bend-ids 1(\r?\n)((?:\/\/[^\r\n]*\1)*?)\/\/ bend-ids end\1/.exec(src.slice(start));
@@ -2747,22 +2748,22 @@ function foreign_src(src: string, scopes: Bend.File[], use?: (macro: string, key
     const [, macro, token, alias] = row;
     names.add(alias);
 
-    const [key, ...others] = scopes.map(scope => {
-      const found = token[0] === "#" || token[0] === ":"
-        ? name_resolve(FL.book, scope, token.slice(1), token[0] === "#" ? "ctr" : "def")
-        : { k: token };
-      if ("issue" in found && found.issue !== undefined) die(found.issue);
-      const key = found.k;
-      const valid = macro === "CID"
-        ? (key in FL.book.ctrs) || def_foreign(FL.book.tlds[key])
-        : FL.book.tlds[key]?.$ === "Def" || key === CLO_APPLY || key === IO_EMIT;
-      if (!valid || name_parent(key) !== null) {
-        die(`${macro}(${token}) names no public constructor or def`);
-      }
-      return key;
-    });
-    if (others.some((k) => k !== key)) die("foreign binding differs between "
-      + scopes.map((s) => Bend.name_unescape(s.ns)).join(", ") + ": " + line);
+    const scoped = token[0] === "#" || token[0] === ":";
+    if (!scoped && !token.startsWith("Base:") && token !== CLO_APPLY && token !== IO_EMIT) {
+      die("foreign binding requires a scoped name, Base identity or runtime id: " + token);
+    }
+    const found = scoped
+      ? name_resolve(FL.book, scope, token.slice(1), token[0] === "#" ? "ctr" : "def")
+      : { k: token };
+    if ("issue" in found && found.issue !== undefined) die(found.issue);
+    const key = found.k;
+    const valid = macro === "CID"
+      ? (key in FL.book.ctrs) || def_foreign(FL.book.tlds[key])
+      : FL.book.tlds[key]?.$ === "Def" || key === CLO_APPLY || key === IO_EMIT;
+    if (!valid || name_parent(key) !== null) {
+      die(`${macro}(${token}) names no public constructor or def`);
+    }
+
     if (use) {
       use(macro, key);
       return "";
@@ -2781,10 +2782,14 @@ function effect_src(k: QName, tld: Bend.Def & { i: NonNullable<Bend.Def["i"]> })
   const path = fs.realpathSync(tld.i.paths.find((x) => x.endsWith(ext))
     ?? die("no " + ext + " import: " + name_display(FL.book, k)));
   const scope = tld.i.file;
-  const [scopes, src] = memo(FL.effs, path, () => [[], fs.readFileSync(path, "utf8")]);
-  if (!scopes.includes(scope)) {
-    scopes.push(scope);
-    if (!FL.js) foreign_src(src, scopes, (macro, key) => {
+  const old = FL.effs.get(path);
+  if (old !== undefined && old[0].ns !== scope.ns) {
+    die("foreign source imported from different Bend files: " + path);
+  }
+  if (old === undefined) {
+    const src = fs.readFileSync(path, "utf8");
+    FL.effs.set(path, [scope, src]);
+    if (!FL.js) foreign_src(src, scope, (macro, key) => {
       if (macro === "FID" && fun_runs(FL.book.tlds[key])) {
         src_add(key);
         FL.fids.add(key);
@@ -2918,7 +2923,7 @@ export function compile_book(book: Bend.Book): string {
       .join("\n");
   }).join("\n\n");
   const c = runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
-    [...FL.effs.values()].map(([scopes, src]) => foreign_src(src, scopes)).join(""));
+    [...FL.effs.values()].map(([scope, src]) => foreign_src(src, scope)).join(""));
   // keep nothing memoized: clang may run next, while this process waits
   FL = file_new(book, false);
   return c;
@@ -3020,7 +3025,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       }
       const fs = ctr_live(FL.book.ctrs[x.k]);
       return `{$: ${JSON.stringify(x.k)}${exprs.map((z, j) =>
-        ", [" + JSON.stringify(js_field(fs[j][1])) + "]: " + z).join("")}}`;
+        ", [" + JSON.stringify(fs[j][1]) + "]: " + z).join("")}}`;
     }
     case "Let": return js_expr(sc, js_open(sc, x), ty);
     case "Lam":
@@ -3035,7 +3040,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const cl = { ...sc, seg: seg_new(INTERNAL.dummy, BOX, []),
         caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
       FL.spins.push(cl.seg);
-      const name = name_global(name_fresh(sc.def, "closure"));
+      const name = name_global(name_gen(sc.def, "closure", FL.next++));
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set(vs.values())];
       vs.forEach((_, p) => js_expr(sc, p));
@@ -3115,7 +3120,7 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
         ? [k === DEFAULT ? "" : mat_ops((c) => `${s}.$ === ${JSON.stringify(c)}`), h, [s]]
         : native === undefined
         ? [`${s}.$ === ${JSON.stringify(k)}`, h,
-           ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}[${JSON.stringify(js_field(f))}]`)]
+           ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}[${JSON.stringify(f)}]`)]
         : [tpl(native.cond ?? "", [s]), h,
            (native.elim ?? []).map((e) => tpl(e, [s]))];
     });
@@ -3195,7 +3200,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const names = Object.fromEntries(done_defs(def_foreign)
     .map(([k]) => [k, name_display(book, k)]));
   const effs = [...FL.effs.values()]
-    .map(([scopes, src]) => `(() => {\n${foreign_src(src, scopes)}\n})();\n\n`).join("");
+    .map(([scope, src]) => `(() => {\n${foreign_src(src, scope)}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `const module = Object.create(null);\n${outs.map((k) => {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
@@ -3224,8 +3229,7 @@ export function js_book(book: Bend.Book): string {
   const show = show_main();
   return `${lib}\n${RUNTIME_MAIN}\ncli(process.argv.slice(1));\nio_exit(${
     name_global(entry())}, ${JSON.stringify(show && show.map((c) =>
-      typeof c === "number" ? c : [c, name_display(FL.book, c),
-        ctr_live(FL.book.ctrs[c]).map(([, f]) => js_field(f))]))});`;
+      typeof c === "number" ? c : [c, name_display(FL.book, c)]))});`;
 }
 
 // RuntimeC
@@ -6197,14 +6201,15 @@ function show_val(D, d, v, chain) {
       ? v ? ${js_tag("True")} : ${js_tag("False")} : v.$;
     let a = d + 3;
     for (; D[a + 1][0] !== tag; a += 4 + 2 * D[a + 2]) {}
-    const [, name, fields] = D[a + 1];
+    const [, name] = D[a + 1];
+    const fields = Object.values(v).slice(1);
     const o = "{[("[D[a + 3]];
     let s = o === "{" ? name + "{" : chain === o ? "" : o;
-    for (const [j, field] of fields.entries()) {
+    for (let j = 0; j < fields.length; j++) {
       if (o === "[" ? j === 0 && chain === o : j > 0) {
         s += ", ";
       }
-      s += show_val(D, D[a + 5 + 2 * j], v[field], j === 1 && o !== "{" ? o : 0);
+      s += show_val(D, D[a + 5 + 2 * j], fields[j], j === 1 && o !== "{" ? o : 0);
     }
     return o === "{" || chain !== o ? s + "}])"[D[a + 3]] : s;
   }

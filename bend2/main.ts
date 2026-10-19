@@ -343,9 +343,8 @@ async function cli_checkup(file: string): Promise<void> {
     if (!/^import(\s|$)/.test(line)) {
       break;
     }
-    const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:#.*)?$/
-      .exec(line);
-    if (m === null) {
+    const m = Bend.IMPORT_LINE.exec(line);
+    if (m === null || m[2] === undefined) {
       continue;
     }
     const at = m[1].startsWith("/") ? m[1]
@@ -883,9 +882,10 @@ function pkg_files(file: string, book: Bend.Book, seen: Map<string, Bend.FileId 
     for (const line of files[p].split("\n")) {
       const text = line.trim();
       if (!text || text.startsWith("#")) continue;
-      const [word, use, , alias] = text.split(/\s+/);
-      if (word !== "import") break;
-      if (use === "Base" || /^(0x[0-9a-f]+|[^/]*@[^/]*)\//.test(use)) continue;
+      const m = Bend.IMPORT_LINE.exec(text);
+      if (m === null) break;
+      const [, use, alias] = m;
+      if (alias === undefined || /^(0x[0-9a-f]+|[^/]*@[^/]*)\//.test(use)) continue;
       check(from, book.files.get(scope.al[alias])?.path ?? "", use);
     }
   }

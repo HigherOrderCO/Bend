@@ -45,7 +45,8 @@
 // bend-ids end
 // The effects of lint.bend. bend-lint puts its channel on
 // globalThis.BEND_LINT before it runs a rule, and removes it after. Bool,
-// String and U32 are native JS values here; other data is {$: Name, ...}.
+// String and U32 are native JS values here; other data carries a constructor
+// identity in $, resolved by the bindings above.
 
 const LINT_SEVERITY = {
   [BEND_CID_Error]:       "error",

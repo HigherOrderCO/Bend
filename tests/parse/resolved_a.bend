@@ -1,4 +1,4 @@
-# Operators distinguish this module from the colliding alias's module.
+# These names also occur in resolved_b, with different values and operators.
 type Box<-T: Type> is Type:
   Wrap{x: T}
 
@@ -26,7 +26,5 @@ type Id is Type:
 def Id.pure(x: Quant) -> Id:
   MkId{x}
 
-def Id.bind(-A: Type, v: Id, f: A -> Id) -> Id:
-  v
-
-#|All terms check.
+#|ALL PROOFS CHECK
+#|Use --verdict for mathematical validity.

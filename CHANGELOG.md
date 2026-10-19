@@ -14,15 +14,17 @@ latest one; the GitHub release carries the same notes.
   arguments for elaboration instead of recovering them from serialized cache keys.
 - Bare names in patterns bind variables, including names also used by
   constructors. Constructor patterns use braces in every file.
-- Source declarations retain their identities in compiled code. Generated
-  symbols and numeric runtime dispatch tables remain local to each build.
-- Publication preserves source imports and rejects archives that would lose
-  their targets, split module identity or change proof-sibling obligations.
+- Source identities determine lookup, JS export keys and constructor tags.
+  Private symbols and numeric runtime dispatch tables are local to each build.
+- Publication preserves valid source import routes, including adjacent import
+  comments, and rejects archives that would lose their targets, split module
+  identity or change proof-sibling obligations.
 - **Foreign interface change:** C and JS files declare their Bend references in
   a `// bend-ids 1` header. Replace body `CID(...)`/`FID(...)` uses with the
   declared host aliases; the compiler now copies the host body unchanged.
   Header names use the imports of the Bend file supplying the implementation,
-  including when that implementation fills a law declared elsewhere.
+  including when that implementation fills a law declared elsewhere. Use scoped
+  selectors for local declarations so foreign files survive package relocation.
   See [Effects](guide/EFFECTS.md) for the format and examples.
 
 ## 2.0.38 (2026-10-20)

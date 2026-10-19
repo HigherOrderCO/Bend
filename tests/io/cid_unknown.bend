@@ -1,4 +1,4 @@
-# a CID(..) in an effect names a constructor or a def: a misspelled one
+# a CID header selector names a constructor or a def: a misspelled one
 # fails the build (it once built a tag no match knew, and the program took
 # the other branch)
 import Base

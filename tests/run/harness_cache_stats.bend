@@ -1,6 +1,6 @@
 # gates/test.ts's state_run compiles a second checked copy of this book
 # in one process, C and JS over and over, around normalization and the
-# next fixture: each must give the first copy's bytes.
+# next fixture: each must give the first copy's generated code.
 import Base
 
 law flip:
