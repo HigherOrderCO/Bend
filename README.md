@@ -234,6 +234,8 @@ def add_zero(x):
 - Base is small: expect to write helpers other languages ship built in.
 - Effects are few: print, env, time, sleep, spawn, channels, files, TCP, UDP.
   UDP buffers fit IPv4's 65,507-byte payload limit.
+  TCP text sends return unsent bytes on failure or timeout; resume them with
+  `TCP.send_bytes`, since a partial write may split a UTF-8 character.
 - No TLS, HTTP library, JSON or regex for now (you can add them as foreigns).
 - Targets are C, Metal, CUDA and JavaScript; Lua, Luau and Python are planned.
 - The JavaScript target runs on one core and has no graphics or audio.
