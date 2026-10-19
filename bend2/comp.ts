@@ -3553,6 +3553,8 @@ enum { ERR_RING = 1, ERR_TAGS, ERR_HEAP, ERR_FIDS, ERR_NATS, ERR_RFCS,
 #define H_BUMP       0
 #define H_CAP        1
 #define H_CURSOR     LINE
+#define H_FRONT      (H_CURSOR + 1)
+#define H_GROUPS     (H_CURSOR + 2)
 #define H_ROOT_DONE  (2 * LINE)
 #define H_ERROR_CODE (3 * LINE)
 #define H_ROOT_WORD  (4 * LINE)
@@ -4273,16 +4275,20 @@ INLINE u32 ring_flip(u32 i) {
   return (i % CUBE_T << CUBE_LOG) + i / CUBE_T;
 }
 
+// A turn's five dispatches (x, y, z) sit at H_GROUPS, before H_ROOT_DONE.
+typedef char turn_fits[H_GROUPS + 8 <= H_ROOT_DONE ? 1 : -1];
+
+#define TURN_ROWS(at) ((at) % 4 == 0 ? 1 : CUBE_G)
+
 INLINE u32 turn_groups(u64 f, u32 at) {
   bool run = f != 0 && (at == 2 ? f >= CUBE_T : at == 1 ? f < LANES
     : at == 4 || f < CUBE_T);
-  return run ? at % 4 == 0 ? 1 : CUBE_G : 0;
+  return run ? TURN_ROWS(at) : 0;
 }
 
 INLINE void turn_set(DEV u64* H, u64 f) {
-  DEV u32* g = (DEV u32*)(H + H_CURSOR + 2);
-  H[H_CURSOR + 1] = f;
-  H[H_CURSOR + 10] += f != 0;
+  DEV u32* g = (DEV u32*)(H + H_GROUPS);
+  H[H_FRONT] = f;
   for (u32 i = 0; i < 15; i += 1) {
     g[i] = i % 3 != 0 ? 1 : turn_groups(f, i / 3);
   }
@@ -4595,15 +4601,14 @@ kernel void bend_dev(DEV u64* H [[buffer(0)]], constant u32& pass [[buffer(1)]],
   u32 row [[threadgroup_position_in_grid]],
   u32 lane [[thread_position_in_threadgroup]]) {
 #else
-extern "C" __global__ void bend_dev(DEV u64* H, u32 pass) {
+extern "C" __global__ void bend_dev(DEV u64* H, u32 pass, u32 at) {
   __shared__ u32 vote[3];
   u32 grids = gridDim.x;
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
 #endif
 #ifndef __METAL_VERSION__
-  if (!turn_groups(H[H_CURSOR + 1], pass ? pass % 3 ? 2 * pass : 3
-    : grids > 1)) {
+  if (!turn_groups(H[H_FRONT], at)) {
     return;
   }
 #endif
@@ -4924,6 +4929,7 @@ static void gpu_note(const char* path) {
 
 static void gpu_kernel(u32 pass, u32 at);
 
+// Dispatch at runs pass {0, 0, 1, 3, 2}[at] on TURN_ROWS(at) groups.
 static void gpu_run(void) {
   for (u32 i = 0; i < 5; i += 1) {
     gpu_kernel((u32[]){ 0, 0, 1, 3, 2 }[i], i);
@@ -5019,33 +5025,41 @@ static void gpu_load(u64 bytes) {
 static void gpu_kernel(u32 pass, u32 at) {
   [gpu_enc setBytes:&pass length:sizeof pass atIndex:1];
   [gpu_enc dispatchThreadgroupsWithIndirectBuffer:gpu_buf
-    indirectBufferOffset:(H_CURSOR + 2) * 8 + at * 12
+    indirectBufferOffset:H_GROUPS * 8 + at * 12
     threadsPerThreadgroup:MTLSizeMake(CUBE_T, 1, 1)];
   [gpu_enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
 }
 
-static void gpu_pass(u32 n) {
-  @autoreleasepool {
-    id<MTLCommandBuffer> cb[2];
-    id<MTLEvent>         ev = [gpu_dev newEvent];
-    u64                  v  = 0;
-    for (u32 i = 0; i < n + 2; i += 1) {
-      id<MTLCommandBuffer> c = cb[i % 2];
+// A bang gives each round its own command buffer, GPU_DEEP in flight, each
+// waiting on the last through one event, until the pack empties the
+// frontier. A round queued past that dispatches no groups.
+
+#define GPU_DEEP 3
+
+static id<MTLEvent> gpu_ev;
+static u64          gpu_ev_at;
+
+static void gpu_pass(u64* H) {
+  id<MTLCommandBuffer> cb[GPU_DEEP] = { nil };
+  gpu_ev = gpu_ev ? gpu_ev : [gpu_dev newEvent];
+  for (u32 i = 0, left = GPU_DEEP; left != 0; i += 1) {
+    @autoreleasepool {
+      id<MTLCommandBuffer> c = cb[i % GPU_DEEP];
       [c waitUntilCompleted];
       if ([c error]) {
         gpu_fail([c error]);
       }
-      cb[i % 2] = c = i < n && CORPUS[H_CURSOR + 1] ? [gpu_que commandBuffer]
-        : nil;
+      left -= left < GPU_DEEP || ((volatile u64*)H)[H_FRONT] == 0;
+      cb[i % GPU_DEEP] = c = left == GPU_DEEP ? [gpu_que commandBuffer] : nil;
       if (c) {
-        [c encodeWaitForEvent:ev value:v];
+        [c encodeWaitForEvent:gpu_ev value:gpu_ev_at];
         gpu_enc = [c computeCommandEncoder];
         [gpu_enc setComputePipelineState:gpu_pso];
         [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
         [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
         gpu_run();
         [gpu_enc endEncoding];
-        [c encodeSignalEvent:ev value:++v];
+        [c encodeSignalEvent:gpu_ev value:++gpu_ev_at];
         [c commit];
       }
     }
@@ -5187,20 +5201,23 @@ static void gpu_load(u64 bytes) {
 }
 
 static void gpu_kernel(u32 pass, u32 at) {
-  void* args[] = { &CORPUS, &pass };
-  u32   groups = at % 4 == 0 ? 1 : CUBE_G;
-  if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, 0, NULL,
+  void* args[] = { &CORPUS, &pass, &at };
+  if (cuLaunchKernel(gpu_pso, TURN_ROWS(at), 1, 1, CUBE_T, 1, 1, 0, NULL,
     args, NULL) != CUDA_SUCCESS) {
     err_fail("device launch failed");
   }
 }
 
-static void gpu_pass(u32 n) {
-  for (u32 i = 0; i < n; i += 1) {
-    gpu_run();
-  }
-  if (cuCtxSynchronize() != CUDA_SUCCESS) {
-    err_fail("device fault");
+// A bang launches 1, 2, 4 .. 64 rounds between syncs, until the pack
+// empties the frontier. A pass launched past that returns at once.
+static void gpu_pass(u64* H) {
+  for (u32 n = 1; H[H_FRONT] != 0; n = n < 32 ? 2 * n : 64) {
+    for (u32 i = 0; i < n; i += 1) {
+      gpu_run();
+    }
+    if (cuCtxSynchronize() != CUDA_SUCCESS) {
+      err_fail("device fault");
+    }
   }
 }
 
@@ -5210,7 +5227,7 @@ static void gpu_pass(u32 n) {
 #define gpu_make(p) true
 #define gpu_span()  0
 #define gpu_load(b)
-#define gpu_pass(n)
+#define gpu_pass(H)
 
 #endif
 
@@ -5247,26 +5264,18 @@ static void ring_rewind(u64* H, u32 rows) {
   }
 }
 
-// A GPU bang runs batches of rounds sized by the last bang, doubling to
-// 64; Metal gives each round its own command buffer, two in flight.
-
-static u32 gpu_n = 1;
-
 static void cube_run(u64* H, bool gpu) {
   u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
   if (gpu) {
-    H[H_CURSOR + 10] = 0;
     turn_set(H, f);
   }
-  for (u32 n = gpu_n; !root_done(H);) {
+  while (!root_done(H)) {
     if (f == 0) {
       err_fail("frontier drained without a result");
     }
     if (gpu) {
-      gpu_pass(n);
-      f = (u32)H[H_CURSOR + 1];
-      gpu_n = H[H_CURSOR + 10] < 64 ? H[H_CURSOR + 10] : 64;
-      n = n < 32 ? 2 * n : 64;
+      gpu_pass(H);
+      f = (u32)H[H_FRONT];
     } else {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
