@@ -458,20 +458,20 @@ def main() -> IO(Unit):
   App.run(~U32, ~App{+s => (s, Pix{s}), tick}, "Hello", 256, 256, 0)
 ```
 
-An `Image` is a quadtree: `Pix{color}` paints a square; `Qua{tl, tr, bl, br}`
-splits it into four, recursively and in parallel. Events are `Key`, `Mouse`,
-`Move`, `Look`, `Scroll`, `Close` and `Resize{width, height}`. Scroll deltas
-`dx, dy: F32` are signed; an X11 wheel notch is 1. `Window.grab(window, True{})`
-hides and holds the cursor, reporting `Look` instead of `Move` until released
-or focus is lost.
-
-`App.run_resizable` allows resizing; `App.run` stays fixed. `Resize` reports
-drawable pixels (points times backing scale on macOS) to `tick` before the
-next `view`, which can then adjust image detail. Custom loops use
-`Window.open_resizable` and receive events and the owned image from
-`Window.frame`. `App.run` calls `view` then `tick` each frame until `tick`
-returns `None`. The affine state must be returned beside the image. See
-`demos/app_pong_game_2d` for a complete app.
+An `Image` is a quadtree: `Pix{color}` paints a square, and `Qua{tl, tr, bl,
+br}` splits it in four, so a frame is drawn by recursion like everything else,
+in parallel if you want. Events are `Key`, `Mouse`, `Move`, `Look`, `Scroll`
+and `Close`. `Scroll{x, y, dx, dy}` is a wheel or trackpad under the pointer;
+its signed `F32` deltas scroll toward a page's top and left (a notch is 1 on
+X11). For a first-person camera, `Window.grab(window, True{})` hides and holds
+the cursor, and the mouse's motion comes as `Look{dx, dy}` (signed `F32`, in
+`Move`'s units) until `Window.grab(window, False{})` or the window losing focus
+lets it go.
+`App.run` opens a window and calls `view` then `tick` once per frame, until
+`tick` answers `None`. Since the state is affine, `view` must hand it back next
+to the image. Underneath are `Window.open`, `Window.frame` and `Window.close`,
+and `Audio.open`, `Audio.write` and `Audio.close` for sound. See
+`demos/app_pong_game_2d` for a complete one.
 
 ### The Base Library
 
