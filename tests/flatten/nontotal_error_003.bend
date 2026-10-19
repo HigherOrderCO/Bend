@@ -20,11 +20,11 @@ def main(): pred(Se3{Ze3{}})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Ze3
-#|- observed : \{}
+#|- message  : this match doesn't cover Ze3
 #|Location: pred
 #|11 | def pred(n):
 #|12>|   match n:
 #|   |   ^^^^^^^^
 #|13 |     case Se3{p}:
+#|Note: add `case Ze3{}:` (or `case _:`).
 #|exit 1

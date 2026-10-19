@@ -37,8 +37,7 @@ def main(): f(Zz2b{}, Nl2{}, Zz2b{}, Nl2{})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Cl2
-#|- observed : \{}
+#|- message  : this match doesn't cover Cl2
 #|Context:
 #|- b : Lz2<Nz2>
 #|- c : Nz2
@@ -47,4 +46,5 @@ def main(): f(Zz2b{}, Nl2{}, Zz2b{}, Nl2{})
 #|25>|   match a, b, c, d:
 #|   |   ^^^^^^^^^^^^^^^^^
 #|26 |     case Zz2b{}, xs, b, Nl2{}:
+#|Note: add `case Cl2{h, t}:` (or `case _:`).
 #|exit 1

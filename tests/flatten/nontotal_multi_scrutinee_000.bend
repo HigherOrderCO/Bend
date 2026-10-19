@@ -44,8 +44,7 @@ def main(): f(Nl0{}, Nl0{})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Zz0
-#|- observed : \{}
+#|- message  : this match doesn't cover Zz0
 #|Context:
 #|- b : Lz0<Nz0>
 #|Location: f
@@ -53,4 +52,5 @@ def main(): f(Nl0{}, Nl0{})
 #|26>|   match a, b:
 #|   |   ^^^^^^^^^^^
 #|27 |     case Cl0{Sz0{a}, b}, Cl0{Sz0{c}, d}:
+#|Note: add `case Zz0{}:` (or `case _:`).
 #|exit 1

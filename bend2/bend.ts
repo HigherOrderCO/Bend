@@ -3625,7 +3625,16 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       switch (tm.$) {
         case "Efq": {
           if (rem.length !== 0 && !ctx_dead(book, ctx)) {
-            throw Err(book, ctx, "cases for " + rem.map((c) => name_key(c.k)).join(", "), tm, tm.s, lhs.def);
+            const patt = (c: Ctr): string => {
+              const doms = c.n === 0 ? [] : tele_unbind(book, c.T).doms.slice(-c.n);
+              const bnd = doms.map(([, x], j) => x === "_" ? "_" + String(j) : x);
+              const xs: LTerm[] = bnd.map((x, j) => Var(x, j));
+              return term_show(Ctr(c.k, xs), -1, bnd, tm.s?.file);
+            };
+            const nte = rem.length === 1
+              ? "Note: add `case " + patt(rem[0]) + ":` (or `case _:`)."
+              : "Note: add cases for " + rem.map(patt).join(", ") + " (or `case _:`).";
+            throw Err(book, ctx, "this match doesn't cover " + rem.map((c) => name_key(c.k)).join(", "), undefined, tm.s, lhs.def, nte);
           }
           return Check(tm, ty, uses_nil());
         }

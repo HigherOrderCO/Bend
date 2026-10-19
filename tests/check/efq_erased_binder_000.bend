@@ -23,8 +23,7 @@ def bad(x):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for B1
-#|- observed : \{}
+#|- message  : this match doesn't cover B1
 #|Context:
 #|- v : Void
 #|Location: bad
@@ -32,4 +31,5 @@ def bad(x):
 #|21>|       match b:
 #|   |       ^^^^^^^^
 #|22 |         case B0{}: B0{}
+#|Note: add `case B1{}:` (or `case _:`).
 #|exit 1

@@ -27,11 +27,11 @@ def main(): f(Sx7{Zx7{}})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Zx7
-#|- observed : \{}
+#|- message  : this match doesn't cover Zx7
 #|Location: f
 #|16 | def f(a):
 #|17>|   match a:
 #|   |   ^^^^^^^^
 #|18 |     case Sx7{Sx7{a}}:
+#|Note: add `case Zx7{}:` (or `case _:`).
 #|exit 1
