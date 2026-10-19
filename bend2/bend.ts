@@ -3344,16 +3344,20 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
             const doms = tld?.$ === "Def" ? tele_unbind(book, tld.T).doms : [];
             const file = tm.s?.file;
             const bnd  = ctx_scope(ctx);
+            // the argument as written, so the message stays short and the
+            // check does not evaluate the body
+            const arg_of = (x: HTerm): string => term_show(term_lower(x), -1, bnd, file).replace(/\^\d+/g, "");
             let at = -1;
             for (let j = 0; j < sp.length && j < doms.length; j++) {
-              if (expr_show(book, sp[j], bnd, file) !== name_show(file, doms[j][1])) {
+              if (arg_of(sp[j]) !== name_show(file, doms[j][1])) {
                 at = j;
                 break;
               }
             }
             at = at < 0 ? 0 : at;
             if (at < sp.length && at < doms.length) {
-              const arg = expr_show(book, sp[at], bnd, file);
+              const raw = arg_of(sp[at]);
+              const arg = raw.length <= 60 ? raw : raw.slice(0, 57) + "...";
               const col = name_show(file, doms[at][1]);
               const nte = "Note: pass a part of " + col + ", or mark the def @unsafe to skip the termination check.";
               throw Err(book, ctx, name_key(lhs.def) + "'s " + ordinal(at + 1) + " argument, " + arg + ", is not smaller than " + col, undefined, tm.s, lhs.def, nte);

@@ -38,7 +38,7 @@ def main(): fold(10n)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : fold's 1st argument, ndiv.fin(Nat.divmod.go(n, 1n, 0n, 0n)), is not smaller than n
+#|- message  : fold's 1st argument, ndiv(n, 2n), is not smaller than n
 #|Context:
 #|- n : Nat<> - Zero{}
 #|Location: fold

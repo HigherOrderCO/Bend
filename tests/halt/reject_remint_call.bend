@@ -31,7 +31,7 @@ def main(): N{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : loop's 1st argument, f(C{y => N{}}), is not smaller than t
+#|- message  : loop's 1st argument, f(grow(N{})), is not smaller than t
 #|Context:
 #|- f : @_:T -> T
 #|Location: loop

@@ -34,7 +34,7 @@ def main(): Fx4{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : bad's 1st argument, Fx4{}, is not smaller than b
+#|- message  : bad's 1st argument, flip(Tx4{}), is not smaller than b
 #|Location: bad
 #|25 |     case Tx4{}:
 #|26>|       bad(flip(Tx4{}))
