@@ -16,14 +16,15 @@ function chan_wait(item) {
 }
 
 // Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer).
+// A nested io_run may wake it; its queue and timer belong to the parked IO.
 function chan_wake(row, x) {
   const w = row.wait.shift();
   if (w.late !== undefined) {
-    const ws = io_active.waits;
+    const ws = w.io.waits;
     ws.splice(ws.findIndex((t) => t.more === w.late), 1);
     x = { $: CID(Ready), value: x };
   }
-  io_push(w.cont, x, false);
+  w.io.runs.push({ fun: w.cont, arg: x });
   return w.item;
 }
 
@@ -48,7 +49,7 @@ function chan_shut(row) {
 // Parks k on row with item; with ms, a timer too, whose late answers Wait:
 // the first of the two to come cuts the other.
 function chan_park(row, k, item, ms) {
-  const w = { cont: k, item: item };
+  const w = { io: io_active, cont: k, item: item };
   if (ms !== undefined) {
     w.late = () => {
       row.wait.splice(row.wait.indexOf(w), 1);
