@@ -1,5 +1,6 @@
 # Nat's ops and U32.to_nat run as native C and JS (comp.ts
-# OPERATIONS), not as Base's defs.
+# OPERATIONS), not as Base's defs. Nat.pow has no native: it runs
+# Base's def on every lane.
 # model proves by {==} that the calls equal these values in Base's defs,
 # so --verdict pins the model; main prints the same calls, so every lane
 # must print what the model computes. The values are each lane's answers.

@@ -1,5 +1,6 @@
 # U32's arithmetic, bitwise and shift ops run as native C and JS
-# (comp.ts OPERATIONS), not as Base's defs.
+# (comp.ts OPERATIONS), not as Base's defs. U32.pow is native in C
+# only, and U32.min and U32.max have no native: they run Base's defs.
 # model proves by {==} that the calls equal these values in Base's defs,
 # so --verdict pins the model; main prints the same calls, so every lane
 # must print what the model computes. The values are each lane's answers.
