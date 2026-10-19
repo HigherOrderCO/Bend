@@ -1,7 +1,8 @@
 # io (io_chan_try_late): expired channel waiters are withdrawn before any
 # computation resumes. Register the sender's 1 ms timer before the receive's
-# 10 ms deadline, then hold the loop with synchronous clock reads for 20 ms.
-# Both timers are overdue: try_recv answers Wait, and the next recv takes 7.
+# 10 ms deadline, then hold the loop with one blocking 20 ms effect, which a
+# turn cannot yield inside. Both timers are overdue: try_recv answers Wait,
+# and the next recv takes 7.
 import Base
 
 def show(r: Poll<&1, &1, Maybe<&1, U32>, Unit>) -> String:
@@ -20,27 +21,17 @@ def got(m: Maybe<&1, U32>) -> String:
     case None{}:
       "A: then ended"
 
-def busy.next(early: Bool, next: IO(Unit)) -> IO(Unit):
-  match early:
-    case True{}:
-      next
-    case False{}:
-      IO.print("B: held")
+law hold:
+  U32 -> IO(Unit)
 
-# Fuel makes the clock loop terminating; exhaustion fails the test.
-def busy.loop(fuel: Nat, +until: Nat) -> IO(Unit):
-  match fuel:
-    case 0n:
-      IO.die(Unit, 1, "test clock did not advance")
-    case 1n+p:
-      do IO<Unit>:
-        now : Nat <- IO.now()
-        busy.next(Nat.is_lt(now, until), busy.loop(p, until))
+def hold(ms):
+  import "./chan_try_late.c"
+  import "./chan_try_late.js"
 
 def busy() -> IO(Unit):
   do IO<Unit>:
-    start : Nat <- IO.now()
-    busy.loop(4294967295n, Nat.add(start, 20n))
+    Unit <- hold(20)
+    IO.print("B: held")
 
 def recv(+c: Chan(U32)) -> IO(Unit):
   do IO<Unit>:
