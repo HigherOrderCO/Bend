@@ -237,21 +237,20 @@ const FIXES: ReadonlyArray<
 
 export function readConfig(file: string): Config {
   try {
+    let config: Config;
     if ([".js", ".ts"].includes(path.extname(file))) {
       const module = import.meta.require(url.pathToFileURL(path.resolve(file)).href);
       if (!Object.hasOwn(module, "config")) {
         throw new Error("must export a named `config` object");
       }
-      if (
-        typeof module.config !== "object" ||
-        module.config === null ||
-        Array.isArray(module.config)
-      ) {
-        throw new Error("`config` must be an object");
-      }
-      return module.config;
+      config = module.config;
+    } else {
+      config = JSON.parse(fs.readFileSync(file, "utf8"));
     }
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    if (typeof config !== "object" || config === null || Array.isArray(config)) {
+      throw new Error("`config` must be an object");
+    }
+    return config;
   } catch (e) {
     throw new Error(file + ": " + (e instanceof Error ? e.message : String(e)));
   }
@@ -287,7 +286,7 @@ function settings(
     throw new Error(where + ' must be "off" or an object');
   }
   const { severity, ...options } = given;
-  if (severity !== undefined && !Object.hasOwn(HEAD, severity)) {
+  if (severity !== undefined && (typeof severity !== "string" || !Object.hasOwn(HEAD, severity))) {
     throw new Error(where + ": severity must be one of " + Object.keys(HEAD).join(", "));
   }
   for (const [key, value] of Object.entries(options)) {

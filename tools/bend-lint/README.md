@@ -351,6 +351,11 @@ configs export a named `config` object and go through Bun's loader, cache
 included. They can import relative files. Rule settings and option validation
 are the same for all three formats.
 
+Configuration roots must be non-null objects, not arrays or primitive values.
+A rule's severity must be a string: `error`, `warning`, `information` or `hint`.
+Invalid configuration types are tool errors (CLI exit 2), not successful runs
+with the policy silently ignored.
+
 ### JSON output
 
 `--json` prints one JSON object on stdout. Status and failure messages can still

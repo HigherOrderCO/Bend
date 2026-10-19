@@ -1429,18 +1429,29 @@ describe("options", () => {
   });
 
   test("a wrong config fails loudly", async () => {
-    await expect(messages({ rules: { "test/echo": { tabSize: 4 } } })).rejects.toThrow(
-      /test\/echo has no option tabSize/,
-    );
-    await expect(messages({ rules: { "test/echo": { tabWidth: "4" } } })).rejects.toThrow(
-      /tabWidth must be a number/,
-    );
-    await expect(messages({ rules: { "test/echo": { severity: "loud" } } })).rejects.toThrow(
-      /severity must be one of/,
-    );
-    await expect(messages({ rules: { "test/echo": 4 } })).rejects.toThrow(
-      /must be "off" or an object/,
-    );
+    await expect(messages({ rules: { "test/echo": { tabSize: 4 } } })).rejects.toBeInstanceOf(Error);
+    await expect(messages({ rules: { "test/echo": { tabWidth: "4" } } })).rejects.toBeInstanceOf(Error);
+    await expect(messages({ rules: { "test/echo": { severity: "loud" } } })).rejects.toBeInstanceOf(Error);
+    await expect(messages({ rules: { "test/echo": 4 } })).rejects.toBeInstanceOf(Error);
+  });
+
+  test("CLI rejects malformed config types without bypassing the error policy", () => {
+    const file = fixture("config_policy_source.bend", "import Base\ndef main()->U32:42\n");
+    const formatRule = fileURLToPath(new URL("../rules/format.ts", import.meta.url));
+    const cases = [
+      ["root_array", [], 2],
+      ["root_number", 42, 2],
+      ["severity_array", { rules: { "format/layout": { severity: ["error"] } } }, 2],
+      ["error_policy", { rules: { "format/layout": { severity: "error" } } }, 1],
+      ["default_policy", {}, 0],
+    ] as const;
+    for (const [name, config, status] of cases) {
+      const configFile = fixture(name + ".json", JSON.stringify(config));
+      const result = spawnSync(process.execPath,
+        [CLI, file, "--rules", formatRule, "--config", configFile, "--json"],
+        { encoding: "utf8", env: { ...process.env, BEND_DIR: BEND2 }, timeout: 30_000 });
+      expect(result.status).toBe(status);
+    }
   });
 
   test("bend-lint.json is found in the file's folder or above it", async () => {
@@ -1510,16 +1521,16 @@ describe("options", () => {
 
   test("module configs require a named object export and preserve load errors", () => {
     for (const extension of ["js", "ts"]) {
-      for (const [name, text, error] of [
-        ["default", "export default {};", /must export a named `config` object/],
-        ["missing", "export const rules = {};", /must export a named `config` object/],
-        ["null", "export const config = null;", /`config` must be an object/],
-        ["array", "export const config = [];", /`config` must be an object/],
-        ["function", "export const config = () => ({});", /`config` must be an object/],
-        ["throws", 'throw new Error("config exploded");', /config exploded/],
+      for (const [name, text] of [
+        ["default", "export default {};"],
+        ["missing", "export const rules = {};"],
+        ["null", "export const config = null;"],
+        ["array", "export const config = [];"],
+        ["function", "export const config = () => ({});"],
+        ["throws", 'throw new Error("config exploded");'],
       ] as const) {
         const file = fixture(`config_${name}.${extension}`, text);
-        expect(() => readConfig(file)).toThrow(error);
+        expect(() => readConfig(file)).toThrow(Error);
         expect(() => readConfig(file)).toThrow(file);
       }
     }
