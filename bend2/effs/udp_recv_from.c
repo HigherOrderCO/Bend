@@ -33,7 +33,8 @@ static Term udp_recv_from_start(Env e, Term* f, IoWork* w, IoPack more, u64 at) 
     return io_tup(e, io_hand(w->hand), io_poll_end(e, w,
       term_pak(CID(Unit), 0), io_fail(e, EINVAL, NULL)));
   }
-  w->made = f[1] < INT32_MAX ? (intptr_t)f[1] : INT32_MAX;
+  // IPv4's 65535-byte packet has at least 20 IP and 8 UDP header bytes.
+  w->made = f[1] < 65507 ? (intptr_t)f[1] : 65507;
   w->data = io_mem(malloc((size_t)w->made + 1));
   return io_wait_on(w, (int)w->hand, POLLIN, at, more);
 }
