@@ -3715,7 +3715,40 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
   if (term_compare("LE", book, x_inf.ty, ty, d)) {
     return x_inf;
   }
-  throw Err(book, ctx, ty, x_inf.ty, tm.s, lhs.def);
+  const o_wnf = term_wnf(book, x_inf.ty);
+  const t_wnf = term_wnf(book, ty);
+  let nte: string | undefined;
+  if (o_wnf.$ === "All" && t_wnf.$ !== "All") {
+    const [raw, args] = term_unapply(term_strip(x_inf.tm));
+    const head = term_strip(raw);
+    const tld = head.$ === "Ref" ? book.tlds[head.k] : undefined;
+    if (tld?.$ === "Def") {
+      const doms  = tele_unbind(book, tld.T).doms;
+      const total = doms.filter(([q]) => q.$ !== "None").length;
+      if (args.length < total) {
+        const file = tm.s?.file;
+        const miss: string[] = [];
+        let ok = true;
+        let bnd = ctx_scope(ctx);
+        let cur: HTerm = o_wnf;
+        for (let j = 0; j < 8 && cur.$ === "All"; j++) {
+          if (cur.q.$ !== "None") {
+            if (miss.length === 0 && term_wnf(book, cur.A).$ === "All") {
+              ok = false;
+              break;
+            }
+            miss.push(cur.k + " : " + expr_show(book, cur.A, bnd, file));
+          }
+          bnd = bnd.concat([cur.k]);
+          cur = term_wnf(book, cur.B(Var(cur.k, cur.i)));
+        }
+        if (ok && miss.length > 0) {
+          nte = "Note: " + name_show(file, head.k) + " takes " + String(total) + " argument" + (total === 1 ? "" : "s") + ", " + String(args.length) + " given (missing " + miss.join(", ") + ").";
+        }
+      }
+    }
+  }
+  throw Err(book, ctx, ty, x_inf.ty, tm.s, lhs.def, nte);
 }
 
 export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {

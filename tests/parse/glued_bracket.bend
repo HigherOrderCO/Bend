@@ -21,8 +21,9 @@ def main(): id2
 #|- expected : U32
 #|- observed : @-A:Type -> @x:A -> A
 #|Location: main
-#|16 | 
+#|16 |
 #|17>| def main(): id2
 #|   |             ^^^
 #|18 |
+#|Note: id2 takes 1 argument, 0 given (missing x : A).
 #|exit 1
