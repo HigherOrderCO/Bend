@@ -1808,9 +1808,10 @@ def F32.max(a: F32, b: F32) -> F32:
 def F32.clamp(x: F32, lo: F32, hi: F32) -> F32:
   F32.min(F32.max(x, lo), hi)
 
-# Return either endpoint unchanged, including signed zero, without evaluating
-# the unused endpoint. Between them the weighted sum avoids overflowing b - a
-# for finite endpoints of opposite signs.
+# At t = 0 and t = 1 return that endpoint as is, keeping signed zero and never
+# multiplying the other one (an infinite endpoint would give NaN). Between them
+# the weighted sum avoids overflowing b - a for finite endpoints of opposite
+# signs.
 def F32.lerp(a: F32, b: F32, t: F32) -> F32:
   match t:
     case F32{+z}:
