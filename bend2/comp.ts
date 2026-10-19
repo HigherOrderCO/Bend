@@ -179,8 +179,11 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
+  // C only: a JS file runs Base's U32.pow, U32.log2 and Map.msb.u, as intr_of
+  // skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
+  u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
+  map_msb_u: { C: "map_msb_u($0, $1)" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -383,6 +386,12 @@ INLINE u64 nat_chk(Env e, u64 n) {
 
 INLINE u64 nat_mul(Env e, u64 a, u64 b) {
   return nat_chk(e, b != 0 && a > NAT_IMM / b ? NAT_IMM + 1 : a * b);
+}
+
+INLINE u64 map_msb_u(u64 n, u32 x) {
+  if (n == 0 || x == 0) return 0;
+  u64 width = 32 - CLZ(x);
+  return n < width ? n : width;
 }
 
 #if DEVICE
