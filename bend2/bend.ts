@@ -3672,20 +3672,16 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
         const bnd  = ctx_scope(ctx);
         // the de Bruijn markers are noise here: the note reads as prose
         const plain = (s: string): string => s.replace(/\^\d+/g, "");
+        const cut = (s: string): string => s.length <= 100 ? s : s.slice(0, 97) + "...";
+        const raw = (x: HTerm): string => plain(term_show(term_lower(x), -1, bnd, file));
         const show = (x: HTerm): string => {
           const s = plain(expr_show(book, x, bnd, file));
-          if (s.length <= 100) {
-            return s;
-          }
-          const w = plain(term_show(term_lower(term_wnf(book, x)), -1, bnd, file));
-          return w.length <= 100 ? w : w.slice(0, 97) + "...";
+          return s.length <= 100 ? s : cut(plain(term_show(term_lower(term_wnf(book, x)), -1, bnd, file)));
         };
-        const raw = (x: HTerm): string => plain(term_show(term_lower(x), -1, bnd, file));
         const lft  = raw(t_wnf.a);
         const rgt  = raw(t_wnf.b);
         const lval = show(t_wnf.a);
         const rval = show(t_wnf.b);
-        const cut = (s: string): string => s.length <= 100 ? s : s.slice(0, 97) + "...";
         const nte  = "- left     : " + cut(lft) + "  =>  " + lval + "\n- right    : " + cut(rgt) + "  =>  " + rval;
         throw Err(book, ctx, "{==} needs both sides to compute to the same value", undefined, tm.s, lhs.def, nte);
       }
