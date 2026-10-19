@@ -271,6 +271,14 @@ try {
     + " command's stdout and exit code untouched", bad.code === 1
     && bad.out === "" && bad.err.includes("bend 99.0.0 is available: run"
     + " bend update\nhelloworld\n"));
+  for (const cached of [{ ver: null, notice: "" }, { ver: "99.0.0", notice: null }]) {
+    fs.writeFileSync(path.join(BEND, "check.json"),
+      JSON.stringify({ t: Date.now(), ...cached }));
+    const invalid = await bend(["--help"]);
+    check("an invalid update cache leaves the command unchanged: "
+      + JSON.stringify(cached), invalid.code === 0 && invalid.out === help.out
+      && invalid.err === "");
+  }
   release(ver);
   fresh();
   const t0 = Date.now();

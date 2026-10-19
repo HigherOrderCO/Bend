@@ -154,7 +154,7 @@ async function cli(): Promise<void> {
   } else {
     await cli_file(args);
   }
-  await check();
+  await check().catch(() => {});
 }
 
 // cli_guide prints guide/<NAME>.md: the guide, or a named extra.

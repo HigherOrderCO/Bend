@@ -72,6 +72,8 @@ type File = {
   ids: Map<string, string>;
   taken: Set<string>;
   teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  steps: Map<string, HTerm>;
+  opens: Map<string, boolean>;
   srcs: Map<Name, Set<Name> | null>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
@@ -86,7 +88,6 @@ type File = {
     uses: Map<HTerm, Bend.PMap<number>>;
     folds: Map<HTerm, HTerm | null>;
     spines: Map<HTerm, Spine>;
-    steps: Map<HTerm, HTerm>;
   };
 };
 
@@ -243,6 +244,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
+  string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
@@ -489,7 +491,10 @@ function nat_chk(n) {
 }
 
 function nat_in(n) {
-  return Number.isInteger(n) && n >= 0 && n <= 2 ** 53 ? n : nat_chk(1 / 0);
+  if (!Number.isInteger(n) || n < 0 || n > 2 ** 53) {
+    throw "bend: expected a Nat host number: an integer from 0 to 2^53";
+  }
+  return n;
 }
 
 function f32_show(x) {
@@ -509,7 +514,7 @@ function f32_from_bits(u) {
 }
 
 function f32_read(s) {
-  const re = /^[\t\n\v\f\r ]*[+-]?((\d+\.?\d*|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
+  const re = /^[\t\n\v\f\r ]*[+-]?((\d+(?:\.\d*)?|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
   const v = f32_round(s.replace(/inf\w*/i, "Infinity"));
   return re.test(s) ? {$: "Some", value: v} : {$: "None"};
 }
@@ -518,13 +523,23 @@ const f32_round = ${Bend.f32_round};
 
 const char_new = ${char_new};
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, at = 0) {
+  return s[at] === "\uDC00" ? 4 : s.codePointAt(at) > 0xFFFF ? 2 : 1;
 }
 
 function char_code(s) {
   return s.length < 4 ? s.codePointAt(0)
     : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+}
+
+function string_contains(s, p) {
+  // A match must start at a Char boundary, not inside a packed U32 code.
+  for (let at = 0; at <= s.length; at += char_len(s, at)) {
+    if (s.startsWith(p, at)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function str_out(s) {
@@ -659,7 +674,7 @@ function lit_call(s: Of<"Lit">): HTerm | null {
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
   return s.$ !== "Lit" ? s
-    : memo(FL.memo.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
+    : memo(FL.steps, s.k + s.v, () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -667,10 +682,12 @@ function term_strip(t: HTerm): HTerm {
 }
 
 function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
-  return memo(FL.memo.opens, t, () => {
-    const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
-    return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
-  });
+  return memo(FL.memo.opens, t, open_of);
+}
+
+function open_of(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
+  const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
+  return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
 }
 
 function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
@@ -687,36 +704,38 @@ function let_live(t: Of<"Let">): boolean[] {
 }
 
 function term_spine(tm: HTerm): Spine {
-  return memo(FL.memo.spines, tm, () => {
-    const apps: Of<"App">[] = [];
-    let h = tm;
-    let c = term_force(tm);
-    while (c.$ === "Ann" || c.$ === "App") {
-      if (c.$ === "App") {
-        apps.unshift(c);
-        h = c.f;
-      }
-      c = term_force(c.$ === "App" ? c.f : c.x);
+  return memo(FL.memo.spines, tm, spine_of);
+}
+
+function spine_of(tm: HTerm): Spine {
+  const apps: Of<"App">[] = [];
+  let h = tm;
+  let c = term_force(tm);
+  while (c.$ === "Ann" || c.$ === "App") {
+    if (c.$ === "App") {
+      apps.unshift(c);
+      h = c.f;
     }
-    const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
-    const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
-    const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
-    const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
-    const all = apps.map((a) => a.x);
-    const args = all.filter((_, i) => live[i]);
-    const def = c.$ === "Ref" && intr_of(c.k) === undefined
-      && fun_runs(tld) ? c.k : null;
-    const need = def === null ? 0 : fun_of(def).lays.length;
-    const a = apps[live.lastIndexOf(true)];
-    const m = { h, t: c, all, args, tld, k: null, xs: args };
-    if (def !== null && args.length === need) {
-      return { ...m, k: def, b: (c as Of<"Ref">).b };
-    }
-    if (args.length > need && (def !== null || c.$ !== "Ref")) {
-      return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
-    }
-    return m;
-  });
+    c = term_force(c.$ === "App" ? c.f : c.x);
+  }
+  const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
+  const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
+  const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
+  const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
+  const all = apps.map((a) => a.x);
+  const args = all.filter((_, i) => live[i]);
+  const def = c.$ === "Ref" && intr_of(c.k) === undefined
+    && fun_runs(tld) ? c.k : null;
+  const need = def === null ? 0 : fun_of(def).lays.length;
+  const a = apps[live.lastIndexOf(true)];
+  const m = { h, t: c, all, args, tld, k: null, xs: args };
+  if (def !== null && args.length === need) {
+    return { ...m, k: def, b: (c as Of<"Ref">).b };
+  }
+  if (args.length > need && (def !== null || c.$ !== "Ref")) {
+    return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
+  }
+  return m;
 }
 
 function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
@@ -787,16 +806,19 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
   return Bend.pmap_get(u, p.i) ?? 0;
 }
 
+const ADD = (a: number, b: number) => a + b;
+
 function term_uses(tm: HTerm): Bend.PMap<number> {
-  return memo(FL.memo.uses, tm, () => {
-    const t = term_force(tm);
-    if (t.$ === "Var") {
-      return t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
-    }
-    const add = t.$ === "Mat" ? Math.max : (a: number, b: number) => a + b;
-    return term_kids(t).reduce((u, x) =>
-      Bend.pmap_union(u, term_uses(x), add), USE0);
-  });
+  return memo(FL.memo.uses, tm, uses_of);
+}
+
+function uses_of(tm: HTerm): Bend.PMap<number> {
+  const t = term_force(tm);
+  let u = t.$ !== "Var" || t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
+  for (const x of term_kids(t)) {
+    u = Bend.pmap_union(u, term_uses(x), t.$ === "Mat" ? Math.max : ADD);
+  }
+  return u;
 }
 
 function rest_use(rest: HTerm[], p: Of<"Var">): number {
@@ -1005,7 +1027,8 @@ function lay_node(k: Name): Lay {
 
 // An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
-  return ty_holds(A, (t) => ty_tag(t, "Var App")) ? v.lay : lay_of(A);
+  return A && memo(FL.opens, Bend.term_key(Bend.term_lower(A)), () =>
+    ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
 function lay_eq(a: Lay, b: Lay): boolean {
@@ -1427,6 +1450,8 @@ function file_new(book: Bend.Book, js: boolean): File {
     ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     teles: new Map(),
+    steps: new Map(),
+    opens: new Map(),
     srcs: new Map(),
     loops: new Map(),
     flats: new Map(),
@@ -1441,7 +1466,6 @@ function file_new(book: Bend.Book, js: boolean): File {
       uses: new Map(),
       folds: new Map(),
       spines: new Map(),
-      steps: new Map(),
     },
   };
 }
@@ -1602,9 +1626,6 @@ function spare_flush(sc: Scope): void {
 
 // Seg
 // ===
-
-// A segment enters by popping its frame and reading its
-// parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: string, ret: Lay, vals: Val[],
   frame: Seg["frame"] = null): Seg {
@@ -1885,6 +1906,7 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // A binding counts its uses: the last takes the value, an earlier
 // one shares it. A fresh binding of a shared box of a flat type
 // unboxes before its first share, so its words copy, not its node.
+// A share may wrap its word: a frame slot holding it takes the new one.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -1894,8 +1916,11 @@ function bind_pop(sc: Scope, x: HTerm): Val {
     return b.val;
   }
   bind_set(sc, p, b, b.n - 1);
+  const fr = sc.seg.frame;
   val_owned(sc, b.val).forEach((w) => {
-    file_push(sc, `${w} = term_keep(e, ${w}, 1);`);
+    const s = fr?.pop === 0 ? fr.at[sc.seg.params.indexOf(w)] : undefined;
+    const to = s === undefined ? "" : `STK(${s}) = `;
+    file_push(sc, `${to}${w} = term_keep(e, ${w}, 1);`);
     facts_hot(sc, b.A, true);
   });
   return b.val;
@@ -1958,8 +1983,7 @@ function memo_gc(): void {
 // A pure main prints through a descriptor of its type, a node per (type,
 // layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
 // (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
-// then an (offset, node) per field). An IO main has none; an unprintable
-// type (a function, a Type, an erased or dependent field) refuses the build.
+// then an (offset, node) per field).
 
 function show_main(): (number | Name)[] | null {
   const main = FL.book.tlds.main;
@@ -2816,9 +2840,11 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
 // namespace, else as is. An effect source is read once, in one namespace.
+// effect_srcs splices a C source's backslash-newlines first, as C does even
+// in a comment; JS does not.
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  return src.replace(/\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
     }
@@ -2842,7 +2868,10 @@ function effect_srcs(ext: string, miss: string): string[] {
     }
     seen.set(path, m);
   }
-  return [...seen].map(([p, m]) => c_ids(fs.readFileSync(p, "utf8"), m));
+  return [...seen].map(([p, m]) => {
+    const src = fs.readFileSync(p, "utf8");
+    return c_ids(ext === ".c" ? src.replace(/\\[ \t]*\r?\n/g, "") : src, m);
+  });
 }
 
 // C
@@ -2874,6 +2903,7 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
+      PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {
@@ -3545,6 +3575,8 @@ enum { ERR_RING = 1, ERR_TAGS, ERR_HEAP, ERR_FIDS, ERR_NATS, ERR_RFCS,
 #define H_BUMP       0
 #define H_CAP        1
 #define H_CURSOR     LINE
+#define H_FRONT      (H_CURSOR + 1)
+#define H_GROUPS     (H_CURSOR + 2)
 #define H_ROOT_DONE  (2 * LINE)
 #define H_ERROR_CODE (3 * LINE)
 #define H_ROOT_WORD  (4 * LINE)
@@ -3810,7 +3842,7 @@ INLINE void bank_push(DEV u64* H, u32 c, u64 head) {
 // on the host COLD, one parked generation. A host free reaching KEEP_WORDS
 // parks HOT as COLD and banks the old COLD. A miss takes COLD, a bank entry
 // or a fresh quantum. A device lane banks its complete generations at the
-// kernel end (dev_cut). The bump grows only when all of these are empty.
+// kernel end (dev_cut).
 
 #define ALC_AT(e, i)   (e).alc[(i) * LANE_STEP]
 #define ALC_LEN(e, c)  ALC_AT(e, NCLS_ALL + (c))
@@ -4138,8 +4170,7 @@ INLINE Term term_word(Env e, Term w) {
 // ===
 
 // A block owns one allocation in its class (an ARR 2^c Terms, a BUF 2^c
-// u32). Matching ANode is blk_half twice (the high call frees the source);
-// ANode{l, r} is blk_node; Array.clone is blk_copy.
+// u32). Matching ANode is blk_half twice (the high call frees the source).
 
 #define BLK_ALLOC(n, w) \
   u64 n = heap_alloc(e, w); \
@@ -4289,6 +4320,25 @@ INLINE void ring_push(DEV u64* H, u32 r, Term tsk) {
 
 INLINE u32 ring_flip(u32 i) {
   return (i % CUBE_T << CUBE_LOG) + i / CUBE_T;
+}
+
+// A turn's five dispatches (x, y, z) sit at H_GROUPS, before H_ROOT_DONE.
+typedef char turn_fits[H_GROUPS + 8 <= H_ROOT_DONE ? 1 : -1];
+
+#define TURN_ROWS(at) ((at) % 4 == 0 ? 1 : CUBE_G)
+
+INLINE u32 turn_groups(u64 f, u32 at) {
+  bool run = f != 0 && (at == 2 ? f >= CUBE_T : at == 1 ? f < LANES
+    : at == 4 || f < CUBE_T);
+  return run ? TURN_ROWS(at) : 0;
+}
+
+INLINE void turn_set(DEV u64* H, u64 f) {
+  DEV u32* g = (DEV u32*)(H + H_GROUPS);
+  H[H_FRONT] = f;
+  for (u32 i = 0; i < 15; i += 1) {
+    g[i] = i % 3 != 0 ? 1 : turn_groups(f, i / 3);
+  }
 }
 
 #define ring_pick(b, s, c) ((b) + (s) * (a32_add(c, 1) & (CUBE_T - 1)))
@@ -4598,14 +4648,23 @@ kernel void bend_dev(DEV u64* H [[buffer(0)]], constant u32& pass [[buffer(1)]],
   u32 row [[threadgroup_position_in_grid]],
   u32 lane [[thread_position_in_threadgroup]]) {
 #else
-extern "C" __global__ void bend_dev(DEV u64* H, u32 pass) {
-  extern __shared__ u32 vote[];
+extern "C" __global__ void bend_dev(DEV u64* H, u32 pass, u32 at) {
+  __shared__ u32 vote[3];
   u32 grids = gridDim.x;
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
 #endif
+#ifndef __METAL_VERSION__
+  if (!turn_groups(H[H_FRONT], at)) {
+    return;
+  }
+#endif
   if (pass == 2) {
     bank_pack(H, lane);
+    if (lane == 0) {
+      turn_set(H, root_done(H) || err_seen(H) ? 0
+        : a32_exch(a32_at(H, H_CURSOR), 0));
+    }
     return;
   }
   u32 stride = grids == 1 ? CUBE_G : 1;
@@ -4915,17 +4974,13 @@ static void gpu_note(const char* path) {
 
 #if BEND_METAL || BEND_CUDA
 
-static void gpu_kernel(u32 pass, u32 groups);
+static void gpu_kernel(u32 pass, u32 at);
 
-static void gpu_run(u32 f) {
-  if (f < CUBE_T) {
-    gpu_kernel(0, 1);
+// Dispatch at runs pass {0, 0, 1, 3, 2}[at] on TURN_ROWS(at) groups.
+static void gpu_run(void) {
+  for (u32 i = 0; i < 5; i += 1) {
+    gpu_kernel((u32[]){ 0, 0, 1, 3, 2 }[i], i);
   }
-  if (f < LANES) {
-    gpu_kernel(0, CUBE_G);
-  }
-  gpu_kernel(f < CUBE_T ? 3 : 1, CUBE_G);
-  gpu_kernel(2, 1);
 }
 
 #endif
@@ -5014,26 +5069,46 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
-  [gpu_enc setComputePipelineState:gpu_pso];
-  [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+static void gpu_kernel(u32 pass, u32 at) {
   [gpu_enc setBytes:&pass length:sizeof pass atIndex:1];
-  [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
-  [gpu_enc dispatchThreadgroups:MTLSizeMake(groups, 1, 1)
+  [gpu_enc dispatchThreadgroupsWithIndirectBuffer:gpu_buf
+    indirectBufferOffset:H_GROUPS * 8 + at * 12
     threadsPerThreadgroup:MTLSizeMake(CUBE_T, 1, 1)];
   [gpu_enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
 }
 
-static void gpu_pass(u32 f) {
-  @autoreleasepool {
-    id<MTLCommandBuffer> cb = [gpu_que commandBuffer];
-    gpu_enc = [cb computeCommandEncoder];
-    gpu_run(f);
-    [gpu_enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
-    if ([cb error]) {
-      gpu_fail([cb error]);
+// A bang gives each round its own command buffer, GPU_DEEP in flight, each
+// waiting on the last through one event, until the pack empties the
+// frontier. A round queued past that dispatches no groups.
+
+#define GPU_DEEP 3
+
+static id<MTLEvent> gpu_ev;
+static u64          gpu_ev_at;
+
+static void gpu_pass(u64* H) {
+  id<MTLCommandBuffer> cb[GPU_DEEP] = { nil };
+  gpu_ev = gpu_ev ? gpu_ev : [gpu_dev newEvent];
+  for (u32 i = 0, left = GPU_DEEP; left != 0; i += 1) {
+    @autoreleasepool {
+      id<MTLCommandBuffer> c = cb[i % GPU_DEEP];
+      [c waitUntilCompleted];
+      if ([c error]) {
+        gpu_fail([c error]);
+      }
+      left -= left < GPU_DEEP || ((volatile u64*)H)[H_FRONT] == 0;
+      cb[i % GPU_DEEP] = c = left == GPU_DEEP ? [gpu_que commandBuffer] : nil;
+      if (c) {
+        [c encodeWaitForEvent:gpu_ev value:gpu_ev_at];
+        gpu_enc = [c computeCommandEncoder];
+        [gpu_enc setComputePipelineState:gpu_pso];
+        [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+        [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
+        gpu_run();
+        [gpu_enc endEncoding];
+        [c encodeSignalEvent:gpu_ev value:++gpu_ev_at];
+        [c commit];
+      }
     }
   }
 }
@@ -5172,18 +5247,24 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
-  void* args[] = { &CORPUS, &pass };
-  if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, TG_HOLD * 8, NULL,
+static void gpu_kernel(u32 pass, u32 at) {
+  void* args[] = { &CORPUS, &pass, &at };
+  if (cuLaunchKernel(gpu_pso, TURN_ROWS(at), 1, 1, CUBE_T, 1, 1, 0, NULL,
     args, NULL) != CUDA_SUCCESS) {
     err_fail("device launch failed");
   }
 }
 
-static void gpu_pass(u32 f) {
-  gpu_run(f);
-  if (cuCtxSynchronize() != CUDA_SUCCESS) {
-    err_fail("device fault");
+// A bang launches 1, 2, 4 .. 64 rounds between syncs, until the pack
+// empties the frontier. A pass launched past that returns at once.
+static void gpu_pass(u64* H) {
+  for (u32 n = 1; H[H_FRONT] != 0; n = n < 32 ? 2 * n : 64) {
+    for (u32 i = 0; i < n; i += 1) {
+      gpu_run();
+    }
+    if (cuCtxSynchronize() != CUDA_SUCCESS) {
+      err_fail("device fault");
+    }
   }
 }
 
@@ -5193,7 +5274,7 @@ static void gpu_pass(u32 f) {
 #define gpu_make(p) true
 #define gpu_span()  0
 #define gpu_load(b)
-#define gpu_pass(f)
+#define gpu_pass(H)
 
 #endif
 
@@ -5208,8 +5289,6 @@ static void gpu_pass(u32 f) {
 // a row grows into itself, and a column grow's cur tasks land in rows 0
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
-
-// Between turns, each ring's pending tasks move back to slot 0.
 
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
@@ -5233,16 +5312,17 @@ static void ring_rewind(u64* H, u32 rows) {
 }
 
 static void cube_run(u64* H, bool gpu) {
-  for (;;) {
-    u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
-    if (root_done(H)) {
-      return;
-    }
+  u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
+  if (gpu) {
+    turn_set(H, f);
+  }
+  while (!root_done(H)) {
     if (f == 0) {
       err_fail("frontier drained without a result");
     }
     if (gpu) {
-      gpu_pass(f);
+      gpu_pass(H);
+      f = (u32)H[H_FRONT];
     } else {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
@@ -5256,7 +5336,7 @@ static void cube_run(u64* H, bool gpu) {
         pool_turn(true, rows);
       }
       pool_turn(false, rows);
-      f = a32_load(a32_at(H, H_CURSOR));
+      f = a32_exch(a32_at(H, H_CURSOR), 0);
       ring_rewind(H, f > rows ? f : rows);
     }
     u32 ec = a32_load(a32_at(H, H_ERROR_CODE));
@@ -5264,6 +5344,7 @@ static void cube_run(u64* H, bool gpu) {
       err_post(H, ec);
     }
   }
+  a32_store(a32_at(H, H_CURSOR), 0);
 }
 
 // Corpus
@@ -5491,7 +5572,6 @@ static void io_spawn(Term m) {
 
 // io_park stays in deadline order (time 0, none, sorts last; ties keep
 // their park order), so io_wait wakes due timers in the order they expire.
-// It links both ways, so io_park_cut drops a waiter in O(1).
 static void io_park_add(IoWork* w) {
   IoWork* p = io_park;
   if (p == NULL || p->time - 1 <= w->time - 1) {
@@ -5644,7 +5724,6 @@ static Term io_str(Env e, const char* p, u64 n) {
   return s;
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8.
 #ifdef CID(Con)
 
 static Term io_list(Env e, const char* p, u64 n) {
@@ -6161,9 +6240,6 @@ function cli(argv) {
 
 // Show
 // ====
-
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = char_code(s);
