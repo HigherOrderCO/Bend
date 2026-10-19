@@ -503,8 +503,10 @@ function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
+// Virtual names must not shadow real files; only their diagnostics map to a page.
 async function cli_bundle(page: string, dir: string): Promise<void> {
-  const code = new Map<string, string>();
+  type Inline = { id: string; page: string; text: string };
+  const code = new Map<string, Inline>();
   const inline: BunPlugin = {
     name: "bend inline",
     setup(build) {
@@ -513,7 +515,7 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         return code.has(id) ? { path: id, namespace: "inline" } : undefined;
       });
       build.onLoad({ filter: /.*/, namespace: "inline" }, (a) =>
-        ({ contents: code.get(a.path)!, loader: "js" }));
+        ({ contents: code.get(a.path)!.text, loader: "js" }));
       build.onLoad({ filter: /\.html$/ }, async (a) => {
         const src = await Bun.file(a.path).text();
         // HTMLRewriter gives no offsets, so a first pass marks where each
@@ -529,15 +531,20 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
             }
           },
         }).transform(src);
-        const mods: { id: string; text: string }[] = [];
-        let mod: { id: string; text: string } | null = null;
+        const mods: Inline[] = [];
+        let mod: Inline | null = null;
+        let serial = 0;
         const html = new HTMLRewriter().on("script", {
           element(el) {
             mod = null;
             if (is_inline_module(el)) {
-              const name = "." + path.basename(a.path) + ".bend-inline-"
-                + mods.length + ".js";
-              mod = { id: path.join(path.dirname(a.path), name), text: "" };
+              let name: string;
+              let id: string;
+              do {
+                name = "." + path.basename(a.path) + ".bend-inline-" + serial++ + ".js";
+                id = path.join(path.dirname(a.path), name);
+              } while (fs.existsSync(id));
+              mod = { id, page: a.path, text: "" };
               mods.push(mod);
               el.setAttribute("src", "./" + name);
             }
@@ -556,7 +563,8 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
           const at = marked.indexOf(mark, end + skip) - skip;
           line += src.slice(end, at).split("\n").length - 1;
           const col = at - src.lastIndexOf("\n", at - 1) - 1;
-          code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
+          m.text = "\n".repeat(line) + " ".repeat(col) + m.text;
+          code.set(m.id, m);
           end = at;
         }
         return { contents: html, loader: "html" };
@@ -575,7 +583,11 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
       cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
     }
   } catch (e) {
-    throw book_err(e).replace(/\.([^/\\]+)\.bend-inline-\d+\.js/g, "$1");
+    let message = book_err(e);
+    for (const [id, mod] of code) {
+      message = message.replaceAll(id + ":", mod.page + ":");
+    }
+    throw message;
   }
 }
 
