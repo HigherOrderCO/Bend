@@ -45,6 +45,8 @@ Every fix is marked `safe`, `suggested` or `dangerous`:
 Fixes go into the file you passed in, even if the run had errors. A fix that
 also edits another file is skipped. When two fixes overlap, the later one is
 skipped. Run it again to get it.
+All edit offsets refer to the original text. Accepted edits are assembled in one
+pass rather than copying the whole file for each edit.
 
 Exit code is 0 if there were no errors (warnings don't count), 1 for a checker
 or rule error, and 2 for bad arguments or a crash.
@@ -133,6 +135,8 @@ A module exports `rules: LintRule[]`. A rule has an `id` (`namespace/name`, it
 becomes the finding's `code`) and `run(cx, signal)`, which returns diagnostics
 and can be async. It can also have `facts` and `options`. If `run` throws or the
 signal aborts, the error goes to whoever called the library.
+Aborting also rejects while an async rule is pending; the caller need not wait
+for that rule to finish or cooperate with cancellation.
 
 Build findings with `cx.diag()`. Severity defaults to `warning`. Rules run in
 order and see earlier findings in `cx.prior`. The first `error` ends the run:
@@ -332,8 +336,9 @@ if (result.ok) {
 Set `BEND_DIR` before importing bend-lint to pick a Bend checkout. Import
 bend-lint before you load Bend yourself, so the patching happens first. `lint`
 takes `{ config, signal, unsaved }` as a third argument. Without `config` it looks
-next to the file. `unsaved` maps file paths to editor text that isn't saved yet.
-Bend and the rules read that text instead of the file, for that run only. Runs
+next to the file. `unsaved` maps file paths to editor text that isn't saved yet;
+new files and imports need not exist on disk. Bend and the rules read that text
+for that run only, without creating files or directories. Runs
 at the same time wait for each other's check, one at a time; rules still run
 side by side. `position(span)` gives an LSP range.
 

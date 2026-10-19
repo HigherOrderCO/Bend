@@ -227,10 +227,24 @@ const CHILDREN: { [K in LTerm["$"]]: (tm: Extract<LTerm, { $: K }>) => LTerm[] }
 
 const slash = (p: string): string => p.split(nodePath.sep).join("/");
 
+// Unsaved files may not have directory entries yet; resolve their existing parents.
+const realPath = (p: nodeFs.PathLike, missing = false): string => {
+  try {
+    return slash(nodeFs.realpathSync(p));
+  } catch (e) {
+    if (typeof p === "string" && (e as NodeJS.ErrnoException).code === "ENOENT") {
+      const parent = nodePath.dirname(p);
+      if (parent !== p) {
+        const candidate = slash(nodePath.join(realPath(parent, true), nodePath.basename(p)));
+        if (missing || unsaved.has(candidate)) return candidate;
+      }
+    }
+    throw e;
+  }
+};
+
 const held = (p: nodeFs.PathOrFileDescriptor): string | undefined =>
-  typeof p === "string" && unsaved.size > 0 && nodeFs.existsSync(p)
-    ? unsaved.get(slash(nodeFs.realpathSync(p)))
-    : undefined;
+  typeof p === "string" && unsaved.size > 0 ? unsaved.get(realPath(p)) : undefined;
 
 // path.posix.resolve from `cwd`, where a drive letter is a root.
 export const resolve = (cwd: string, ...ps: string[]): string => {
@@ -249,12 +263,15 @@ export const relative = (from: string, to: string): string =>
 // fs and path for bend.ts and main.ts.
 export const fs = {
   ...nodeFs,
-  realpathSync: (p: nodeFs.PathLike): string => slash(nodeFs.realpathSync(p)),
+  existsSync: (p: nodeFs.PathLike): boolean =>
+    nodeFs.existsSync(p) ||
+    (typeof p === "string" && unsaved.size > 0 && unsaved.has(realPath(p, true))),
+  realpathSync: (p: nodeFs.PathLike): string => realPath(p),
   readFileSync: ((p: nodeFs.PathOrFileDescriptor, ...rest: unknown[]) => {
     const out =
       held(p) ?? (nodeFs.readFileSync as (...a: unknown[]) => unknown)(p, ...rest);
     if (reads !== undefined && typeof p === "string" && typeof out === "string") {
-      reads.set(slash(nodeFs.realpathSync(p)), out);
+      reads.set(realPath(p), out);
     }
     return out;
   }) as typeof nodeFs.readFileSync,
@@ -455,6 +472,8 @@ export const fetchBend = async (
     nodeFs.rmSync(dir, { recursive: true, force: true });
     nodeFs.renameSync(part, dir);
   } catch (e) {
+    if (!cachedBend(dir)) throw e;
+  } finally {
     nodeFs.rmSync(part, { recursive: true, force: true });
     if (!whole()) {
       throw e;
@@ -764,10 +783,8 @@ export const check = (
 ): Promise<Checked> => {
   const turn = queue.then(async (): Promise<Checked> => {
     signal.throwIfAborted();
-    [...(text ?? [])]
-      .filter(([at]) => fs.existsSync(at))
-      .forEach(([at, str]) => unsaved.set(fs.realpathSync(at), str));
     try {
+      for (const [at, str] of text ?? []) unsaved.set(realPath(at, true), str);
       return await checked(m, file, filters, signal);
     } finally {
       hook.see = undefined;

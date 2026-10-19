@@ -1156,6 +1156,38 @@ describe("lint", () => {
     await expect(lint(userland, [], { signal: controller.signal })).rejects.toThrow();
   });
 
+  test("aborting a pending async rule rejects without waiting for the rule", async () => {
+    let entered!: () => void;
+    const started = new Promise<void>((resolve) => { entered = resolve; });
+    const controller = new AbortController();
+    const reason = new Error("cancelled");
+    const pending = lint(userland, [{
+      id: "test/pending",
+      run: () => { entered(); return new Promise<Diag[]>(() => {}); },
+    }], { signal: controller.signal });
+    await started;
+    controller.abort(reason);
+    await expect(pending).rejects.toBe(reason);
+  });
+
+  test("new unsaved files and imports are checked without creating them on disk", async () => {
+    const dir = path.join(DIR, "virtual", "nested");
+    const file = path.join(dir, "main.bend");
+    const dep = path.join(dir, "dep.bend");
+    const main = "import ./dep.bend as D\ndef main() -> D.N:\n  D.id(D.Z{})\n";
+    const unsaved = new Map([
+      [file, main],
+      [dep, "type N is Data:\n  Z{}\ndef id(x: N) -> N:\n  x\n"],
+    ]);
+    const valid = await lint(file, [], { unsaved });
+    expect([valid.ok, valid.diags]).toEqual([true, []]);
+    unsaved.set(file, main.replace("D.Z{}", "D.missing"));
+    const invalid = await lint(file, [], { unsaved });
+    expect([invalid.ok, invalid.diags[0]?.code]).toEqual([false, "bend/check"]);
+    const absent = await lint(file, []);
+    expect([absent.ok, absent.diags[0]?.code, fs.existsSync(dir)]).toEqual([false, "bend/check", false]);
+  });
+
   test("unsaved text is what bend and the rules see, for that run only", async () => {
     const saved = "import Base\ndef main() -> U32:\n  1\n";
     const edited = "import Base\ndef main() -> U32:\n  2\n";
@@ -1582,6 +1614,20 @@ describe("review fixes", () => {
         fix(1, 1, "-"),
       ]),
     ).toEqual({ text: "a bcXf", skipped: 2, elsewhere: 0 });
+  });
+
+  test("fixes keep original UTF-16 offsets and insertion order at replacement boundaries", () => {
+    const file: Source = { path: "<fix>", text: "a😀bc", root: true, base: false };
+    const edits: Edit[] = [
+      { span: { file, beg: 5, end: 5 }, text: "!" },
+      { span: { file, beg: 3, end: 4 }, text: "B" },
+      { span: { file, beg: 3, end: 3 }, text: "<" },
+      { span: { file, beg: 4, end: 4 }, text: ">" },
+    ];
+    expect(applyFixes(file, [{
+      code: "test/boundaries", severity: "hint", message: "",
+      fixes: [{ title: "edit", applicability: "safe", edits }],
+    }])).toEqual({ text: "a😀<B>c!", skipped: 0, elsewhere: 0 });
   });
 
   test("a fix that also edits another file is skipped whole", () => {
