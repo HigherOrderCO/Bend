@@ -1219,7 +1219,13 @@ export function name_show(file: File | undefined, k: Name): string {
 
 // a misspelt name: declared names within edit distance 2, same namespace
 // first, then nearest and alphabetical. on the error path only.
-function name_suggest(book: Book, k: Name): Name[] {
+function name_suggest(book: Book, k: Name, file?: File): Name[] {
+  // a name the file can see: the root, its own, or an imported one
+  const vis = file === undefined ? null : new Set(["", file.ns, ...Object.values(file.al)]);
+  const mod = (o: Name): string => {
+    const c = o.indexOf(":");
+    return c < 0 ? "" : o.slice(0, c);
+  };
   const part = (o: Name): [string, string] => {
     const c = o.indexOf(":");
     if (c >= 0) {
@@ -1243,6 +1249,9 @@ function name_suggest(book: Book, k: Name): Name[] {
   const out: Array<[Name, number, number]> = [];
   for (const o in book.tlds) {
     if (o === k || o.includes("~") || o.lastIndexOf(".") === 0) {
+      continue;
+    }
+    if (vis !== null && !vis.has(mod(o))) {
       continue;
     }
     const [ons, onm] = part(o);
@@ -3359,7 +3368,7 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
     case "Ref": {
       const tld = book.tlds[tm.k];
       if (tld === undefined) {
-        const sug = name_suggest(book, tm.k).map((o) => name_show(tm.s?.file, o));
+        const sug = name_suggest(book, tm.k, tm.s?.file).map((o) => name_show(tm.s?.file, o));
         const nte = sug.length === 0 ? undefined
           : "Note: did you mean " + (sug.length === 1 ? sug[0] : sug.slice(0, -1).join(", ") + ", or " + sug[sug.length - 1]) + "?";
         throw Err(book, ctx, "a defined name", tm, tm.s, lhs.def, nte);
