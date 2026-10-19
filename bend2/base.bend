@@ -1064,24 +1064,39 @@ def List.foldr(
     case h <> t:
       f(h, List.foldr(~a, ~A, ~B, ~f, t, z))
 
+# Searches stop at the first decisive predicate; later elements are not tested.
+def List.any.if(rest: Unit -> Bool, hit: Bool) -> Bool:
+  match hit:
+    case False{}:
+      rest(Unit{})
+    case True{}:
+      True{}
+
 def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
   match xs:
     case Nil{}:
       False{}
     case h <> t:
-      Bool.or(f(h), List.any(~a, ~A, ~f, t))
+      List.any.if(u => List.any(~a, ~A, ~f, t), f(h))
+
+def List.all.if(rest: Unit -> Bool, hit: Bool) -> Bool:
+  match hit:
+    case False{}:
+      False{}
+    case True{}:
+      rest(Unit{})
 
 def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
   match xs:
     case Nil{}:
       True{}
     case h <> t:
-      Bool.and(f(h), List.all(~a, ~A, ~f, t))
+      List.all.if(u => List.all(~a, ~A, ~f, t), f(h))
 
-def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
+def List.find.if(-A: Data, h: A, rest: Unit -> Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
   match hit:
     case False{}:
-      r
+      rest(Unit{})
     case True{}:
       Some{h}
 
@@ -1090,7 +1105,7 @@ def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
     case Nil{}:
       None{}
     case +h <> t:
-      List.find.put(A, h, List.find(~A, ~f, t), f(h))
+      List.find.if(A, h, u => List.find(~A, ~f, t), f(h))
 
 def List.contains(
   ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A
@@ -1099,7 +1114,7 @@ def List.contains(
     case Nil{}:
       False{}
     case h <> t:
-      Bool.or(eq(h, x), List.contains(~A, ~eq, t, x))
+      List.any.if(u => List.contains(~A, ~eq, t, x), eq(h, x))
 
 def List.merge.step(
   -A: Data, acc: List<&2, A>, x: A, xt: List<&2, A>, y: A, yt: List<&2, A>,
