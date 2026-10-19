@@ -4581,7 +4581,7 @@ kernel void bend_dev(DEV u64* H [[buffer(0)]], constant u32& pass [[buffer(1)]],
   u32 lane [[thread_position_in_threadgroup]]) {
 #else
 extern "C" __global__ void bend_dev(DEV u64* H, u32 pass) {
-  extern __shared__ u32 vote[];
+  __shared__ u32 vote[3];
   u32 grids = gridDim.x;
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
@@ -5156,7 +5156,7 @@ static void gpu_load(u64 bytes) {
 
 static void gpu_kernel(u32 pass, u32 groups) {
   void* args[] = { &CORPUS, &pass };
-  if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, TG_HOLD * 8, NULL,
+  if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, 0, NULL,
     args, NULL) != CUDA_SUCCESS) {
     err_fail("device launch failed");
   }
