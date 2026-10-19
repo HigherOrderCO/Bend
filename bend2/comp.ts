@@ -3085,7 +3085,8 @@ function js_tag(k: Name): string {
 }
 
 function js_key(n: Name): string {
-  return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
+  const key = JSON.stringify(n);
+  return (n === "__proto__" ? `[${key}]` : key) + ": ";
 }
 
 function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
@@ -3287,7 +3288,7 @@ function host(A: HTerm | null, x: string, out = 0): string {
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
-// def a host can call.
+// callable def by its book name: "lib:value" differs from a root "lib.value".
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
@@ -3307,7 +3308,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${host(tele_unbind(
+    return `  ${js_key(k)}run_lib((${ps}) => ${host(tele_unbind(
       FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
     }, ${lays.length}),`;
   }).join("\n")}\n};\n`;

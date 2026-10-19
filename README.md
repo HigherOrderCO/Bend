@@ -196,6 +196,15 @@ def add_zero(x):
       {==}
 ```
 
+### JavaScript modules
+
+`bend app.bend -o app.mjs` exports a default object of callable definitions.
+Its keys keep Bend's module separator: an imported `lib:value` and a root
+definition named `lib.value` are distinct. Use `app["lib:value"]` for the
+former and `app["lib.value"]` for the latter.
+Keys are escaped as JavaScript strings, including quotes or backslashes in
+an imported module's name.
+
 # References
 
 - Guide: [GUIDE.md](guide/GUIDE.md), also printed by `bend guide`.
