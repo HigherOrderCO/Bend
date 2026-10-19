@@ -21,10 +21,12 @@ function chan_wake(row, x) {
   const w = row.wait.shift();
   if (w.late !== undefined) {
     const ws = w.io.waits;
-    ws.splice(ws.findIndex((t) => t.more === w.late), 1);
+    const at = ws.findIndex((t) => t.more === w.late);
+    if (at >= 0) ws.splice(at, 1);
     x = { $: CID(Ready), value: x };
   }
   w.io.runs.push({ fun: w.cont, arg: x });
+  w.cont = null;
   return w.item;
 }
 
@@ -52,6 +54,9 @@ function chan_park(row, k, item, ms) {
   const w = { io: io_active, cont: k, item: item };
   if (ms !== undefined) {
     w.late = () => {
+      // Another ready callback may have won since the poller selected us.
+      if (w.cont === null) return undefined;
+      w.cont = null;
       row.wait.splice(row.wait.indexOf(w), 1);
       return chan_wait(item);
     };
