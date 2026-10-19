@@ -483,11 +483,10 @@ Base is small, and its names follow a scheme, so you can guess most of it:
 import Base
 
 def main() -> String:
-  Nat.show(F32.to_nat(4294967296.0)) # "4294967296", beyond U32
+  +a = (6 * 7 : U32)         # sugar for U32.mul(6, 7)
+  b  = U32.to_nat(a)         # conversions are T.to_x and T.from_x
+  U32.show(a) ++ " = " ++ Nat.show(b)
 ```
-
-`F32.to_nat` truncates nonnegative finite floats, including values above
-`2^32` that fit the Nat runtime range; negative values become zero.
 
 Every def is named `Type.verb`, and the same verbs recur across `Nat`, `U32`
 and `F32`: `add sub mul div mod` for arithmetic, `and or xor not shl shr` for
