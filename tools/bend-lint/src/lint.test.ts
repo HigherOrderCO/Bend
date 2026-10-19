@@ -2078,6 +2078,44 @@ describe("cli", () => {
     expect(out.stderr).not.toContain("skipped");
   });
 
+  test("fix flags preserve text changed while a rule runs", () => {
+    const changed = module(
+      "changed.js",
+      `[{ id: "test/changed", async run(cx) {
+      const fs = await import("node:fs");
+      fs.writeFileSync(cx.root.path, "# new text\\n");
+      const span = { file: cx.root, beg: 0, end: 0 };
+      return [cx.diag({ message: "Add a comment.", fixes: [{ title: "Add a comment", applicability: "safe",
+        edits: [{ span, text: "# lint fix\\n" }] }] })];
+    } }]`,
+    );
+    for (const flag of ["--fix", "--fix-suggested", "--fix-dangerously"]) {
+      const target = fixture("changed" + flag + ".bend", "# old text\n");
+      const out = run(target, "--rules", changed, flag);
+      expect(out.status).toBe(2);
+      expect(out.stderr).toContain(target + ": file changed during lint; run the command again");
+      expect(out.stderr).not.toContain("bend-lint: fixed");
+      expect(fs.readFileSync(target, "utf8")).toBe("# new text\n");
+    }
+  });
+
+  test("--fix accepts identical text saved while a rule runs", () => {
+    const saved = module(
+      "saved.js",
+      `[{ id: "test/saved", async run(cx) {
+      const fs = await import("node:fs");
+      fs.writeFileSync(cx.root.path, cx.root.text);
+      const span = { file: cx.root, beg: 0, end: 0 };
+      return [cx.diag({ message: "Add a comment.", fixes: [{ title: "Add a comment", applicability: "safe",
+        edits: [{ span, text: "# lint fix\\n" }] }] })];
+    } }]`,
+    );
+    const target = fixture("saved.bend", "# old text\n");
+    const out = run(target, "--rules", saved, "--fix");
+    expect(out.status).toBe(0);
+    expect(fs.readFileSync(target, "utf8")).toBe("# lint fix\n# old text\n");
+  });
+
   test("--fix applies fixes even when a finding is an error", () => {
     const target = fixture("fix_error.bend", "#abc\n");
     const strict = module(

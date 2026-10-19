@@ -789,6 +789,9 @@ async function cli(argv: string[]): Promise<number> {
         ].join("\n\n"),
   );
   if (root !== undefined && fixed !== undefined && fixed.text !== root.text) {
+    if (fs.readFileSync(root.path, "utf8") !== root.text) {
+      throw new Error(root.path + ": file changed during lint; run the command again");
+    }
     fs.writeFileSync(root.path, fixed.text);
     console.error("bend-lint: fixed " + root.path);
   }

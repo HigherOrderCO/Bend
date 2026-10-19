@@ -48,8 +48,12 @@ skipped. Run it again to get it.
 All edit offsets refer to the original text. Accepted edits are assembled in one
 pass rather than copying the whole file for each edit.
 
+Before writing fixes, the CLI checks that the file still matches the checked text.
+If the text differs, it leaves the file unchanged and exits with code 2.
+Run the command again to use the new text.
+
 Exit code is 0 if there were no errors (warnings don't count), 1 for a checker
-or rule error, and 2 for bad arguments or a crash.
+or rule error, and 2 for bad arguments, changed input, or a tool failure.
 
 `--json` prints the findings as JSON. The format is in
 [JSON output](#json-output).
