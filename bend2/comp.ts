@@ -26,6 +26,26 @@ type Bind = { val: Val; n: number; A: HTerm };
 
 type Dst = Val | null;
 
+// A captured binding: a probe the surrounding segment owns, the layout its
+// words have, its type (for the sharing pass's heat facts) and how many
+// times the arm body uses it.
+type ArmCap = { p: Probe; lay: Lay; A: HTerm; n: number };
+
+// One shared arm: the canonical encoding that proves equality, the
+// captures in the encoding's order, and what its spin was emitted with.
+type ArmRep = {
+  toks: Tok[];
+  caps: ArmCap[];
+  argLays: Lay[];
+  ret: Lay;
+  ers: HTerm[];
+  spin: string | null;
+  argSig: string;
+  retSig: string;
+  size: number;
+  bad?: boolean;
+};
+
 type Seg = {
   fid: string;
   def: Bend.Name;
@@ -84,6 +104,14 @@ type File = Carb & {
   tabs: Map<string, number>;
   spins: [string, string, Set<string>][];
   spun: Map<string, string>;
+  armBusy: Set<string>;
+  armReps: Map<string, ArmRep[]>;
+  armDead: Set<string>;
+  armSeen: Map<string, number>;
+  armBad: Set<number>;
+  armBytes: number;
+  spinGuard?: { seg: Seg };
+  spinSmall?: boolean;
   clos: Set<string>;
   img: string[];
   lits: Map<string, number>;
@@ -155,6 +183,37 @@ const FOLD_FUEL = 8192;
 // of Metal compile, 2.6 s so); at 128 raytrace lost 31% on PAR-CPU.
 const SPIN_FAR = 256;
 
+
+// Shared arm bodies the emitter may retain per file and per encoding, the
+// nodes and depth an encoding may walk, and the total encoding bytes: hard
+// bounds on the work and memory a pass spends proving equality. Past any,
+// the arm is emitted inline (a lost share, never a wrong one).
+const ARM_KEYS = 16384;
+const ARM_BUCKET = 8;
+const ARM_NODES = 65536;
+const ARM_DEPTH = 2048;
+const ARM_BYTES = 32 * 1024 * 1024;
+
+// A body this large pays for its spin on the second occurrence; a smaller
+// one waits for a third equal arm, so a body no one duplicates leaves the
+// C byte-identical to upstream.
+const ARM_BIG = 64;
+
+// The sentinel that unwinds a spin emission the moment it writes a bank
+// reference (which cannot compile in a plain function).
+const ARM_ABORT = {};
+
+// A spin body is a plain C function: these names are the segment bank and
+// may not appear in it.
+const ARM_BANK = /\bWL_(?:CONT|IDX|JMP|AGAIN|DYN|PUSH|PUSHN|POP|POPN|RETN|TAKE|SAVE)\b|\b(?:STK|sp|seq|rn)\b/;
+
+// Synthetic binders for alpha comparison: below any real probe index, so a
+// bound occurrence can never be mistaken for a captured one.
+const ARM_BIND = -1000000;
+
+// Spin names are global to a compilation: a nested emission must not rewind
+// the counter (emit_native snapshots and restores every File field).
+let armSeq = 0;
 const USE0 = Bend.Emp<number>();
 
 const W32: Lay = { ks: ["w32"], arms: null };
@@ -1544,12 +1603,19 @@ function cid_mac(k: string): string {
 function file_new(cb: Carb, decl: string): File {
   return { ...cb, decl, segs: [], seg: seg_new("", BOX, []), tab: 2,
     cids: new Map(), tabs: new Map(), spins: [], spun: new Map(), clos: new Set(),
+    armBusy: new Set(), armReps: new Map(), armDead: new Set(),
+    armSeen: new Map(), armBad: new Set(),
+    armBytes: 0,
     img: [], lits: new Map(), consts: new Map(), reqs: "", fuel: 0,
     fresh: new Map(), spares: [],
     uses: new Map(), brwl: new Map(), rest: [], def: "" };
 }
 
 function file_push(fl: File, line: string): void {
+  if (fl.spinGuard !== undefined && fl.spinGuard.seg === fl.seg
+    && ARM_BANK.test(line)) {
+    throw ARM_ABORT;
+  }
   fl.seg.lines.push("  ".repeat(fl.tab) + line);
 }
 
@@ -2741,6 +2807,546 @@ function lits_cond(w: string, j: number, n: number): string {
   return j === 32 ? `${w} == ${n}` : `(${w} & ${2 ** j - 1}) == ${n}`;
 }
 
+// Arm sharing
+// ===========
+
+// The key only narrows the candidate list: the outer kinds and spans, the
+// layouts of the arguments, the result and the captures. Structural
+// equality below decides every reuse, and a key miss only loses sharing.
+function lay_sig(lay: Lay): string {
+  return JSON.stringify(lay);
+}
+
+function span_sig(t: HTerm): string {
+  const s = term_force(t).s;
+  return s === undefined ? "?" : s.beg + ":" + s.end;
+}
+
+function arm_head(t: HTerm): string {
+  const x = term_force(t);
+  switch (x.$) {
+    case "Lam": return "L" + (x.q?.$ ?? "");
+    case "Let": return "T" + x.v.length + ":" + x.q.map((q) => q.$).join(",");
+    case "App": {
+      let h = x;
+      let n = 0;
+      while (h.$ === "App" && n < 6) {
+        h = term_force(h.f);
+        n += 1;
+      }
+      return "A" + (h.$ === "Ref" ? h.k : h.$) + ":" + n;
+    }
+    case "Mat": return "M" + x.k + ":" + x.h.$ + ":" + x.m.$;
+    case "Ctr": return "C" + x.k + ":" + x.x.length;
+    case "ADT": return "D" + x.k + ":" + x.x.length;
+    case "Var": return "V" + x.k + ":" + x.i;
+    case "Ref": return "R" + x.k;
+    case "Lit": return "I" + typeof x.v + ":" + String(x.v).length;
+    case "Ann": return "N" + x.x.$ + ":" + x.T.$;
+    default: return x.$;
+  }
+}
+
+function arm_key(h: HTerm, argSig: string, retSig: string,
+  caps: number, ers: HTerm[]): string {
+  const t = term_force(h);
+  const x = t.$ === "Ann" ? term_force(t.x) : t;
+  return [t.$, span_sig(t), x.$, span_sig(x), arm_head(x),
+    argSig, retSig, String(caps), String(ers.length)].join("|");
+}
+
+function arm_ers_eq(a: HTerm[], b: HTerm[]): boolean {
+  return a.length === b.length && a.every((t, i) => t === b[i]);
+}
+
+// Structural equality under alpha-renaming of the arm's own binders and a
+// layout-checked bijection of its captures. Sub's body is a term over a
+// binder index rather than a function, so all binders (canonical or real)
+// are tracked in the two maps; a free variable must be the same probe on
+// both sides, or a capture whose layout matches its partner's.
+// A canonical encoding, not a hash: the walk opens every binder with
+// `term_open`, names a bound occurrence by its distance to its binder,
+// names a capture by its first-occurrence rank and layout, and names every
+// other free probe by its first-occurrence rank. Two bodies encode
+// identically exactly when their emitted code is the same function of the
+// captures, in the encoding's capture order. The cheap key above only
+// gates work; the encoding is the proof.
+type Tok = string | number;
+
+// Tag atoms are negative and every numeric payload is non-negative, so a
+// token stream is self-delimiting under ===: equal arrays are equal trees.
+const T_V = -1; const T_R = -2; const T_LAM = -3; const T_LET = -4;
+const T_APP = -5; const T_CTR = -6; const T_MAT = -7; const T_LIT = -8;
+const T_ANN = -9; const T_RWT = -10; const T_EQL = -11; const T_ADT = -12;
+const T_MIN = -13; const T_TYP = -14; const T_QUA = -15; const T_HOL = -16;
+const T_SUB = -17; const T_ALL = -18; const T_QNT = -19; const T_RFL = -20;
+const T_EFQ = -21; const T_BND = -22; const T_CAP = -23; const T_LAY = -24;
+const T_FREE = -25; const T_CTR_TAG = -26; const T_NAME = -27;
+const T_NUM = -28; const T_Q = -29; const T_PC = -30;
+
+type ArmEnc = { toks: Tok[]; caps: number[]; size: number };
+
+// The one canonical walk. `out` receives the token stream and returns false
+// to abort at the first difference. Bound occurrences are named by their
+// distance to their binder, captures by their first-occurrence rank and
+// layout, all other free probes by their first-occurrence rank.
+function arm_walk(fl: File, h: HTerm, capLays: Map<number, string>,
+  out: (t: Tok) => boolean): { caps: number[]; ok: boolean } {
+  const bound = new Map<number, number>();
+  const rank = new Map<number, number>();
+  const caps: number[] = [];
+  let nodes = 0;
+  let ok = true;
+  const put = (t: Tok): void => {
+    if (ok && !out(t)) {
+      ok = false;
+    }
+  };
+  const free = (i: number): void => {
+    const got = rank.get(i);
+    if (got === undefined) {
+      const r = caps.length;
+      rank.set(i, r);
+      caps.push(i);
+      put(T_FREE);
+      put(r);
+    } else {
+      put(T_FREE);
+      put(got);
+    }
+  };
+  const vs = (i: number, d: number): void => {
+    const b = bound.get(i);
+    if (b !== undefined) {
+      put(T_BND);
+      put(d - b);
+      return;
+    }
+    const lay = capLays.get(i);
+    if (lay === undefined) {
+      free(i);
+      return;
+    }
+    const got = rank.get(i);
+    if (got === undefined) {
+      const r = caps.length;
+      rank.set(i, r);
+      caps.push(i);
+      put(T_CAP);
+      put(r);
+      put(T_LAY);
+      put(lay);
+    } else {
+      put(T_CAP);
+      put(got);
+    }
+  };
+  const patt = (p: Bend.Patt, d: number): void => {
+    if (p.$ === "PVar") {
+      vs(p.i, d);
+      return;
+    }
+    put(T_PC);
+    put(p.k);
+    put(p.x.length);
+    for (const z of p.x) {
+      patt(z, d);
+    }
+  };
+  const walk = (u: HTerm, d: number): void => {
+    if (!ok) {
+      return;
+    }
+    if (d > ARM_DEPTH || ++nodes > ARM_NODES) {
+      ok = false;
+      return;
+    }
+    const t = term_force(u);
+    switch (t.$) {
+      case "Var": put(T_V); vs(t.i, d); break;
+      case "Ref": put(T_R); put(t.k); break;
+      case "Lam": {
+        put(T_LAM);
+        put(t.q?.$ ?? "");
+        const o = term_open(t);
+        bound.set(o.ps[0].i, d);
+        walk(o.b, d + 1);
+        bound.delete(o.ps[0].i);
+        break;
+      }
+      case "Let": {
+        put(T_LET);
+        put(t.v.length);
+        for (const q of t.q) {
+          put(T_Q);
+          put(q.$);
+        }
+        for (const v of t.v) {
+          walk(v, d);
+        }
+        const o = term_open(t);
+        o.ps.forEach((p, j) => bound.set(p.i, d + j));
+        walk(o.b, d + o.ps.length);
+        o.ps.forEach((p) => bound.delete(p.i));
+        break;
+      }
+      case "App": put(T_APP); walk(t.f, d); walk(t.x, d); break;
+      case "Ctr":
+        put(T_CTR);
+        put(T_CTR_TAG);
+        put(t.k);
+        put(t.x.length);
+        for (const x of t.x) {
+          walk(x, d);
+        }
+        break;
+      case "Mat":
+        put(T_MAT);
+        put(t.k);
+        walk(t.h, d);
+        walk(t.m, d);
+        break;
+      case "Lit":
+        put(T_LIT);
+        put(typeof t.v);
+        put(String(t.v));
+        break;
+      case "Ann":
+        put(T_ANN);
+        walk(t.x, d);
+        put(T_TYP);
+        put(Bend.term_key(Bend.term_lower(term_force(t.T))));
+        break;
+      case "Rwt": put(T_RWT); walk(t.e, d); walk(t.p, d); walk(t.f, d); break;
+      case "Eql":
+        put(T_EQL);
+        walk(t.a, d);
+        walk(t.b, d);
+        walk(t.T, d);
+        break;
+      case "ADT":
+        put(T_ADT);
+        put(t.k);
+        put(t.x.length);
+        for (const x of t.x) {
+          walk(x, d);
+        }
+        break;
+      case "Min": put(T_MIN); walk(t.a, d); walk(t.b, d); break;
+      case "Typ": put(T_TYP); walk(t.g, d); break;
+      case "Qua": put(T_QUA); put(t.q.$); break;
+      case "Hol": put(T_HOL); put(t.k); break;
+      case "Sub": {
+        put(T_SUB);
+        const v: HTerm | Bend.Patt = t.v;
+        if (v.$ === "PVar" || v.$ === "PCtr") {
+          patt(v, d);
+        } else {
+          walk(v, d);
+        }
+        const old = bound.get(t.i);
+        bound.set(t.i, d);
+        walk(t.f, d + 1);
+        old === undefined ? bound.delete(t.i) : bound.set(t.i, old);
+        break;
+      }
+      case "All": {
+        put(T_ALL);
+        put(JSON.stringify(t.q));
+        walk(t.A, d);
+        const bp = Bend.Var(t.k, ARM_BIND - d);
+        bound.set(bp.i, d);
+        walk(t.B(bp), d + 1);
+        bound.delete(bp.i);
+        break;
+      }
+      case "Qnt": put(T_QNT); break;
+      case "Rfl": put(T_RFL); break;
+      case "Efq": put(T_EFQ); break;
+      default: ok = false;
+    }
+  };
+  walk(h, 0);
+  return { caps, ok: ok && caps.length === fl.uses.size };
+}
+
+function arm_enc(fl: File, h: HTerm, capLays: Map<number, string>):
+  ArmEnc | null {
+  const toks: Tok[] = [];
+  let size = 0;
+  const got = arm_walk(fl, h, capLays, (t) => {
+    toks.push(t);
+    size += typeof t === "string" ? t.length + 8 : 8;
+    return true;
+  });
+  return got.ok ? { toks, caps: got.caps, size } : null;
+}
+
+function arm_cmp(fl: File, h: HTerm, capLays: Map<number, string>,
+  toks: Tok[]): { ok: boolean; caps: number[] } {
+  let pos = 0;
+  const got = arm_walk(fl, h, capLays, (t) => {
+    if (pos >= toks.length || toks[pos] !== t) {
+      return false;
+    }
+    pos += 1;
+    return true;
+  });
+  return { ok: got.ok && pos === toks.length, caps: got.caps };
+}
+
+function enc_hash(toks: Tok[]): number {
+  let h = 0x811c9dc5;
+  for (const t of toks) {
+    if (typeof t === "number") {
+      h = Math.imul(h ^ t, 0x01000193);
+    } else {
+      for (let i = 0; i < t.length; i++) {
+        h = Math.imul(h ^ t.charCodeAt(i), 0x01000193);
+      }
+    }
+  }
+  return h >>> 0;
+}
+
+// A spin is a plain C function, so its body cannot touch the segment bank
+// (a jump, a fork frame, a return through the stack). `file_push` unwinds
+// the emission at the first such line; the attempt is then rolled back and
+// the arm is emitted inline, unchanged. Returns the spin's name, or null.
+function arm_spin(fl: File, term: HTerm, caps: ArmCap[], argLays: Lay[],
+  ret: Lay, ers: HTerm[], min: number): string | null {
+  const outerFresh = fl.fresh;
+  fl.fresh = new Map();
+  try {
+  const name = `arm_${armSeq++}`;
+  const capNames = caps.map((c) => c.lay.ks.map(() => name_local(fl, "a")));
+  const argNames = argLays.map((lay) => lay.ks.map(() => name_local(fl, "a")));
+  const params = [...capNames.flat(), ...argNames.flat()];
+  const ks = [...caps.flatMap((c) => c.lay.ks),
+    ...argLays.flatMap((lay) => lay.ks)];
+  const seg = seg_new(name, ret, params, ks);
+  const outer = { seg: fl.seg, uses: fl.uses, spares: fl.spares,
+    tab: fl.tab, rest: fl.rest };
+  const uses = new Map<Probe, Bind>(caps.map((c, i) => [c.p,
+    { val: val_new(capNames[i], c.lay), n: c.n, A: c.A }]));
+  const argv = argLays.map((lay, i) => val_new(argNames[i], lay));
+  const segs0 = fl.segs.length;
+  const spins0 = fl.spins.length;
+  const guard0 = fl.spinGuard;
+  const snap = {
+    tabs: new Map(fl.tabs), lits: new Map(fl.lits),
+    img: fl.img.length, consts: new Map(fl.consts), spun: new Map(fl.spun),
+    brwl: new Map(fl.brwl), clos: new Set(fl.clos), fuel: fl.fuel,
+    def: fl.def, own: [...fl.own], hot: [...fl.hot], stat: [...fl.stat],
+    lend: [...fl.lend],
+  };
+  Object.assign(fl, { seg, spares: [], tab: 2, rest: [], uses,
+    spinGuard: { seg } });
+  const d = val_new(ret.ks.map(() => name_local(fl, "v")), ret);
+  fl.armBusy.add(name);
+  let aborted = false;
+  try {
+    emit_body(fl, term, null, ers, argv, d);
+  } catch (e) {
+    if (e !== ARM_ABORT) {
+      throw e;
+    }
+    aborted = true;
+  } finally {
+    fl.armBusy.delete(name);
+    fl.spinGuard = guard0;
+  }
+  if (aborted || seg.lines.length < min) {
+    fl.spinSmall = !aborted;
+    const created = new Set(fl.spins.slice(spins0).map(([n]) => n));
+    fl.spins.length = spins0;
+    fl.segs.length = segs0;
+    fl.armReps.forEach((reps, key) => {
+      const keep = reps.filter((rep) => {
+        if (!created.has(rep.spin)) {
+          return true;
+        }
+        fl.armBytes -= rep.size;
+        return false;
+      });
+      keep.length === 0 ? fl.armReps.delete(key)
+        : fl.armReps.set(key, keep);
+    });
+    Object.assign(fl, outer);
+    fl.tabs = snap.tabs;
+    fl.lits = snap.lits;
+    fl.img.length = snap.img;
+    fl.consts = snap.consts;
+    fl.spun = snap.spun;
+    fl.brwl = snap.brwl;
+    fl.clos = snap.clos;
+    fl.fuel = snap.fuel;
+    fl.def = snap.def;
+    fl.own.clear();
+    snap.own.forEach((x) => fl.own.add(x));
+    fl.hot.clear();
+    snap.hot.forEach((x) => fl.hot.add(x));
+    fl.stat.clear();
+    snap.stat.forEach((x) => fl.stat.add(x));
+    fl.lend.clear();
+    snap.lend.forEach((x) => fl.lend.add(x));
+    return null;
+  }
+  fl.spins.push([name, [`${seg.lines.length < SPIN_FAR ? "INLINE" : "FAR"} Term ${name}(Env e, THR Term* o${
+    seg.ks.map((k, i) => `, ${lay_c(k)} r${i}`).join("")}) {`,
+  "  u32 wpoll = 0;",
+  ...d.ws.map((v, j) => `  ${lay_c(ret.ks[j])} ${v} = 0;`),
+  ...seg_take(seg).map((l) => "  " + l),
+  "  WL_SPIN", ...seg.lines, "  break;", "  }",
+  ...d.ws.map((v, j) => `  o[${j}] = ${v};`),
+  "  return 1;", "}"].join("\n"), seg.refs]);
+  Object.assign(fl, outer);
+  return name;
+  } finally {
+    fl.fresh = outerFresh;
+  }
+}
+
+// Calls a shared arm: the spin takes its captures in the representative's
+// order, then the arm's arguments. Every use of a capture is inside the
+// spin, so each mapped binding is consumed here once, not once per body
+// occurrence (the spin shares it internally).
+function arm_call(fl: File, rep: ArmRep, map: Map<number, number>,
+  cand: ArmCap[], av: Val[], dst: Dst): void {
+  const name = rep.spin ?? die("an arm call without a spin");
+  const probe = new Map(cand.map((c) => [c.p.i, c.p]));
+  seg_ref(fl, name);
+  const cws = rep.caps.flatMap((c) => {
+    const p = map.get(c.p.i) ?? die("an arm capture without a partner");
+    const cp = probe.get(p) ?? die("an arm capture without a probe");
+    const b = fl.uses.get(cp) ?? die("an arm capture without a binding");
+    return val_own(fl, b.val);
+  });
+  map.forEach((p) => {
+    const cp = probe.get(p);
+    if (cp !== undefined) {
+      fl.uses.delete(cp);
+    }
+  });
+  const aws = av.flatMap((v) => val_own(fl, v));
+  const o = name_local(fl, "o");
+  file_push(fl, `Term ${o}[${rep.ret.ks.length}];`);
+  const args = ["e", o, ...cws, ...aws].join(", ");
+  block(fl, `if (${name}(${args}) == 0) {`,
+    () => file_push(fl, "return 0;"));
+  emit_put(fl, dst, val_new(rep.ret.ks.map((_, j) => `${o}[${j}]`), rep.ret));
+}
+
+// The arm's surviving bindings are exactly its captures: `bind_dead` kept
+// only bindings the body uses, and a probe is owned by one binder. The
+// first occurrence of a key is emitted inline; the second occurrence of a
+// key with a new canonical encoding becomes a spin; later equal arms call
+// it. A body no one duplicates never changes the emitted C.
+function emit_arm_shared(fl: File, h: HTerm, av: Val[], dst: Dst,
+  ers: HTerm[]): boolean {
+  const argLays = av.map((v) => v.lay);
+  const ret = dst?.lay ?? fl.seg.ret;
+  const argSig = argLays.map(lay_sig).join(";");
+  const retSig = lay_sig(ret);
+  const cheap = arm_key(h, argSig, retSig, fl.uses.size, ers);
+  if (fl.armDead.has(cheap)) {
+    return false;
+  }
+  const seen = fl.armSeen.get(cheap);
+  if (seen === undefined) {
+    if (fl.armSeen.size < ARM_KEYS) {
+      fl.armSeen.set(cheap, 1);
+    }
+    return false;
+  }
+  fl.armSeen.set(cheap, seen + 1);
+  const all: ArmCap[] = [...fl.uses].map(([p, b]) =>
+    ({ p, lay: b.val.lay, A: b.A, n: b.n }));
+  const meta = new Map(all.map((c) => [c.p.i, c]));
+  const capLays = new Map(all.map((c) => [c.p.i, lay_sig(c.lay)]));
+  const capsOf = (ids: number[]): ArmCap[] => ids.map((i) =>
+    meta.get(i) ?? die("an encoded capture without a binding"));
+  if (seen > 1) {
+    const bucket = fl.armReps.get(cheap);
+    if (bucket !== undefined) {
+      for (const rep of bucket) {
+        if (rep.bad || rep.argSig !== argSig || rep.retSig !== retSig
+          || rep.caps.length !== fl.uses.size || !arm_ers_eq(rep.ers, ers)) {
+          continue;
+        }
+        const cmp = arm_cmp(fl, h, capLays, rep.toks);
+        if (!cmp.ok) {
+          continue;
+        }
+        const caps = capsOf(cmp.caps);
+        if (rep.spin === null) {
+          const spin = arm_spin(fl, h, caps, argLays, ret, ers, 0);
+          if (spin === null) {
+            const enc = arm_enc(fl, h, capLays);
+            if (enc !== null) {
+              fl.armBad.add(enc_hash(enc.toks));
+            }
+            rep.bad = true;
+            return false;
+          }
+          rep.caps = caps;
+          rep.argLays = argLays;
+          rep.ret = ret;
+          rep.ers = ers;
+          rep.argSig = argSig;
+          rep.retSig = retSig;
+          rep.spin = spin;
+        }
+        if (fl.armBusy.has(rep.spin)) {
+          return false;
+        }
+        arm_call(fl, rep, new Map(rep.caps.map((c, k) =>
+          [c.p.i, caps[k].p.i])), caps, av, dst);
+        return true;
+      }
+    }
+  }
+  const got = arm_enc(fl, h, capLays);
+  if (got === null) {
+    fl.armDead.add(cheap);
+    return false;
+  }
+  const caps = capsOf(got.caps);
+  const bh = enc_hash(got.toks);
+  if (fl.armBad.has(bh)) {
+    return false;
+  }
+  const bucket = fl.armReps.get(cheap);
+  if ((bucket !== undefined && bucket.length >= ARM_BUCKET)
+    || fl.armReps.size >= ARM_KEYS
+    || fl.armBytes + got.size > ARM_BYTES) {
+    return false;
+  }
+  let spin: string | null = null;
+  if (seen === 1) {
+    fl.spinSmall = false;
+    spin = arm_spin(fl, h, caps, argLays, ret, ers, ARM_BIG);
+    if (spin === null && !fl.spinSmall) {
+      fl.armBad.add(bh);
+      return false;
+    }
+  }
+  const rep: ArmRep = { toks: got.toks, caps, argLays, ret, ers, spin,
+    argSig, retSig, size: got.size };
+  fl.armBytes += got.size;
+  const reps = fl.armReps.get(cheap);
+  if (reps === undefined) {
+    fl.armReps.set(cheap, [rep]);
+  } else {
+    reps.push(rep);
+  }
+  if (spin === null) {
+    return false;
+  }
+  arm_call(fl, rep, new Map(rep.caps.map((c) => [c.p.i, c.p.i])),
+    caps, av, dst);
+  return true;
+}
 function emit_match(fl: File, x: Of<"Mat"> | Of<"Efq">,
   ty: HTerm | null, ers: HTerm[], args: Val[], dst: Dst): void {
   if (x.$ === "Efq") {
@@ -2806,7 +3412,10 @@ function emit_match(fl: File, x: Of<"Mat"> | Of<"Efq">,
     fl.spares = spares.slice();
     const outer = { seg: fl.seg, tab: fl.tab, uses: new Map(fl.uses) };
     bind_dead(fl, [h]);
-    emit_body(fl, h, null, ers, [...fs(), ...rest], dst);
+    const av = [...fs(), ...rest];
+    if (!emit_arm_shared(fl, h, av, dst, ers)) {
+      emit_body(fl, h, null, ers, av, dst);
+    }
     if (dst !== null) {
       spare_flush(fl);
     }
@@ -2973,7 +3582,23 @@ function compile_segs(fl: File): string {
   }).join("\n\n");
 }
 
+// The indices of spins that a preceding spin calls: each needs a forward
+// declaration. A spin that is only reached from a segment needs none, since
+// the whole Spins block precedes the Segments block.
+function spinDeclared(spins: [string, string, Set<string>][]): number[] {
+  const at = new Map(spins.map(([n], i) => [n, i]));
+  const out = new Set<number>();
+  spins.forEach(([, , refs], i) => refs.forEach((r) => {
+    const j = at.get(r);
+    if (j !== undefined && j > i) {
+      out.add(j);
+    }
+  }));
+  return [...out].sort((a, b) => a - b);
+}
+
 export function compile_book(book: Bend.Book): string {
+  armSeq = 0;
   const cb = carb_book(book, ["main", ...RUNTIME_ADTS]);
   const show = show_main(book);
   const facts = () => cb.own.size + cb.hot.size + cb.stat.size;
@@ -3033,6 +3658,11 @@ export function compile_book(book: Bend.Book): string {
     ["Tables", [defs.join("\n"), ...[...fl.tabs].map(([r, i]) =>
       `CONSTV u64 TAB_${i}[] = { ${r} };`)]],
     ["Spins", [`CONSTV u64 STAT_IMG[] = { ${fl.img.join(", ") || 0} };`,
+      // A spin may call one pushed later (a nested spin is pushed before
+      // its caller's body is finished), so declare those first.
+      ...spinDeclared(fl.spins).map((i) =>
+        fl.spins[i][1].slice(0, fl.spins[i][1].indexOf("\n"))
+          .replace(/\s*\{\s*$/, ";")),
       ...fl.spins.map((s) => s[1])]],
     ["Segments", [compile_segs(fl)]],
     ["Requests", [fl.reqs]],
