@@ -1,8 +1,9 @@
 # Each write discards its unmatched stereo sample; two halves never join.
-# JS only: pause this silent device so timing cannot hide a phantom frame.
+# Pause the silent JS device so timing cannot hide a phantom frame.
 import Base
 
 def pause(audio: Audio) -> IO(Audio):
+  import "./audio_whole_frames.c"
   import "./audio_whole_frames.js"
 
 def report(pair: Audio & U32) -> IO(Unit):
