@@ -2,10 +2,11 @@
 # puts t's binders a level deeper. bend2's annotations name a variable by
 # the level bend2 checked it at, so the type of the λ-match under n still
 # named n at the level y took: the kernel saw y's Bool where n's Nat was
-# expected (#1665). t now goes under the λ through its lowered form, so
-# its annotations move with its binders. A term goes η-long as an argument
-# (arg), as a def's body (leaf), as a match arm (arm) and as a default arm
-# (rest). The law checks main's value in the emitted book too
+# expected (#1665). A def's body now goes through its lowered form once,
+# before --verdict builds it, so its annotations move with its binders. A
+# term goes η-long as an argument (arg), as a def's body (leaf), as a
+# match arm (arm) and as a default arm (rest). The law checks main's value
+# in the emitted book too
 import Base
 
 type Fact<-P: Type> is Data:
