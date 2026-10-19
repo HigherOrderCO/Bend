@@ -81,6 +81,7 @@ type File = {
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
+  holds: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
@@ -908,12 +909,12 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words.
 function ty_holds(A: HTerm | null,
-  p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
+  p: Name | ((t: HTerm | null) => boolean), seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
     return ty_holds(t.f(DUMMY), p, seen);
   }
-  if (p(t)) {
+  if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
   }
   if (t?.$ !== "ADT" || WORDS[t.k]) {
@@ -977,8 +978,7 @@ function lay_of(A: HTerm | null): Lay {
     Bend.term_key(Bend.term_lower(t)), (key) => {
     const tld = FL.book.tlds[t.k];
     if (t.k === "Array" || t.k === "IO.OP" || tld?.$ !== "ADT"
-      || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F,
-        (u) => u?.$ === "ADT" && u.k === t.k)))) {
+      || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F, t.k)))) {
       return BOX;
     }
     FL.lays.set(key, BOX);
@@ -1074,6 +1074,16 @@ function ctr_live(ctr: Bend.Ctr, xs?: HTerm[]): Dom[] {
 
 function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
   return ctr_live(ctr, xs).map(([, , A]) => A);
+}
+
+function lay_holds(A: HTerm | null, lay: Lay, fam: Name): Lay {
+  if (lay.arms) {
+    return lay_pack(Object.entries(lay.arms).map(([k, lays]) =>
+      [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) =>
+        memo(FL.holds, fam + " " + Bend.term_key(Bend.term_lower(F)),
+          () => lay_holds(F, lays[i], fam)))]));
+  }
+  return lay === BOX && !ty_holds(A, fam) ? W32 : lay;
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
@@ -1449,6 +1459,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
+    holds: new Map(),
     lay_ids: new Map(),
     memo: {
       opens: new Map(),
@@ -2927,12 +2938,14 @@ export function compile_book(book: Bend.Book): string {
   const arg = val_new([""], W64);
   const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
     seg_new(CLO_APPLY, BOX, [arg, arg])];
-  const cids = new Map<Name, number>();
-  const cid = (k: Name, n: number) =>
-    cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
+  const cids = new Map<Name, number[]>();
+  const cid = (k: Name, n: number, d = 0) =>
+    cids.set(k, [n > WIDE ? 240 + Math.log2(n) : n, Number(FL.hot.has(k)), d]);
   for (const k of FL.srcs.keys()) {
     for (const c of (FL.book.tlds[k] as Bend.ADT).c ?? []) {
-      cid(c.k, lay_node(c.k).ks.length);
+      const lay = lay_node(c.k), n = lay.ks.length;
+      const at = lay_holds(tele_unbind(c.T).ret, lay, k).ks.lastIndexOf("box");
+      cid(c.k, n, at < 0 ? 0 : n - 1 - at);
     }
   }
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
@@ -2940,7 +2953,7 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.fid)), [...FL.segs, { fid: seg_fid(CLO_APPLY),
     refs: FL.clos }].flatMap((s) => [...s.refs].map((r) => [r, s.fid])));
   if (entries.some((s) => s.params.length > WIDE)
-    || [...cids.values()].some((n) => n > 255)) {
+    || [...cids.values()].some(([n]) => n > 255)) {
     die("an arity over " + WIDE);
   }
   const defs = [[...cids.keys()].map(cid_mac),
@@ -2952,12 +2965,12 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.params.length));
   const rs = [...Array(n).keys()].map((i) => "r" + i);
   const ws = n > 6 ? [...rs.slice(0, 6), "rp", ...rs.slice(6)] : rs;
-  defs.push(`CONSTV u8 FID_T[][3] = { ${entries.map((s) =>
-    `{ ${s.params.length}, ${s.frame === null ? 0
-      : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
-      | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) =>
-    `{ ${n}, ${Number(FL.hot.has(k))} }`).join(", ")} };`,
+  defs.push(`CONSTV Fid FID_T[] = { ${entries.map((s) => `{ ${[s.params.length,
+    s.frame === null ? 0 : s.params.length - s.frame.at.length,
+    FL.bangs.has(s.def), !forky.has(s.fid)].map(Number).join(", ")} }`)
+    .join(", ")} };`,
+  `CONSTV Cid CID_T[] = { ${[...cids.values()].map((r) =>
+    `{ ${r.join(", ")} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3494,6 +3507,7 @@ typedef uint64_t u64;
 typedef uint32_t u32;
 typedef uint8_t  u8;
 #endif
+typedef unsigned short u16;
 typedef float f32;
 
 typedef u64 Term;
@@ -3631,16 +3645,19 @@ static const char* CLI_HELP =
 // Tables
 // ======
 
+typedef struct { u8 ar, resw, bangs, nofk; } Fid;
+typedef struct { u8 ar, hot; u16 spine; } Cid;
+
 ${tabs}
 
 #define TAB_AT(T, S, I) T[S < I ? S : I]
 
-#define fid_arity(x) ((u32)FID_T[x][0])
-#define fid_resw(x)  ((u32)FID_T[x][1])
-#define fid_bangs(x) ((bool)(FID_T[x][2] & 1))
-#define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
-#define cid_arity(x) ((u32)CID_T[x][0])
-#define cid_hot(x)   ((bool)CID_T[x][1])
+#define fid_arity(x) FID_T[x].ar
+#define fid_resw(x)  FID_T[x].resw
+#define fid_bangs(x) FID_T[x].bangs
+#define fid_nofk(x)  FID_T[x].nofk
+#define cid_arity(x) CID_T[x].ar
+#define cid_hot(x)   CID_T[x].hot
 
 // A32
 // ===
@@ -3894,6 +3911,11 @@ INLINE void heap_free(Env e, u32 cls, u64 loc) {
   if (err_peek(e.mem)) {
     return;
   }
+#ifdef BEND_POISON // a later read of a freed block fails
+  for (u64 i = 1; i < 1ull << cls; i += 1) {
+    e.mem[loc + i] = RFC_BIT | TAG_CTR << 56 | LOC_MASK;
+  }
+#endif
   e.mem[loc]       = ALC_AT(e, cls);
   ALC_AT(e, cls)   = loc;
   ALC_LEN(e, cls) += 1ull << cls;
@@ -4006,6 +4028,9 @@ INLINE u32 blk_span(Term t) {
   return blk_wcls(term_tag(t) == TAG_ARR, blk_cls(t));
 }
 
+// A node's first word holds its frame; free it before its last live child.
+// Swap the spine to the end for cell-by-cell list drops. Ends <256 fit the frame;
+// a wider end goes in the trivial last cell, then the counter.
 FAR void term_drop(Env e, Term t) {
   DEV u64* H = e.mem;
   u64  cur = 0;
@@ -4030,12 +4055,27 @@ FAR void term_drop(Env e, Term t) {
       } else {
         u32 aux = (u32)term_aux(t);
         u64 loc = term_loc(t);
-        u32 n   = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
-          : fid_arity(aux) - (tag == TAG_CLO);
-        u32 cls = tag == TAG_ARR ? 64 | blk_cls(t)
+        u32 n = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
+          : fid_arity(aux) - (tag == TAG_CLO),
+          cls = tag == TAG_ARR ? 64 | blk_cls(t)
           : n > ${WIDE} ? 64 | (n - 240)
-          : cls_fit(tag == TAG_TSK ? n + 2 : n);
-        c0 = H[loc];
+          : cls_fit(tag == TAG_TSK ? n + 2 : n),
+          w = cls < 64 ? n : 1u << (cls & 63),
+          d = tag == TAG_CTR ? CID_T[aux].spine : 0, m = w;
+        if (d) {
+          u64 end = loc + w - 1;
+          Term f = H[end - d];
+          H[end - d] = H[end];
+          H[end] = f;
+        }
+        while (m && term_triv(H[loc + m - 1])) --m;
+        if (m < 256) {
+          n   = m;
+          cls &= 63;
+        } else if (m < w) {
+          H[loc + w - 1] = m;
+        }
+        c0 = m ? H[loc] : 0;
         H[loc] = cur;
         cur = loc | ((u64)n << 48) | ((u64)cls << 56);
       }
@@ -4053,26 +4093,25 @@ FAR void term_drop(Env e, Term t) {
       if (arr) {
         cls &= 63;
         n   = 1u << cls;
-        if (i == 2) {
-          j = (u32)H[loc + 1];
-        }
+        Term z = H[loc + (i > 1 ? 1 : n - 1)];
+        n = i > 1 ? z >> 32 : term_triv(z) ? (u32)z : n;
+        j = i > 1 ? (u32)z : i;
       }
-      if (j < n) {
-        Term c = j == 0 ? c0 : H[loc + j];
-        if (arr && j > 0) {
-          H[loc + 1] = j + 1;
+      Term c = j == 0 ? c0 : H[loc + j];
+      if (j + 1 >= n) {
+        cur = H[loc];
+        heap_free(e, cls, loc);
+      } else {
+        if (arr && j) {
+          H[loc + 1] = (u64)n << 32 | (j + 1);
         }
         if (!arr || i < 2) {
           cur += 1ull << 40;
         }
-        if (!term_triv(c)) {
-          t = c;
-          break;
-        }
-      } else {
-        u64 up = H[loc];
-        heap_free(e, cls, loc);
-        cur = up;
+      }
+      if (!term_triv(c)) {
+        t = c;
+        break;
       }
     }
   }
