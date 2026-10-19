@@ -3625,15 +3625,16 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       switch (tm.$) {
         case "Efq": {
           if (rem.length !== 0 && !ctx_dead(book, ctx)) {
-            const patt = (c: Ctr): string => {
-              const doms = c.n === 0 ? [] : tele_unbind(book, c.T).doms.slice(-c.n);
-              const bnd = doms.map(([, x], j) => x === "_" ? "_" + String(j) : x);
-              const xs: LTerm[] = bnd.map((x, j) => Var(x, j));
-              return term_show(Ctr(c.k, xs), -1, bnd, tm.s?.file);
-            };
+            // the case to add: a nullary constructor by its surface
+            // spelling (0n for Zero, [] for Nil), a fielded one by its
+            // name (its fields may be dependent, so a case with them may
+            // not check)
+            const one = (c: Ctr): string => c.n === 0
+              ? "`case " + term_show(term_lower(Ctr(c.k, [])), -1, [], tm.s?.file) + ":`"
+              : "a case for `" + name_key(c.k) + "`";
             const nte = rem.length === 1
-              ? "Note: add `case " + patt(rem[0]) + ":` (or `case _:`)."
-              : "Note: add cases for " + rem.map(patt).join(", ") + " (or `case _:`).";
+              ? "Note: add " + one(rem[0]) + " (or `case _:`)."
+              : "Note: add cases for " + rem.map((c) => name_key(c.k)).join(", ") + " (or `case _:`).";
             throw Err(book, ctx, "this match doesn't cover " + rem.map((c) => name_key(c.k)).join(", "), undefined, tm.s, lhs.def, nte);
           }
           return Check(tm, ty, uses_nil());

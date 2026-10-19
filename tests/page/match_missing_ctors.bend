@@ -25,5 +25,5 @@ def main(): f(Tt{})
 #|13>|   match b:
 #|   |   ^^^^^^^^
 #|14 |
-#|Note: add cases for Tt{}, Ff{} (or `case _:`).
+#|Note: add cases for Tt, Ff (or `case _:`).
 #|exit 1

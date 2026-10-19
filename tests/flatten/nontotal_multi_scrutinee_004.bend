@@ -36,5 +36,5 @@ def main(): f(Oy{}, Ay{})
 #|20>|   match x, y:
 #|   |   ^^^^^^^^^^^
 #|21 |     case Oy{}, Ay{}:
-#|Note: add cases for By{}, Cy{} (or `case _:`).
+#|Note: add cases for By, Cy (or `case _:`).
 #|exit 1

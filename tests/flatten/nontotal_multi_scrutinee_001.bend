@@ -44,5 +44,5 @@ def main(): f(Nl1{}, Nl1{}, Nl1{})
 #|24>|   match a, b, c:
 #|   |   ^^^^^^^^^^^^^^
 #|25 |     case Nl1{}, a, Nl1{}:
-#|Note: add `case Cl1{h, t}:` (or `case _:`).
+#|Note: add a case for `Cl1` (or `case _:`).
 #|exit 1

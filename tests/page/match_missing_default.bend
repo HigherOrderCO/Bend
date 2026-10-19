@@ -17,5 +17,5 @@ def main():
 #|10>|   \{}
 #|   |   ^^^
 #|11 |
-#|Note: add `case U32{data}:` (or `case _:`).
+#|Note: add a case for `U32` (or `case _:`).
 #|exit 1
