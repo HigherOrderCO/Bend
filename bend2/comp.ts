@@ -6007,7 +6007,7 @@ static void show_val(Env e, u32 d, const Term* w, char chain) {
 // ===
 
 static void io_step(Env e, IoWork* a) {
-  for (;;) {
+  for (u32 step = 0; step < 64; step += 1) {
     u64  ap  = task_node(e, FID(Clo~apply), TERM_HOLE, 0, 0);
     e.mem[ap]     = a->cont;
     e.mem[ap + 1] = a->item;
@@ -6039,6 +6039,7 @@ static void io_step(Env e, IoWork* a) {
     }
     a->item = x;
   }
+  io_push(&io_runs, a);
 }
 
 OUTLINE void io_loop(u64* H) {
@@ -6508,7 +6509,7 @@ function io_run(m) {
       }
       const s = io.runs.shift();
       let op = s.fun(s.arg);
-      while (op !== undefined) {
+      for (let left = 64; op !== undefined; left -= 1) {
         if (op.$ === "Emit") {
           io.live -= 1;
           break;
@@ -6527,6 +6528,12 @@ function io_run(m) {
         }
         const x = run(...op.args, op.kont);
         if (x === undefined) {
+          break;
+        }
+        if (left === 1) {
+          s.fun = op.kont;
+          s.arg = x;
+          io.runs.push(s);
           break;
         }
         op = op.kont(x);
