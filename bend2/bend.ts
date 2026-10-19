@@ -3515,7 +3515,8 @@ function ctr_fields(book: Book, k: Name, fs: Map<Name, Quant[]>): Quant[] {
 // the checked body's value positions that mention binder i, as the
 // measure counts them: a type position (an annotation's type, an
 // equation's endpoints, a rewrite's motive, a type application) is
-// dead, and so is an erased field.
+// dead, and so is an erased field. a match's arms join, so a use in
+// each arm is one use: the count is the mentions, the measure fires.
 function term_uses_at(book: Book, tm: LTerm, i: number, out: Span[], fs: Map<Name, Quant[]>): void {
   switch (tm.$) {
     case "Var": {
@@ -3564,9 +3565,11 @@ function term_uses_at(book: Book, tm: LTerm, i: number, out: Span[], fs: Map<Nam
   }
 }
 
-export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Quant, s: Span | undefined, def?: Name, fx?: Name, body?: LTerm): Uses {
+export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Name, q: Quant, s: Span | undefined, def?: Name, opts?: { fx?: Name; body?: LTerm }): Uses {
   const u = pmap_get(us, i) ?? None();
   if (quant_join(u, q).$ !== q.$) {
+    const fx = opts?.fx;
+    const body = opts?.body;
     if (q.$ === "Lone" && u.$ === "Many" && body !== undefined) {
       const at: Span[] = [];
       term_uses_at(book, body, i, at, new Map());
@@ -3617,7 +3620,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       }
       const f_ctx = ctx_bind(ctx, d, q, tm.k, t_wnf.A);
       const f_chk = term_check(book, f_lhs, tm.f(x), qt, t_wnf.B(x), f_ctx, d+1);
-      return Check(Lam(tm.k, d, f_chk.tm, tm.s), ty, uses_close(book, ctx, f_chk.us, d, tm.k, q, tm.s, lhs.def, tm.fx, f_chk.tm));
+      return Check(Lam(tm.k, d, f_chk.tm, tm.s), ty, uses_close(book, ctx, f_chk.us, d, tm.k, q, tm.s, lhs.def, { fx: tm.fx, body: f_chk.tm }));
     }
     // Γ ⊢ vj : Aj ~ vuj  (each value in Γ: the binders are parallel)
     // Γ ⊢ Aj : Kind(qj)
@@ -3643,7 +3646,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const f_chk = term_check(book, lhs, tm.f(xs), qt, ty, f_ctx, d + n);
       let fu = f_chk.us;
       for (let j = 0; j < n; j++) {
-        fu = uses_close(book, ctx, fu, d + j, tm.k[j], tm.q[j], tm.s, lhs.def, undefined, f_chk.tm);
+        fu = uses_close(book, ctx, fu, d + j, tm.k[j], tm.q[j], tm.s, lhs.def, { body: f_chk.tm });
       }
       return Check(Let(tm.k, xs.map((_, j) => d + j), vx, f_chk.tm, tm.s, tm.q), ty, uses_add(us, fu));
     }
