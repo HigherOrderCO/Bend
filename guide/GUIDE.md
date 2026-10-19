@@ -394,15 +394,15 @@ blocks while the child runs. On Linux, native builds need glibc 2.34 or newer
 to close inherited descriptors. It does not sandbox the child: callers must
 whether a command is trusted before executing it.
 
-Bend interleaves computations on one event loop. Each runs pure code, using
-[parallel calls](#parallelism) on every core, up to its next effect. Ready
-effects yield in bounded turns; a socket, sleep or channel wait steps aside.
-`IO.fork` starts a computation and returns its result channel; `IO.join` waits
+A Bend program is a set of computations interleaved by one event loop, as in
+Node.js: one at a time, each runs its pure code, on every core through its
+[parallel calls](#parallelism), up to its next effect, and one that waits on a
+socket, a sleep or a channel steps aside for the others. `IO.fork` starts a
+computation and returns the channel its result will arrive on; `IO.join` waits
 for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
-`Chan.close`. JS uses linked runnable and channel-waiter queues and growable
-circular channel buffers. `IO.within(A, ms, act)` races `act` against a deadline:
-`None{}` means the deadline won; the loser is not cancelled. The program ends
-when every computation is done, or reports a deadlock when all remaining ones
+`Chan.close`. `IO.within(A, ms, act)` races `act` against a deadline and answers
+`None{}` if the deadline wins; the loser is not cancelled. The program ends when
+every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
 Every effect in Base is a def whose body is `import "./x.js"` plus a `.c` twin,
