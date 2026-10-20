@@ -3778,10 +3778,7 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// err_claim lets one thread end the process: the first caller gets 1 and
-// flushes stdout. A fault in its own exit path (SA_NODEFER) gets 0, and so
-// does any other thread, after waiting a second for its _exit (it may hold
-// the lock the first one flushes on). pthread_self allocates nothing.
+// The first to fail gets 1; others wait a second for its _exit, then 0.
 FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
@@ -3801,8 +3798,7 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A fault flushes stdout only if no other thread holds it, then writes the
-// line raw; a fault inside that flush skips it.
+// A trap never waits on a lock: it flushes only if free, then writes raw.
 static void err_trap(int sig) {
   static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
   if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
