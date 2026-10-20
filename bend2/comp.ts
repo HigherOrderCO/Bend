@@ -1955,6 +1955,16 @@ function bind_dead(sc: Scope, rest: HTerm[], ps = [...sc.uses.keys()]): void {
   }
 }
 
+// Box multiword captures when they and the results exceed the segment limit.
+function bind_caps(sc: Scope, live: [Of<"Var">, Bind][],
+  results: number): [Of<"Var">, Bind][] {
+  if (results + live.reduce((n, [, b]) => n + b.val.ws.length, 0) <= WIDE) {
+    return live;
+  }
+  return live.map(([p, b]) => [p, b.val.ws.length <= 1 ? b
+    : { ...b, val: val_hold(sc, val_to(sc, b.val, BOX), "cap") }]);
+}
+
 // Die
 // ===
 
@@ -2359,11 +2369,12 @@ function emit_intr(sc: Scope, it: Intr, m: Spine, ty: HTerm | null): Val {
 
 function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
   const u = term_uses(x);
-  const live = [...sc.uses].filter(([p]) => term_use(u, p) > 0);
+  let live = [...sc.uses].filter(([p]) => term_use(u, p) > 0);
   live.forEach(([p, b]) => {
     sc.uses.set(p, { ...b, n: b.n - term_use(u, p) + 1 });
     bind_pop(sc, p);
   });
+  live = bind_caps(sc, live, 1);
   const words = live.flatMap(([, b]) => val_own(sc, b.val));
   const name = seg_name(sc, "c");
   const clo = seg_clo(sc, seg_fid(name), words);
@@ -2648,6 +2659,8 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
 function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const o = term_open(x);
   const calls = x.v.map(term_spine);
+  const results = calls.reduce((n, c) => n + fun_of(c.k!).ret.ks.length, 0);
+  sc = { ...sc, uses: new Map(bind_caps(sc, [...sc.uses], results)) };
   const fork = calls.length > 1;
   const name = seg_name(sc, "j");
   let hold: Of<"Var">[] = [];
