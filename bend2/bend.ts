@@ -1668,6 +1668,12 @@ export function parse_qual(p: Parse, k: Name): Name {
 }
 
 export function parse_reso(p: Parse, k: Name): Name {
+  // A key that already carries a namespace was resolved by parse_var; a
+  // source name never contains ":", so resolving it again would qualify it
+  // twice (lib:lib:T) for a datatype declared later in the file (#1514).
+  if (k.includes(":")) {
+    return k;
+  }
   const dot = k.indexOf(".");
   let q = parse_qual(p, k);
   if (dot !== -1 && k.slice(0, dot) in p.al) {
