@@ -13,6 +13,6 @@ def bad() -> Bool -> Bool:
 #|6 | def bad() -> Bool -> Bool:
 #|7>|   \{True: True{}}
 #|  |   ^^^^^^^^^^^^^^^
-#|8 |
-#|Note: add `case False{}:` (or `case _:`).
+#|8 | 
+#|Note: add a case for `False` (pattern `False{}`), or a catch-all case.
 #|exit 1

@@ -16,5 +16,5 @@ def pred(n: Nat) -> Nat:
 #|7>|   match n:
 #|  |   ^^^^^^^^
 #|8 |     case 1n+p:
-#|Note: add `case 0n:` (or `case _:`).
+#|Note: add a case for `Zero` (pattern `0n`), or a catch-all case.
 #|exit 1

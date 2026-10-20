@@ -29,5 +29,5 @@ def main(): f(Sx6{Zx6{}})
 #|15>|   match a:
 #|   |   ^^^^^^^^
 #|16 |     case Sx6{a}:
-#|Note: add `case Zx6{}:` (or `case _:`).
+#|Note: add a case for `Zx6` (pattern `Zx6{}`), or a catch-all case.
 #|exit 1

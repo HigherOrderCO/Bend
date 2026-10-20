@@ -46,5 +46,5 @@ def main(): f(Zz2b{}, Nl2{}, Zz2b{}, Nl2{})
 #|25>|   match a, b, c, d:
 #|   |   ^^^^^^^^^^^^^^^^^
 #|26 |     case Zz2b{}, xs, b, Nl2{}:
-#|Note: add a case for `Cl2` (or `case _:`).
+#|Note: add a case for `Cl2` (its fields may be dependent, so a case with them may not check), or a catch-all case.
 #|exit 1

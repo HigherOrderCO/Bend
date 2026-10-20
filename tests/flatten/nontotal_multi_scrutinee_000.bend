@@ -52,5 +52,5 @@ def main(): f(Nl0{}, Nl0{})
 #|26>|   match a, b:
 #|   |   ^^^^^^^^^^^
 #|27 |     case Cl0{Sz0{a}, b}, Cl0{Sz0{c}, d}:
-#|Note: add `case Zz0{}:` (or `case _:`).
+#|Note: add a case for `Zz0` (pattern `Zz0{}`), or a catch-all case.
 #|exit 1

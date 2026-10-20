@@ -27,5 +27,5 @@ def main(): f(Aa1{})
 #|13>|   match x:
 #|   |   ^^^^^^^^
 #|14 |     case Aa1{}:
-#|Note: add cases for Bb1, Cc1 (or `case _:`).
+#|Note: add cases for `Bb1` (pattern `Bb1{}`), `Cc1` (pattern `Cc1{}`), or a catch-all case.
 #|exit 1

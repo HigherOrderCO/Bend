@@ -33,5 +33,5 @@ def main(): f(Sx7{Zx7{}})
 #|17>|   match a:
 #|   |   ^^^^^^^^
 #|18 |     case Sx7{Sx7{a}}:
-#|Note: add `case Zx7{}:` (or `case _:`).
+#|Note: add a case for `Zx7` (pattern `Zx7{}`), or a catch-all case.
 #|exit 1

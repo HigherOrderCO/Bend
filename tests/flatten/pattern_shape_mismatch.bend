@@ -31,5 +31,5 @@ def main(a):
 #|20>|   match a:
 #|   |   ^^^^^^^^
 #|21 |     case 0:
-#|Note: add `case True{}:` (or `case _:`).
+#|Note: add a case for `True` (pattern `True{}`), or a catch-all case.
 #|exit 1

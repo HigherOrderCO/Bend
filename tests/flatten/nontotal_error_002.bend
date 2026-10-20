@@ -30,5 +30,5 @@ def main(): f(Se2{Ze2{}})
 #|16>|   match a:
 #|   |   ^^^^^^^^
 #|17 |     case Se2{a}:
-#|Note: add `case Ze2{}:` (or `case _:`).
+#|Note: add a case for `Ze2` (pattern `Ze2{}`), or a catch-all case.
 #|exit 1

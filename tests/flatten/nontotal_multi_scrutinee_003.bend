@@ -30,5 +30,5 @@ def main(): mix(Ob{}, Ob{})
 #|14>|   match a, b:
 #|   |   ^^^^^^^^^^^
 #|15 |     case Ob{}, Ob{}:
-#|Note: add `case Ib{}:` (or `case _:`).
+#|Note: add a case for `Ib` (pattern `Ib{}`), or a catch-all case.
 #|exit 1

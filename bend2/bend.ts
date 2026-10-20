@@ -3628,13 +3628,19 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
             // the case to add: a nullary constructor by its surface
             // spelling (0n for Zero, [] for Nil), a fielded one by its
             // name (its fields may be dependent, so a case with them may
-            // not check)
+            // not check). the pattern is named, not the whole case: a
+            // match on several scrutinees takes one pattern each, and
+            // the count is not known here, so a whole case would be
+            // syntax the user cannot write.
             const one = (c: Ctr): string => c.n === 0
-              ? "`case " + term_show(term_lower(Ctr(c.k, [])), -1, [], tm.s?.file) + ":`"
-              : "a case for `" + name_key(c.k) + "`";
+              ? "`" + name_key(c.k) + "` (pattern `"
+                + term_show(term_lower(Ctr(c.k, [])), -1, [], tm.s?.file) + "`)"
+              : "`" + name_key(c.k) + "` (its fields may be dependent, so a"
+                + " case with them may not check)";
             const nte = rem.length === 1
-              ? "Note: add " + one(rem[0]) + " (or `case _:`)."
-              : "Note: add cases for " + rem.map((c) => name_key(c.k)).join(", ") + " (or `case _:`).";
+              ? "Note: add a case for " + one(rem[0]) + ", or a catch-all case."
+              : "Note: add cases for " + rem.map(one).join(", ")
+                + ", or a catch-all case.";
             throw Err(book, ctx, "this match doesn't cover " + rem.map((c) => name_key(c.k)).join(", "), undefined, tm.s, lhs.def, nte);
           }
           return Check(tm, ty, uses_nil());

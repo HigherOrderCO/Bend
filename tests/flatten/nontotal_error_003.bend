@@ -26,5 +26,5 @@ def main(): pred(Se3{Ze3{}})
 #|12>|   match n:
 #|   |   ^^^^^^^^
 #|13 |     case Se3{p}:
-#|Note: add `case Ze3{}:` (or `case _:`).
+#|Note: add a case for `Ze3` (pattern `Ze3{}`), or a catch-all case.
 #|exit 1

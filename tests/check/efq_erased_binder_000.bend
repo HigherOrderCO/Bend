@@ -31,5 +31,5 @@ def bad(x):
 #|21>|       match b:
 #|   |       ^^^^^^^^
 #|22 |         case B0{}: B0{}
-#|Note: add `case B1{}:` (or `case _:`).
+#|Note: add a case for `B1` (pattern `B1{}`), or a catch-all case.
 #|exit 1
