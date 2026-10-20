@@ -6096,7 +6096,7 @@ int main(int argc, char** argv) {
   }
   rts[nr++] = NULL;
   io_argv = argv;
-  io_argc = 1;
+  io_argc = argc > 0;
   for (int i = 1; i < argc; i += 1) {
     char* a = argv[i];
     if (!strcmp(a, "--") || !strcmp(a, "--RTS")) {
@@ -6427,6 +6427,8 @@ function io_text(b, n) {
   return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b.subarray(0, n));
 }
 
+// Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
+// either direction; io_unlist answers null if a value is past 255.
 function io_list(b, n) {
   let xs = { $: "Nil" };
   while (n > 0) {
