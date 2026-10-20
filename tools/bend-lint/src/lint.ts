@@ -372,7 +372,7 @@ export async function lint(
     signal.throwIfAborted();
     const mine = want === undefined ? undefined : select(loaded, checked, want, program);
     const asked = new Set(mine);
-    const out = await rule.run(
+    const pending = rule.run(
       {
         ...ops,
         sources,
@@ -396,6 +396,20 @@ export async function lint(
       },
       signal,
     );
+    let abort: (() => void) | undefined;
+    let out: Diag[];
+    try {
+      out = Array.isArray(pending) ? await pending : await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          abort = () => reject(signal.reason);
+          if (signal.aborted) abort();
+          else signal.addEventListener("abort", abort, { once: true });
+        }),
+      ]);
+    } finally {
+      if (abort !== undefined) signal.removeEventListener("abort", abort);
+    }
     signal.throwIfAborted();
     if (!Array.isArray(out)) {
       throw new TypeError("rule " + rule.id + " must return an array of diagnostics");
@@ -446,12 +460,18 @@ function clash(a: Edit, b: Edit): boolean {
   );
 }
 
-// `text` with edits applied; their spans are offsets into `text`, and they
-// do not clash.
+// Apply non-clashing edits at original UTF-16 offsets, assembling the source once.
 function apply(text: string, edits: Edit[]): string {
-  return [...edits]
-    .sort((a, b) => b.span.beg - a.span.beg || b.span.end - a.span.end)
-    .reduce((s, { span, text: t }) => s.slice(0, span.beg) + t + s.slice(span.end), text);
+  if (edits.length === 0) return text;
+  const parts: string[] = [];
+  let at = 0;
+  for (const { span, text: replacement } of [...edits]
+    .sort((a, b) => a.span.beg - b.span.beg || a.span.end - b.span.end)) {
+    parts.push(text.slice(at, span.beg), replacement);
+    at = span.end;
+  }
+  parts.push(text.slice(at));
+  return parts.join("");
 }
 
 // The text of `file` with the fixes of the given levels applied, in order.
@@ -805,10 +825,14 @@ const given = import.meta.main
       options: OPTIONS,
       allowPositionals: true,
       strict: false,
-    }).values.bend
+    }).values
   : undefined;
 
-const loaded = await load(typeof given === "string" ? given : undefined).catch((e: unknown) =>
+if (given?.help) {
+  process.exit(await cli(process.argv.slice(2)).catch(fail));
+}
+
+const loaded = await load(typeof given?.bend === "string" ? given.bend : undefined).catch((e: unknown) =>
   import.meta.main ? fail(e) : Promise.reject(e),
 );
 

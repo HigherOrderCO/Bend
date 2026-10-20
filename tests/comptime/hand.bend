@@ -1,6 +1,5 @@
 # the hand-written twin of comptime_tmpl: incs maps U32.inc by
-# recursion. the report diffs the two programs' C (identical up to the
-# def name) and times both at 10000000 elements
+# recursion. gates/test.ts checks that the twins' C matches up to FID names.
 import Base
 
 def range(n: Nat, +i: U32, acc: List<U32>) -> List<U32>:

@@ -164,15 +164,15 @@ function looseLines(lines: Line[]): boolean[] {
 }
 
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header or `=>` lambda opener. As in `do IO<Unit>: a`, Bend pins the
-// lines after it to the column of `a`.
+// `def` header, `=>` lambda opener or `;` statement separator. As in
+// `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
 function inlineBodies(lines: Line[]): number[][] {
   let open = 0;
   let header: { open: number; angle: number; typed: boolean } | null = null;
   return lines.map((line) => line.tokens.flatMap((token, index) => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
-    } else if (token.text === "=>" && open === 0) {
+    } else if ((token.text === "=>" || token.text === ";") && open === 0) {
       return index + 1 < line.tokens.length ? [index + 1] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
@@ -188,24 +188,62 @@ function inlineBodies(lines: Line[]): number[][] {
   }));
 }
 
-// A tab is one column, as in the parser. Loose lines measure against a copy of
-// the levels, so they can't shift the statements after them.
-function indentDepths(lines: Line[], loose = looseLines(lines)): number[] {
+type Level = { col: number; depth: number; parent?: Level };
+
+// A tab is one column, as in the parser. Loose lines use a separate path.
+// As in bend-lint's Layout, cases retain their match's path across body dedents.
+// Inline first cases anchor their later arms and nested matches.
+function indentDepths(lines: Line[], loose = looseLines(lines), anchors: (Token | undefined)[] = []): number[] {
   const depths: number[] = [];
-  const stack = [0];
-  let levels = stack;
+  const scopes: { parent: number; first?: number; current: number; level?: Level; anchor?: Token }[] = [];
+  let main: Level = { col: 0, depth: 0 };
+  let level = main;
+  let wasLoose = false;
+  let brackets = 0;
   for (const [index, line] of lines.entries()) {
     if (line.code === "" && line.comment === "") {
       depths.push(-1);
       continue;
     }
-    if (!loose[index]) levels = stack;
-    else if (levels === stack) levels = [...stack];
+    if (!loose[index] || !wasLoose) level = main;
     const width = line.indent.length;
-    while (levels.length > 1 && width < levels[levels.length - 1]) levels.pop();
-    if (width > levels[levels.length - 1]) levels.push(width);
-    else if (width !== levels[levels.length - 1]) levels[levels.length - 1] = width;
-    depths.push(levels.length - 1);
+    while (level.parent && width < level.col) level = level.parent;
+    if (width > level.col) level = { col: width, depth: level.depth + 1, parent: level };
+    const head = line.tokens[0];
+    if (width === 0 && head && ["def", "type", "law", "@"].includes(head.text)) scopes.length = 0;
+    for (const token of line.tokens) {
+      if (token.kind === "symbol" && ["(", "[", "{"].includes(token.text)) brackets++;
+      else if (token.kind === "symbol" && [")", "]", "}"].includes(token.text)) brackets--;
+      else if (brackets === 0 && head?.text !== "import" && token.kind === "word") {
+        if (token.text === "match") {
+          scopes.push({ parent: scopes.at(-1)?.current ?? -1, current: -1, anchor: scopes.at(-1)?.anchor });
+        } else if (token.text === "case") {
+          while (scopes.length) {
+            const scope = scopes.at(-1)!;
+            if (scope.first === undefined ? token.col > scope.parent : token.col >= scope.first) break;
+            scopes.pop();
+          }
+          const scope = scopes.at(-1);
+          if (!scope) continue;
+          if (scope.first === undefined) {
+            scope.first = token.col;
+            if (token === head) {
+              const parent = scopes.at(-2)?.level;
+              if (parent && level.depth <= parent.depth) level = { col: token.col, depth: parent.depth + 1, parent };
+              scope.level = level;
+            } else scope.anchor = token;
+          } else if (token === head && scope.level) {
+            level = scope.level.col === token.col ? scope.level : { ...scope.level, col: token.col };
+            scope.level = level;
+          }
+          if (token === head) anchors[index] = scope.anchor;
+          scope.current = token.col;
+        }
+      }
+    }
+    if (!loose[index]) main = level;
+    wasLoose = loose[index];
+    depths.push(level.depth);
   }
   return depths;
 }
@@ -216,7 +254,7 @@ function fingerprint(lines: Line[]): string {
 }
 
 export function formatBend(source: string, options: FormatOptions = {}): string {
-  const eol = source.includes("\r\n") ? "\r\n" : "\n";
+  const endings = source.match(/\r?\n/g) ?? [];
   const finalEol = source.endsWith("\n");
   const rawLines = source.split(/\r?\n/);
   if (finalEol) rawLines.pop();
@@ -227,24 +265,33 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
     return source;
   }
   const loose = looseLines(lines);
-  const depths = indentDepths(lines, loose);
+  const anchors: (Token | undefined)[] = [];
+  const depths = indentDepths(lines, loose, anchors);
   const bodies = inlineBodies(lines);
   const size = Math.max(1, options.tabSize ?? 2);
   const spaces = options.insertSpaces !== false;
   // A line at or right of an inline body's column moves as far as that body.
   const pins: { from: number; to: number; prefix: string }[] = [];
+  const bodyPins = new Map<Token, typeof pins[number]>();
   const formatted = lines.map((line, index) => {
-    if (line.code === "" && line.comment === "") return "";
+    const ending = endings[index] ?? "";
+    if (line.code === "" && line.comment === "") return ending;
     const width = line.indent.length;
     if (!loose[index]) while (pins.length > 0 && pins[pins.length - 1].from > width) pins.pop();
-    const pin = pins.filter((pin) => pin.from <= width).pop();
+    const anchor = anchors[index];
+    const pin = anchor ? bodyPins.get(anchor) : pins.filter((pin) => pin.from <= width).pop();
+    if (anchor && pin && pins.at(-1) !== pin) pins.push(pin);
     const prefix = pin ? pin.prefix + " ".repeat(width - pin.from + pin.to - pin.prefix.length)
       : spaces ? " ".repeat(depths[index] * size) : "\t".repeat(depths[index]);
     const [code, starts] = formatTokens(line.tokens);
-    for (const at of bodies[index]) pins.push({ from: line.tokens[at].col, to: prefix.length + starts[at], prefix });
-    if (code === "") return prefix + line.comment;
-    return prefix + code + (line.comment === "" ? "" : "  " + line.comment);
-  }).join(eol) + (finalEol ? eol : "");
+    for (const at of bodies[index]) {
+      const pin = { from: line.tokens[at].col, to: prefix.length + starts[at], prefix };
+      pins.push(pin);
+      bodyPins.set(line.tokens[at], pin);
+    }
+    if (code === "") return prefix + line.comment + ending;
+    return prefix + code + (line.comment === "" ? "" : "  " + line.comment) + ending;
+  }).join("");
   try {
     if (fingerprint(lines) !== fingerprint(formatted.replace(/\r\n/g, "\n").split("\n").slice(0, finalEol ? -1 : undefined).map(splitLine))) return source;
   } catch {

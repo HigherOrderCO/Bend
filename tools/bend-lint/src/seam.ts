@@ -227,10 +227,24 @@ const CHILDREN: { [K in LTerm["$"]]: (tm: Extract<LTerm, { $: K }>) => LTerm[] }
 
 const slash = (p: string): string => p.split(nodePath.sep).join("/");
 
+// Unsaved files may not have directory entries yet; resolve their existing parents.
+const realPath = (p: nodeFs.PathLike, missing = false): string => {
+  try {
+    return slash(nodeFs.realpathSync(p));
+  } catch (e) {
+    if (typeof p === "string" && (e as NodeJS.ErrnoException).code === "ENOENT") {
+      const parent = nodePath.dirname(p);
+      if (parent !== p) {
+        const candidate = slash(nodePath.join(realPath(parent, true), nodePath.basename(p)));
+        if (missing || unsaved.has(candidate)) return candidate;
+      }
+    }
+    throw e;
+  }
+};
+
 const held = (p: nodeFs.PathOrFileDescriptor): string | undefined =>
-  typeof p === "string" && unsaved.size > 0 && nodeFs.existsSync(p)
-    ? unsaved.get(slash(nodeFs.realpathSync(p)))
-    : undefined;
+  typeof p === "string" && unsaved.size > 0 ? unsaved.get(realPath(p)) : undefined;
 
 // path.posix.resolve from `cwd`, where a drive letter is a root.
 export const resolve = (cwd: string, ...ps: string[]): string => {
@@ -249,12 +263,15 @@ export const relative = (from: string, to: string): string =>
 // fs and path for bend.ts and main.ts.
 export const fs = {
   ...nodeFs,
-  realpathSync: (p: nodeFs.PathLike): string => slash(nodeFs.realpathSync(p)),
+  existsSync: (p: nodeFs.PathLike): boolean =>
+    nodeFs.existsSync(p) ||
+    (typeof p === "string" && unsaved.size > 0 && unsaved.has(realPath(p, true))),
+  realpathSync: (p: nodeFs.PathLike): string => realPath(p),
   readFileSync: ((p: nodeFs.PathOrFileDescriptor, ...rest: unknown[]) => {
     const out =
       held(p) ?? (nodeFs.readFileSync as (...a: unknown[]) => unknown)(p, ...rest);
     if (reads !== undefined && typeof p === "string" && typeof out === "string") {
-      reads.set(slash(nodeFs.realpathSync(p)), out);
+      reads.set(realPath(p), out);
     }
     return out;
   }) as typeof nodeFs.readFileSync,
@@ -374,6 +391,25 @@ export const installedTag = (
   return version === undefined ? undefined : "v" + version;
 };
 
+const effectFiles = (base: string): string[] => {
+  const files = [...new Set([...base.matchAll(/^\s*import "\.\/(effs\/[^"]+)"/gm)].map((m) => m[1]))];
+  const odd = files.find((file) => !EFF.test(file));
+  if (odd !== undefined) {
+    throw new Error("base.bend imports " + odd + ", which is not a plain file in effs/");
+  }
+  return files;
+};
+
+const cachedBend = (dir: string): boolean => {
+  try {
+    return [...PATCHED, "safe.ts", "base.bend",
+      ...effectFiles(nodeFs.readFileSync(nodePath.join(dir, "base.bend"), "utf8"))]
+      .every((file) => nodeFs.statSync(nodePath.join(dir, file)).isFile());
+  } catch {
+    return false;
+  }
+};
+
 // The newest release, from git's list of refs (GitHub's API limits calls).
 // It asks at most once a day (a missing or damaged note asks again).
 export const latestTag = async (cache: string = CACHE, get: Get = download): Promise<string> => {
@@ -399,7 +435,8 @@ export const latestTag = async (cache: string = CACHE, get: Get = download): Pro
   if ("e" in got) {
     // Offline: the newest cached release, left out of the note, so the
     // next run asks again.
-    const cached = newest(nodeFs.existsSync(cache) ? nodeFs.readdirSync(cache) : []);
+    const cached = newest((nodeFs.existsSync(cache) ? nodeFs.readdirSync(cache) : [])
+      .filter((tag) => RELEASE.test(tag) && cachedBend(nodePath.join(cache, tag, "bend2"))));
     if (cached === undefined) {
       throw new Error(`cannot list bend's releases (${message(got.e)}); ${GIVE}`);
     }
@@ -416,8 +453,8 @@ export const latestTag = async (cache: string = CACHE, get: Get = download): Pro
 
 // bend2 at a release (the PATCHED files, safe.ts, base.bend and the effs/
 // files Base imports), kept in <cache>/<tag>/bend2.
-// A download goes to a temporary folder first, so the cache never holds a
-// partial one.
+// Files are staged before publication. A cached release is reused only when
+// every required source is present, including Base's host effects.
 export const fetchBend = async (
   tag: string,
   cache: string = CACHE,
@@ -427,9 +464,7 @@ export const fetchBend = async (
     throw new Error("not a bend release: " + tag);
   }
   const dir = nodePath.join(cache, tag, "bend2");
-  const whole = (): boolean =>
-    [...PATCHED, "safe.ts", "base.bend"].every((f) => nodeFs.existsSync(nodePath.join(dir, f)));
-  if (whole()) {
+  if (cachedBend(dir)) {
     return dir;
   }
   const fetched = (file: string): Promise<[string, string]> =>
@@ -437,28 +472,26 @@ export const fetchBend = async (
       .then((res) => text(res, ` for bend2/${file}`))
       .then((body) => [file, body]);
   const base = await fetched("base.bend");
-  const effs = [
-    ...new Set([...base[1].matchAll(/^\s*import "\.\/(effs\/[^"]+)"/gm)].map((m) => m[1])),
-  ];
-  const odd = effs.find((f) => !EFF.test(f));
-  if (odd !== undefined) {
-    throw new Error("base.bend imports " + odd + ", which is not a plain file in effs/");
-  }
+  const effs = effectFiles(base[1]);
   const files = [base, ...(await Promise.all([...PATCHED, "safe.ts", ...effs].map(fetched)))];
   nodeFs.mkdirSync(nodePath.join(cache, tag), { recursive: true });
   const part = nodeFs.mkdtempSync(nodePath.join(cache, tag, ".part-"));
-  files.forEach(([file, body]) => {
-    nodeFs.mkdirSync(nodePath.dirname(nodePath.join(part, file)), { recursive: true });
-    nodeFs.writeFileSync(nodePath.join(part, file), body);
-  });
   try {
-    nodeFs.rmSync(dir, { recursive: true, force: true });
-    nodeFs.renameSync(part, dir);
-  } catch (e) {
-    nodeFs.rmSync(part, { recursive: true, force: true });
-    if (!whole()) {
-      throw e;
+    files.forEach(([file, body]) => {
+      nodeFs.mkdirSync(nodePath.dirname(nodePath.join(part, file)), { recursive: true });
+      nodeFs.writeFileSync(nodePath.join(part, file), body);
+    });
+    // A release tag is immutable. Publish complete files without removing a
+    // checkout another downloader has already returned to a reader.
+    for (const [file] of files) {
+      const target = nodePath.join(dir, file);
+      nodeFs.mkdirSync(nodePath.dirname(target), { recursive: true });
+      nodeFs.renameSync(nodePath.join(part, file), target);
     }
+  } catch (e) {
+    if (!cachedBend(dir)) throw e;
+  } finally {
+    nodeFs.rmSync(part, { recursive: true, force: true });
   }
   return dir;
 };
@@ -764,10 +797,8 @@ export const check = (
 ): Promise<Checked> => {
   const turn = queue.then(async (): Promise<Checked> => {
     signal.throwIfAborted();
-    [...(text ?? [])]
-      .filter(([at]) => fs.existsSync(at))
-      .forEach(([at, str]) => unsaved.set(fs.realpathSync(at), str));
     try {
+      for (const [at, str] of text ?? []) unsaved.set(realPath(at, true), str);
       return await checked(m, file, filters, signal);
     } finally {
       hook.see = undefined;
