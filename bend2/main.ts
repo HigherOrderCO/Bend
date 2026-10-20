@@ -446,6 +446,7 @@ function cc_find(gpu: boolean): string {
 // lib; else the ! runs on the cores). On macOS a program with a framework
 // (#import: a window, audio) builds as Objective-C; on Linux it links the X11
 // (plus libdl, for dlopen before glibc 2.34) and ALSA libraries it includes.
+// The GPU program's build runs without the user's $BENDRTS.
 function cli_build(bin: string, file: string): void {
   const c     = fs.readFileSync(file, "utf8");
   const mac   = process.platform === "darwin";
@@ -464,9 +465,10 @@ function cli_build(bin: string, file: string): void {
     : ["-DBEND_CUDA=1", "-I" + cuda + "/include", "-L" + cuda + "/lib64",
       "-L" + cuda + "/lib", ...cpu, "-lcuda", "-lnvrtc"];
   const steps: [string, string[]][] = bangs
-    ? [[cc, gpu], [path.resolve(bin), ["--gpu-build"]]] : [[cc, cpu]];
+    ? [[cc, gpu], [path.resolve(bin), ["+RTS", "--gpu-build"]]] : [[cc, cpu]];
   for (const [cmd, args] of steps) {
-    if (child.spawnSync(cmd, args, { stdio: "inherit" }).status !== 0) {
+    if (child.spawnSync(cmd, args, { stdio: "inherit",
+      env: { ...process.env, BENDRTS: "" } }).status !== 0) {
       throw "Error: " + path.basename(cmd) + " failed to build " + bin;
     }
   }
@@ -505,9 +507,17 @@ function cli_base(what?: string): void {
 }
 
 // An inline module script; an empty svg <script/> can't have content.
+// HTMLRewriter keeps character references in attributes. Only ASCII
+// references and HTML whitespace can turn a type into "module"; NBSP cannot.
 function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  const type = el.getAttribute("type")?.replace(
+    /&#(?:[xX]([\da-fA-F]+)|(\d+));?|&(Tab|NewLine);/g, (t, hex, dec, ws) => {
+      if (ws) return ws === "Tab" ? "\t" : "\n";
+      const n = parseInt(hex ?? dec, hex === undefined ? 10 : 16);
+      return n < 128 ? String.fromCharCode(n) : t;
+    });
   return el.canHaveContent && !el.hasAttribute("src")
-    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+    && type?.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, "").toLowerCase() === "module";
 }
 
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
