@@ -19,8 +19,10 @@ def want(i: U32) -> U32:
   match i:
     case 0:
       33
+    case 1:
+      33
     case _:
-      euro(((i - 1) % 3 : U32))
+      euro(((i - 2) % 3 : U32))
 
 def scan(xs: List<&2, U32>, +n: U32, good: Bool) -> U32 & Bool:
   match xs:
@@ -41,7 +43,7 @@ def drain_got(rest: Socket -> (U32 & Bool) -> IO(Unit), s: Socket, +n: U32, good
     case None{}:
       do IO<Unit>:
         Unit <- Socket.close(s)
-        IO.print(verdict(Bool.and(good, U32.is_eq(n, 600001))))
+        IO.print(verdict(Bool.and(good, U32.is_eq(n, 600002))))
     case Some{xs}:
       rest(s, scan(xs, n, good))
 
@@ -68,19 +70,35 @@ def sent(m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO
     case Fail{((code, message), rest)}:
       IO.die(Unit, code, message)
 
+# The residue must start inside a character, or the test proves nothing.
+def split(rest: List<&2, U32>) -> List<&2, U32> & Bool:
+  match rest:
+    case []:
+      ([], False{})
+    case +x <> xs:
+      (x <> xs, Bool.and(U32.is_ge(x, 128), U32.is_lt(x, 192)))
+
+def resume_split(peer: Socket, s: Socket, m: List<&2, U32> & Bool) -> IO(Unit):
+  (rest, inside) = m
+  match inside:
+    case True{}:
+      do IO<Unit>:
+        Unit <- IO.spawn(Unit, drain(600003n, peer, (0, True{})))
+        next : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send_bytes(s, rest)
+        sent(next)
+    case False{}:
+      IO.die(Unit, 1, "send stopped on a character boundary")
+
 def resume(peer: Socket, m: Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>, List<&2, U32>>) -> IO(Unit):
   (s, r) = m
   match r:
     case Wait{rest}:
-      do IO<Unit>:
-        Unit <- IO.spawn(Unit, drain(600002n, peer, (0, True{})))
-        next : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send_bytes(s, rest)
-        sent(next)
+      resume_split(peer, s, split(rest))
     case Ready{Done{u}}:
       do IO<Unit>:
         Unit <- IO.print("send did not wait")
         Unit <- Socket.close(s)
-        drain(600002n, peer, (0, True{}))
+        drain(600003n, peer, (0, True{}))
     case Ready{Fail{((code, message), rest)}}:
       IO.die(Unit, code, message)
 
@@ -90,7 +108,7 @@ def accepted(c: Socket, m: Listener & Result<&1, &1, U32 & String, Socket>) -> I
     peer : Socket <- IO.pass(Socket, r)
     Unit <- Listener.close(l)
     c : Socket <- Host.small_send(c)
-    result : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>, List<&2, U32>> <- TCP.try_send(c, "!" ++ String.repeat("€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€", 6250n), 0)
+    result : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>, List<&2, U32>> <- TCP.try_send(c, "!!" ++ String.repeat("€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€", 6250n), 0)
     resume(peer, result)
 
 def connected(bound: Listener & U32) -> IO(Unit):
