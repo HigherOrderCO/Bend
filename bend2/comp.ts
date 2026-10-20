@@ -2838,8 +2838,10 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // namespace, else as is. An effect source is read once, in one namespace.
 // effect_src splices a C source's backslash-newlines first, as C does even
 // in a comment; JS does not.
+// Only #define bodies root IDs on C preprocessor lines.
 
 const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
+const C_ID_WORDS = new RegExp(ID_WORDS.source + String.raw`|(?:#|%:)(?:[^\S\n]|/\*[^]*?\*/)*(?![CF]ID\()(\w+)`, "gu");
 
 function c_ids(src: string, m = "", use?: (p: string, k: Name) => void): string {
   const replace = (t: string, p: string | undefined, k: string | undefined, at: number): string => {
@@ -2858,7 +2860,18 @@ function c_ids(src: string, m = "", use?: (p: string, k: Name) => void): string 
       ? js_tag(q) : q) : name_id(p + "_", q);
   };
   if (use) {
-    for (const hit of src.matchAll(ID_WORDS)) replace(hit[0], hit[1], hit[2], hit.index);
+    let end = 0;
+    let directive = "";
+    for (const hit of src.matchAll(C_ID_WORDS)) {
+      for (; end < hit.index; end += 1) {
+        if (src[end] === "\n") directive = "";
+      }
+      end = hit.index + hit[0].length;
+      if (!directive && hit[3]) directive = hit[3];
+      if (!directive || directive === "define") {
+        replace(hit[0], hit[1], hit[2], hit.index);
+      }
+    }
     return src;
   }
   return src.replace(ID_WORDS, replace);
