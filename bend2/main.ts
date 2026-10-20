@@ -154,7 +154,7 @@ async function cli(): Promise<void> {
   } else {
     await cli_file(args);
   }
-  await check();
+  await check().catch(() => {});
 }
 
 // cli_guide prints guide/<NAME>.md: the guide, or a named extra.
@@ -370,6 +370,16 @@ function path_real(p: string): string {
   return fs.existsSync(p) ? fs.realpathSync(p) : path.resolve(p);
 }
 
+// same_file compares device and inode, so links to one file agree.
+function same_file(a: string, b: string): boolean {
+  if (!fs.existsSync(a) || !fs.existsSync(b)) {
+    return false;
+  }
+  const x = fs.statSync(a, { bigint: true });
+  const y = fs.statSync(b, { bigint: true });
+  return x.dev === y.dev && x.ino === y.ino;
+}
+
 function cli_emit(book: Bend.Book, out: string): void {
   if (out.endsWith(".mjs")) {
     fs.writeFileSync(out, Comp.js_lib(book, true));
@@ -503,8 +513,10 @@ function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
+// Virtual names must not shadow real files; only their diagnostics map to a page.
 async function cli_bundle(page: string, dir: string): Promise<void> {
-  const code = new Map<string, string>();
+  type Inline = { id: string; page: string; text: string };
+  const code = new Map<string, Inline>();
   const inline: BunPlugin = {
     name: "bend inline",
     setup(build) {
@@ -513,7 +525,7 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         return code.has(id) ? { path: id, namespace: "inline" } : undefined;
       });
       build.onLoad({ filter: /.*/, namespace: "inline" }, (a) =>
-        ({ contents: code.get(a.path)!, loader: "js" }));
+        ({ contents: code.get(a.path)!.text, loader: "js" }));
       build.onLoad({ filter: /\.html$/ }, async (a) => {
         const src = await Bun.file(a.path).text();
         // HTMLRewriter gives no offsets, so a first pass marks where each
@@ -529,15 +541,20 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
             }
           },
         }).transform(src);
-        const mods: { id: string; text: string }[] = [];
-        let mod: { id: string; text: string } | null = null;
+        const mods: Inline[] = [];
+        let mod: Inline | null = null;
+        let serial = 0;
         const html = new HTMLRewriter().on("script", {
           element(el) {
             mod = null;
             if (is_inline_module(el)) {
-              const name = "." + path.basename(a.path) + ".bend-inline-"
-                + mods.length + ".js";
-              mod = { id: path.join(path.dirname(a.path), name), text: "" };
+              let name: string;
+              let id: string;
+              do {
+                name = "." + path.basename(a.path) + ".bend-inline-" + serial++ + ".js";
+                id = path.join(path.dirname(a.path), name);
+              } while (fs.existsSync(id));
+              mod = { id, page: a.path, text: "" };
               mods.push(mod);
               el.setAttribute("src", "./" + name);
             }
@@ -556,7 +573,8 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
           const at = marked.indexOf(mark, end + skip) - skip;
           line += src.slice(end, at).split("\n").length - 1;
           const col = at - src.lastIndexOf("\n", at - 1) - 1;
-          code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
+          m.text = "\n".repeat(line) + " ".repeat(col) + m.text;
+          code.set(m.id, m);
           end = at;
         }
         return { contents: html, loader: "html" };
@@ -564,8 +582,14 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
     },
   };
   try {
+    // Only the page keeps its name in the bundle (chunks and assets are hashed),
+    // so it is the input an -o can overwrite: refuse that, through links too.
+    const entry = path_real(page);
+    if (same_file(path.join(dir, path.basename(entry)), entry)) {
+      cli_fail("-o " + dir + " would overwrite the page");
+    }
     const out = await Bun.build({
-      entrypoints: [page],
+      entrypoints: [entry],
       outdir: dir,
       target: "browser",
       minify: true,
@@ -575,7 +599,11 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
       cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
     }
   } catch (e) {
-    throw book_err(e).replace(/\.([^/\\]+)\.bend-inline-\d+\.js/g, "$1");
+    let message = book_err(e);
+    for (const [id, mod] of code) {
+      message = message.replaceAll(id + ":", mod.page + ":");
+    }
+    throw message;
   }
 }
 
@@ -808,12 +836,22 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // def outside Base relies on unsafe or foreign code and, with the kernel,
 // when BendTT checks every def too; else FAIL and why. A kernel failure is
 // a mismatch: bend2 accepted what the kernel rejects; it shows the why.
+// When none of those is a law or a def of the file, no law or proof uses
+// them: they come in through imports, and a hint names them.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
-  if (bad.length !== 0) {
-    cli_say(2, FAIL + "\nError: " + String(bad.length) + " def" + (bad.length === 1
-      ? " relies" : "s rely") + " on unsafe or foreign code:\n"
-      + bad.map((k) => "- " + Bend.name_key(k) + "\n").join(""));
+  const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
+  if (n !== 0) {
+    const own = bad.some(([, ks]) => ks.some((k) =>
+      !k.includes(":") || (book.tlds[k] as Bend.Def).l === true));
+    cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
+      : "s rely") + " on unsafe or foreign code:\n"
+      + bad.map(([on, ks]) => "defs that depend on " + on + ": "
+        + ks.map(Bend.name_key).join(", ") + "\n").join("")
+      + (own ? "" : "Hint: no law or proof uses these defs. Move them to a"
+        + " file this proof does not import, and the proofs will check: "
+        + [...new Set(bad.flatMap(([, ks]) => ks))].map(Bend.name_key)
+          .join(", ") + "\n"));
     return 1;
   }
   const why = kernel ? Safe.safe_check(book) : null;
@@ -825,19 +863,24 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   return 0;
 }
 
-// book_promises lists the defs outside Base (laws and types too) that are
-// @unsafe or foreign, or whose type, body, datatype kind, parameters or
-// constructor fields name a def that relies on one. A foreign def is a
-// promise like @unsafe is: the checker reads its type, never its code.
-// If the book holds a promise, a walk from the defs outside Base collects
-// who names whom, then the promises flood back along those edges.
-function book_promises(book: Bend.Book): string[] {
+// book_promises lists, per promise (@unsafe, foreign effects), the defs
+// outside Base (laws and types too) that are one, or whose type, body,
+// datatype kind, parameters or constructor fields name a def that relies
+// on one. A foreign def is a promise like @unsafe is: the checker reads
+// its type, never its code. If the book holds a promise, a walk from the
+// defs outside Base collects who names whom, then each promise floods
+// back along those edges.
+function book_promises(book: Bend.Book): Array<[string, string[]]> {
   const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
-  const bad  = new Set(Object.keys(book.tlds).filter((k) => {
-    const t = book.tlds[k] as Bend.Def;
-    return t.u === true || (t.i !== undefined && t.b !== true);
-  }));
-  if (bad.size === 0) {
+  const keys = Object.keys(book.tlds);
+  const roots: Array<[string, string[]]> = [
+    ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
+    ["foreign effects", keys.filter((k) => {
+      const t = book.tlds[k] as Bend.Def;
+      return t.u !== true && t.i !== undefined && t.b !== true;
+    })],
+  ];
+  if (roots.every(([, ks]) => ks.length === 0)) {
     return [];
   }
   const uses: Record<string, string[]> = Object.create(null);
@@ -858,10 +901,14 @@ function book_promises(book: Bend.Book): string[] {
       }
     }
   }
-  for (const k of bad) {
-    uses[k]?.forEach((j) => bad.add(j));
-  }
-  return own.filter((k) => bad.has(k));
+  return roots.flatMap(([on, ks]) => {
+    const bad = new Set(ks);
+    for (const k of bad) {
+      uses[k]?.forEach((j) => bad.add(j));
+    }
+    const out = own.filter((k) => bad.has(k));
+    return out.length === 0 ? [] : [[on, out]];
+  });
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
@@ -884,11 +931,22 @@ function term_refs(t: object, out: Set<string>): void {
 
 // cli_say writes text to fd, and drops it if the reader has left (EPIPE).
 function cli_say(fd: number, text: string): void {
-  try {
-    fs.writeSync(fd, text);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "EPIPE") {
-      throw e;
+  const data = Buffer.from(text);
+  for (let at = 0; at < data.length;) {
+    try {
+      const n = fs.writeSync(fd, data, at, data.length - at);
+      if (n === 0) {
+        throw new Error("bend: a write made no progress");
+      }
+      at += n;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EPIPE") {
+        return;
+      }
+      if (code !== "EAGAIN" && code !== "EINTR") {
+        throw e;
+      }
     }
   }
 }
@@ -991,9 +1049,10 @@ async function load_js(path: string): Promise<string> {
 
 export async function load(u: string, context: unknown,
   next: (u: string, context: unknown) => unknown): Promise<unknown> {
-  return u.endsWith(".bend")
+  const file = u.startsWith("file:") ? url.fileURLToPath(u) : null;
+  return file !== null && file.endsWith(".bend")
     ? { format: "module", shortCircuit: true,
-      source: await load_js(url.fileURLToPath(u)) }
+      source: await load_js(file) }
     : next(u, context);
 }
 

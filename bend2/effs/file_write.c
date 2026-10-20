@@ -6,6 +6,11 @@ static void file_write_call(IoWork* w) {
   ssize_t n = 0;
   for (uint64_t at = 0; n >= 0 && at < w->size; at += (uint64_t)n) {
     n = write(fd, w->data + at, w->size - at);
+    // no progress would retry forever (#1445)
+    if (n == 0) {
+      w->code = EIO;
+      return;
+    }
   }
   io_sys_end(w, n);
 }

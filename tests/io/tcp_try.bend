@@ -17,7 +17,7 @@ def chunk(n: Nat, acc: String) -> String:
     case 1n+p:
       chunk(p, String.append("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", acc))
 
-def sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Socket):
+def sent(m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO(Socket):
   (s, r) = m
   match r:
     case Done{u}:
@@ -65,7 +65,7 @@ def idle_recv(m: Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, St
         v : Unit <- IO.print("try_recv: early")
         return s
 
-def fill.got(rest: Socket -> IO(Socket), m: Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>) -> IO(Socket):
+def fill.got(rest: Socket -> IO(Socket), m: Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>, List<&2, U32>>) -> IO(Socket):
   (s, r) = m
   match r:
     case Ready{Done{u}}:
@@ -74,11 +74,11 @@ def fill.got(rest: Socket -> IO(Socket), m: Socket & Poll<&1, &1, Result<&1, &1,
       do IO<Socket>:
         u : Unit <- IO.print("send: failed, " ++ message)
         return s
-    case Wait{SCon{h, t}}:
+    case Wait{h <> t}:
       do IO<Socket>:
         u : Unit <- IO.print("send: wait, rest kept")
         return s
-    case Wait{SNil{}}:
+    case Wait{[]}:
       do IO<Socket>:
         u : Unit <- IO.print("send: wait, rest empty")
         return s
@@ -92,7 +92,7 @@ def fill(k: Nat, s: Socket) -> IO(Socket):
         return s
     case 1n+p:
       do IO<Socket>:
-        m : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String> <- TCP.try_send(s, chunk(1024n, ""), 20)
+        m : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>, List<&2, U32>> <- TCP.try_send(s, chunk(1024n, ""), 20)
         fill.got(s2 => fill(p, s2), m)
 
 def fill_go(c: Socket, m: Listener & Result<&1, &1, U32 & String, Socket>) -> IO(Unit):
@@ -115,7 +115,7 @@ def talk(l: Listener, port: U32, c: Socket, a: Socket) -> IO(Unit):
   do IO<Unit>:
     m  : Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, String>>, Unit> <- TCP.try_recv(a, 64, 5)
     a1 : Socket <- idle_recv(m)
-    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "late")
+    sm : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "late")
     c1 : Socket <- sent(sm)
     rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(a1, 64)
     a2 : Socket <- got(rm)

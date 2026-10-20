@@ -15,21 +15,34 @@ function chan_wait(item) {
   return { $: CID(Wait), rest: item === CHAN_RECV ? { $: CID(Unit) } : item };
 }
 
-// Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer).
+// The first waiter, past those whose IO has returned (a nested io_run): their
+// computations are gone with it, so the row drops them and their items.
+function chan_head(row) {
+  while (row.wait.length > 0 && row.wait[0].io.done) {
+    row.wait.shift();
+  }
+  return row.wait[0];
+}
+
+// Wakes the first live waiter with x, as Ready{x} if try_ (cutting its timer,
+// if the poller has not taken it yet), on the IO that parked it: a nested
+// io_run may wake an outer one.
 function chan_wake(row, x) {
-  const w = row.wait.shift();
+  const w = chan_head(row);
+  row.wait.shift();
   if (w.late !== undefined) {
-    const ws = io_active.waits;
-    ws.splice(ws.findIndex((t) => t.more === w.late), 1);
+    const ws = w.io.waits;
+    const at = ws.findIndex((t) => t.more === w.late);
+    if (at >= 0) ws.splice(at, 1);
     x = { $: CID(Ready), value: x };
   }
-  io_push(w.cont, x, false);
+  io_push(w.cont, x, false, w.io);
   return w.item;
 }
 
 function chan_take(row) {
   const v = row.ring.shift();
-  if (row.wait.length > 0) {
+  if (chan_head(row) !== undefined) {
     row.ring.push(chan_wake(row, chan_done()));
   }
   return v;
@@ -38,7 +51,7 @@ function chan_take(row) {
 // A handle is the row (a stale copy keeps it, shut).
 function chan_shut(row) {
   row.shut = true;
-  while (row.wait.length > 0) {
+  while (chan_head(row) !== undefined) {
     const item = row.wait[0].item;
     chan_wake(row, item === CHAN_RECV ? { $: CID(None) }
       : { $: CID(Fail), error: item });
@@ -48,10 +61,13 @@ function chan_shut(row) {
 // Parks k on row with item; with ms, a timer too, whose late answers Wait:
 // the first of the two to come cuts the other.
 function chan_park(row, k, item, ms) {
-  const w = { cont: k, item: item };
+  const w = { io: io_active, cont: k, item: item };
   if (ms !== undefined) {
     w.late = () => {
-      row.wait.splice(row.wait.indexOf(w), 1);
+      // An earlier callback of the same ready batch may have woken w.
+      const at = row.wait.indexOf(w);
+      if (at < 0) return undefined;
+      row.wait.splice(at, 1);
       return chan_wait(item);
     };
     io_park_on(undefined, false, k, w.late, io_until(ms));
@@ -65,7 +81,7 @@ function chan_put(row, value) {
   if (row.shut) {
     return { $: CID(Fail), error: value };
   }
-  if (row.wait.length > 0 && row.wait[0].item === CHAN_RECV) {
+  if (chan_head(row)?.item === CHAN_RECV) {
     chan_wake(row, { $: CID(Some), value: value });
     return chan_done();
   }
@@ -81,7 +97,8 @@ function chan_get(row) {
   if (row.ring.length > 0) {
     return { $: CID(Some), value: chan_take(row) };
   }
-  if (row.wait.length > 0 && row.wait[0].item !== CHAN_RECV) {
+  const w = chan_head(row);
+  if (w !== undefined && w.item !== CHAN_RECV) {
     return { $: CID(Some), value: chan_wake(row, chan_done()) };
   }
   if (row.shut) {

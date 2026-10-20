@@ -99,6 +99,7 @@ export type Checked = {
   book: Book;
   sources: Source[];
   map: Mapper;
+  declarations: Name[];
   facts?: Fact[];
   failure?: Diag;
 };
@@ -147,8 +148,9 @@ const PATCHES: Record<string, Patch> = {
       ...SHIMMED,
       ["export function term_infer(", "function unseen_term_infer("],
       ["export function term_check(", "function unseen_term_check("],
+      ["export function parse_book(", "function unseen_parse_book("],
     ],
-    tail: `import { seeInfer, seeCheck } from ${SHIM};\nexport const term_infer = seeInfer(unseen_term_infer);\nexport const term_check = seeCheck(unseen_term_check);\n`,
+    tail: `import { seeInfer, seeCheck, seeParseBook } from ${SHIM};\nexport const term_infer = seeInfer(unseen_term_infer);\nexport const term_check = seeCheck(unseen_term_check);\nexport const parse_book = seeParseBook(unseen_parse_book);\n`,
     exports: [],
   },
   "comp.ts": {
@@ -164,7 +166,10 @@ const PATCHES: Record<string, Patch> = {
 export const PATCHED = Object.keys(PATCHES);
 
 // Where the wrappers report, set for one check at a time.
-export const hook: { see?: (report: Report) => void } = {};
+export const hook: {
+  see?: (report: Report) => void;
+  parsed?: (dir: string, ns: string, names: Name[]) => void;
+} = {};
 
 // Text an editor holds unsaved, by real path, set for one check at a time.
 // bend.ts reads it in place of the file on disk.
@@ -222,10 +227,24 @@ const CHILDREN: { [K in LTerm["$"]]: (tm: Extract<LTerm, { $: K }>) => LTerm[] }
 
 const slash = (p: string): string => p.split(nodePath.sep).join("/");
 
+// Unsaved files may not have directory entries yet; resolve their existing parents.
+const realPath = (p: nodeFs.PathLike, missing = false): string => {
+  try {
+    return slash(nodeFs.realpathSync(p));
+  } catch (e) {
+    if (typeof p === "string" && (e as NodeJS.ErrnoException).code === "ENOENT") {
+      const parent = nodePath.dirname(p);
+      if (parent !== p) {
+        const candidate = slash(nodePath.join(realPath(parent, true), nodePath.basename(p)));
+        if (missing || unsaved.has(candidate)) return candidate;
+      }
+    }
+    throw e;
+  }
+};
+
 const held = (p: nodeFs.PathOrFileDescriptor): string | undefined =>
-  typeof p === "string" && unsaved.size > 0 && nodeFs.existsSync(p)
-    ? unsaved.get(slash(nodeFs.realpathSync(p)))
-    : undefined;
+  typeof p === "string" && unsaved.size > 0 ? unsaved.get(realPath(p)) : undefined;
 
 // path.posix.resolve from `cwd`, where a drive letter is a root.
 export const resolve = (cwd: string, ...ps: string[]): string => {
@@ -244,12 +263,15 @@ export const relative = (from: string, to: string): string =>
 // fs and path for bend.ts and main.ts.
 export const fs = {
   ...nodeFs,
-  realpathSync: (p: nodeFs.PathLike): string => slash(nodeFs.realpathSync(p)),
+  existsSync: (p: nodeFs.PathLike): boolean =>
+    nodeFs.existsSync(p) ||
+    (typeof p === "string" && unsaved.size > 0 && unsaved.has(realPath(p, true))),
+  realpathSync: (p: nodeFs.PathLike): string => realPath(p),
   readFileSync: ((p: nodeFs.PathOrFileDescriptor, ...rest: unknown[]) => {
     const out =
       held(p) ?? (nodeFs.readFileSync as (...a: unknown[]) => unknown)(p, ...rest);
     if (reads !== undefined && typeof p === "string" && typeof out === "string") {
-      reads.set(slash(nodeFs.realpathSync(p)), out);
+      reads.set(realPath(p), out);
     }
     return out;
   }) as typeof nodeFs.readFileSync,
@@ -270,7 +292,7 @@ export const path = {
 const arity = (f: (...args: never[]) => unknown, n: number, name: string): void => {
   if (f.length !== n) {
     throw drift(
-      `${name} takes ${f.length} parameters, not ${n}; update seeInfer and seeCheck in tools/bend-lint/src/seam.ts`,
+      `${name} takes ${f.length} parameters, not ${n}; update the wrappers in tools/bend-lint/src/seam.ts`,
     );
   }
 };
@@ -296,6 +318,17 @@ export const seeCheck = (f: typeof BendModule.term_check): typeof BendModule.ter
     const [bok, lhs, tm, qt, ty, ctx, dep] = args;
     hook.see?.({ tm: r.tm, ty, bok, ctx, dep, def: lhs.def, qt, us: r.us, spn: tm.s });
     return r;
+  };
+};
+
+// Record the declarations read by the parser, including imported law fills.
+export const seeParseBook = (f: typeof BendModule.parse_book): typeof BendModule.parse_book => {
+  arity(f, 5, "parse_book");
+  return (...args) => {
+    const [book, dir, , ns] = args;
+    const begin = book.order.length;
+    f(...args);
+    hook.parsed?.(dir, ns, book.order.slice(begin));
   };
 };
 
@@ -358,6 +391,25 @@ export const installedTag = (
   return version === undefined ? undefined : "v" + version;
 };
 
+const effectFiles = (base: string): string[] => {
+  const files = [...new Set([...base.matchAll(/^\s*import "\.\/(effs\/[^"]+)"/gm)].map((m) => m[1]))];
+  const odd = files.find((file) => !EFF.test(file));
+  if (odd !== undefined) {
+    throw new Error("base.bend imports " + odd + ", which is not a plain file in effs/");
+  }
+  return files;
+};
+
+const cachedBend = (dir: string): boolean => {
+  try {
+    return [...PATCHED, "safe.ts", "base.bend",
+      ...effectFiles(nodeFs.readFileSync(nodePath.join(dir, "base.bend"), "utf8"))]
+      .every((file) => nodeFs.statSync(nodePath.join(dir, file)).isFile());
+  } catch {
+    return false;
+  }
+};
+
 // The newest release, from git's list of refs (GitHub's API limits calls).
 // It asks at most once a day (a missing or damaged note asks again).
 export const latestTag = async (cache: string = CACHE, get: Get = download): Promise<string> => {
@@ -383,7 +435,8 @@ export const latestTag = async (cache: string = CACHE, get: Get = download): Pro
   if ("e" in got) {
     // Offline: the newest cached release, left out of the note, so the
     // next run asks again.
-    const cached = newest(nodeFs.existsSync(cache) ? nodeFs.readdirSync(cache) : []);
+    const cached = newest((nodeFs.existsSync(cache) ? nodeFs.readdirSync(cache) : [])
+      .filter((tag) => RELEASE.test(tag) && cachedBend(nodePath.join(cache, tag, "bend2"))));
     if (cached === undefined) {
       throw new Error(`cannot list bend's releases (${message(got.e)}); ${GIVE}`);
     }
@@ -400,8 +453,8 @@ export const latestTag = async (cache: string = CACHE, get: Get = download): Pro
 
 // bend2 at a release (the PATCHED files, safe.ts, base.bend and the effs/
 // files Base imports), kept in <cache>/<tag>/bend2.
-// A download goes to a temporary folder first, so the cache never holds a
-// partial one.
+// Files are staged before publication. A cached release is reused only when
+// every required source is present, including Base's host effects.
 export const fetchBend = async (
   tag: string,
   cache: string = CACHE,
@@ -411,9 +464,7 @@ export const fetchBend = async (
     throw new Error("not a bend release: " + tag);
   }
   const dir = nodePath.join(cache, tag, "bend2");
-  const whole = (): boolean =>
-    [...PATCHED, "safe.ts", "base.bend"].every((f) => nodeFs.existsSync(nodePath.join(dir, f)));
-  if (whole()) {
+  if (cachedBend(dir)) {
     return dir;
   }
   const fetched = (file: string): Promise<[string, string]> =>
@@ -421,28 +472,26 @@ export const fetchBend = async (
       .then((res) => text(res, ` for bend2/${file}`))
       .then((body) => [file, body]);
   const base = await fetched("base.bend");
-  const effs = [
-    ...new Set([...base[1].matchAll(/^\s*import "\.\/(effs\/[^"]+)"/gm)].map((m) => m[1])),
-  ];
-  const odd = effs.find((f) => !EFF.test(f));
-  if (odd !== undefined) {
-    throw new Error("base.bend imports " + odd + ", which is not a plain file in effs/");
-  }
+  const effs = effectFiles(base[1]);
   const files = [base, ...(await Promise.all([...PATCHED, "safe.ts", ...effs].map(fetched)))];
   nodeFs.mkdirSync(nodePath.join(cache, tag), { recursive: true });
   const part = nodeFs.mkdtempSync(nodePath.join(cache, tag, ".part-"));
-  files.forEach(([file, body]) => {
-    nodeFs.mkdirSync(nodePath.dirname(nodePath.join(part, file)), { recursive: true });
-    nodeFs.writeFileSync(nodePath.join(part, file), body);
-  });
   try {
-    nodeFs.rmSync(dir, { recursive: true, force: true });
-    nodeFs.renameSync(part, dir);
-  } catch (e) {
-    nodeFs.rmSync(part, { recursive: true, force: true });
-    if (!whole()) {
-      throw e;
+    files.forEach(([file, body]) => {
+      nodeFs.mkdirSync(nodePath.dirname(nodePath.join(part, file)), { recursive: true });
+      nodeFs.writeFileSync(nodePath.join(part, file), body);
+    });
+    // A release tag is immutable. Publish complete files without removing a
+    // checkout another downloader has already returned to a reader.
+    for (const [file] of files) {
+      const target = nodePath.join(dir, file);
+      nodeFs.mkdirSync(nodePath.dirname(target), { recursive: true });
+      nodeFs.renameSync(nodePath.join(part, file), target);
     }
+  } catch (e) {
+    if (!cachedBend(dir)) throw e;
+  } finally {
+    nodeFs.rmSync(part, { recursive: true, force: true });
   }
   return dir;
 };
@@ -648,8 +697,10 @@ const checked = async (
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
+  let declarations: Name[] = [];
   reads = texts;
-  const seeded = real !== "" && /^import Base$/m.test(fs.readFileSync(real, "utf8"));
+  const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+    .test(fs.readFileSync(real, "utf8"));
   const key = fs.readFileSync(Bend.BASE_BEND, "utf8");
   if (seeded && BASE?.key !== key) {
     BASE = { key, book: Main.book_read(Bend.BASE_BEND) };
@@ -666,6 +717,9 @@ const checked = async (
   const read = await Promise.resolve(seeded ? BASE?.book : undefined)
     .then((base) => {
       hook.see = filters.length > 0 ? see : undefined;
+      hook.parsed = (dir, ns, names) => {
+        if (dir === home && ns === "") declarations = names;
+      };
       return Main.book_read(file, base, seen);
     })
     .then(
@@ -702,6 +756,7 @@ const checked = async (
       book,
       sources,
       map,
+      declarations,
       facts: filters.length > 0 ? [...new Map(facts).values()] : undefined,
     };
   }
@@ -716,6 +771,7 @@ const checked = async (
     book: Bend.book_nil(),
     sources,
     map,
+    declarations: [],
     failure: {
       code: "bend/check",
       severity: "error",
@@ -741,13 +797,12 @@ export const check = (
 ): Promise<Checked> => {
   const turn = queue.then(async (): Promise<Checked> => {
     signal.throwIfAborted();
-    [...(text ?? [])]
-      .filter(([at]) => fs.existsSync(at))
-      .forEach(([at, str]) => unsaved.set(fs.realpathSync(at), str));
     try {
+      for (const [at, str] of text ?? []) unsaved.set(realPath(at, true), str);
       return await checked(m, file, filters, signal);
     } finally {
       hook.see = undefined;
+      hook.parsed = undefined;
       reads = undefined;
       unsaved.clear();
     }
@@ -783,7 +838,7 @@ export const select = (
 // in meaning. No typecheck, disk writes or import fetches. A proof made
 // only of {==} has no body span, so its aliases come from the sources. A
 // proof of an imported law fills its declaration rather than creating one.
-const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): boolean => {
+const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, text: string): boolean => {
   const { Bend } = m;
   const root = sources.find((s) => s.root)!;
   const ns = FILES.get(root)!.ns;
@@ -823,17 +878,7 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
     },
     original.imports.length ? spanned() : {},
   );
-  const qualify = (name: string) => {
-    const dot = name.indexOf(".");
-    return dot >= 0 && aliases[name.slice(0, dot)] !== undefined
-      ? aliases[name.slice(0, dot)] + ":" + name.slice(dot + 1)
-      : (ns ? ns + ":" : "") + name;
-  };
-  const own = new Set(
-    [...root.text.matchAll(/^(?:@unsafe\s+)?(?:def|type|law)\s+([\w.]+)/gm)].map((match) =>
-      qualify(match[1]),
-    ),
-  );
+  const own = new Set(declarations);
   const seed = (): Book => {
     const fresh = Bend.book_nil();
     fresh.tlds = { ...book.tlds };
@@ -851,7 +896,13 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
   };
   const snapshot = (s: string) => {
     const parsed = seed();
-    Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
+    const held = hook.parsed;
+    hook.parsed = undefined;
+    try {
+      Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
+    } finally {
+      hook.parsed = held;
+    }
     const lower = (t: HTerm | null) => (t === null ? null : Bend.term_lower(t));
     return JSON.stringify(
       parsed.order.map((k) => {
@@ -1018,6 +1069,7 @@ const selfCheck = async (m: Loaded): Promise<void> => {
   demand(
     [
       ["check", run.failure === undefined],
+      ["declarations (parse_book)", run.declarations.join(",") === "N,id,main"],
       ["Ref id (term_infer)", views.some((v) => v.kind === "Ref" && v.name === "id")],
       ["Lam (term_check)", views.some((v) => v.kind === "Lam")],
       ["type", x !== undefined && ops.show(x.fact, ops.type(x.fact)) === "N"],

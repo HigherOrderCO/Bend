@@ -49,7 +49,7 @@ def finish(l, c, m):
     return 0
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>
   IO(Socket)
 
 def send_go(m):
@@ -71,7 +71,7 @@ law step_data:
 
 def step_data(l, c, a):
   do IO<U32>:
-    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "bend-poll")
+    sm : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "bend-poll")
     c2 : Socket <- send_go(sm)
     m  : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String), Maybe<&1, String>>, Unit> <- TCP.try_recv(a, 64, 1000)
     finish(l, c2, m)
