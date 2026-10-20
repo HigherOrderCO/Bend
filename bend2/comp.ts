@@ -912,14 +912,13 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words. Its type arguments are looked into on every visit,
-// its fields once. When p takes an unknown type as a hit, they are opened
-// with DUMMY for its value arguments, so the answer covers every index it
-// is met with (#1513); else with the arguments first met.
-function ty_holds(A: HTerm | null,
-  p: Name | ((t: HTerm | null) => boolean), seen = new Set<Name>()): boolean {
+// its fields once: with the arguments first met or, for any, with DUMMY
+// for its value arguments, so the answer covers every index (#1513).
+function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
+  any = false, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen);
+    return ty_holds(t.f(DUMMY), p, any, seen);
   }
   if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
@@ -930,17 +929,16 @@ function ty_holds(A: HTerm | null,
   const tld = FL.book.tlds[t.k];
   const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, () =>
     tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K))) : [];
-  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen))) {
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, any, seen))) {
     return true;
   }
   if (tld?.$ !== "ADT" || seen.has(t.k)) {
     return false;
   }
   seen.add(t.k);
-  const xs = typeof p !== "string" && p(DUMMY)
-    ? t.x.map((x, i) => vs[i] ? DUMMY : x) : t.x;
+  const xs = any ? t.x.map((x, i) => vs[i] ? DUMMY : x) : t.x;
   return tld.c.some((c) =>
-    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen)));
+    ctr_doms(c, xs).some((f) => ty_holds(f, p, any, seen)));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
@@ -2945,7 +2943,7 @@ export function compile_book(book: Bend.Book): string {
   const reach = (from: string[]) => graph_close(new Set(from), edges);
   const live = reach(["main", ...FL.fids].map(seg_fid));
   const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
-    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
+    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"), true)));
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
   FL.segs = FL.segs.filter((s) => live.has(s.fid));
   FL.spins = FL.spins.filter((s) => live.has(s.fid));
