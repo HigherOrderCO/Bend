@@ -6,7 +6,7 @@
 // ====
 
 // Compiles a checked Book to C, one source for the host and
-// the device, or to JS. The C and JS runtimes close the file.
+// the device, or to JS.
 
 import * as fs from "node:fs";
 
@@ -601,7 +601,7 @@ function cid_mac(k: string): string {
 // ====
 
 // A Char past the Unicode scalars is 0xDC00 and three 11-bit pieces, which
-// str_out writes as U+FFFD. The JS runtime holds this function's text.
+// str_out writes as U+FFFD.
 function char_new(c: number): string {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
     : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
@@ -2850,9 +2850,8 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // =======
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
-// namespace, else as is. An effect source is read once, in one namespace.
-// effect_src splices a C source's backslash-newlines first, as C does even
-// in a comment; JS does not.
+// namespace, else as is. effect_src splices a C source's backslash-newlines
+// first, as C does even in a comment; JS does not.
 
 const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
 
@@ -3614,7 +3613,7 @@ enum { ERR_RING = 1, ERR_TAGS, ERR_HEAP, ERR_FIDS, ERR_NATS, ERR_RFCS,
 // =======
 
 // The bag is 2^CUBE_LOG groups of CUBE_T lanes (a -D constant on the
-// device). The device program compiles from the binary's own text.
+// device).
 
 #if !DEVICE
 
@@ -4983,9 +4982,8 @@ OUTLINE void pool_turn(bool grow, u32 rows) {
 // ===
 
 // gpu_make compiles the device program into <binary>.gpu: Metal's binary
-// archive, or CUDA's cubin behind a hash of the text; a launch loads it or
-// compiles. CUDA sizes the bag by L2 (a group per 64 KB, 16..128) and runs
-// one stream, which starts faster.
+// archive, or CUDA's cubin behind a hash of the text. CUDA sizes the bag by
+// L2 (a group per 64 KB, 16..128) and runs one stream, which starts faster.
 
 static const char* gpu_path(void) {
   static char path[4096];
@@ -5494,11 +5492,9 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 // ==
 
 // Base's opaque, linear handles pack host fds or pointers into aux and loc.
-// A request's cont applied to its item is the next request. A parked
-// request keeps its fd, deadline and events in word, time and evts; once
-// due, pack resumes it or parks it again (IO_PARK). Text is UTF-8, decoded
-// as WHATWG does. io_sys_addr refuses a leading zero (octal to some libcs).
-// macOS poll misses FIFO EOF, so io_wait selects, sized to the highest fd.
+// Text is UTF-8, decoded as WHATWG does. io_sys_addr refuses a leading zero
+// (octal to some libcs). macOS poll misses FIFO EOF, so io_wait selects,
+// sized to the highest fd.
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -6343,7 +6339,7 @@ function show_val(D, d, v, chain) {
 // Apple arm64 passes variadic fcntl flags on the stack, so io_sys passes
 // them as the ninth argument. A parked effect waits for fd (a write when
 // out) and/or until at; once due, io_wait calls more and resumes k with its
-// value, or parks it again on undefined. Waits stay in deadline order.
+// value, or parks it again on undefined.
 
 function io_exit(main, show) {
   try {
