@@ -2862,7 +2862,7 @@ function c_ids(src: string, m = ""): string {
       || q in FL.book.tlds || FL.ids.has(p + "_" + q))
       ?? die(`${p}(${k}) names no constructor or def`);
     return FL.js ? JSON.stringify(p === "CID" && q in FL.book.ctrs
-      ? js_tag(q) : Bend.name_key(q)) : name_id(p + "_", q);
+      ? js_tag(q) : q) : name_id(p + "_", q);
   });
 }
 
@@ -3085,7 +3085,8 @@ function js_tag(k: Name): string {
 }
 
 function js_key(n: Name): string {
-  return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
+  const key = JSON.stringify(n);
+  return (n === "__proto__" ? `[${key}]` : key) + ": ";
 }
 
 function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
@@ -3250,7 +3251,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   block(sc, `function ${name_id("$", k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
-      return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
+      return file_push(sc, `return { $: ${JSON.stringify(k)
         }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
         }], kont: (x) => ${params.at(-1)}(${host(K?.$ === "All" ? K.A : null,
         "x")}) };`);
@@ -3287,7 +3288,7 @@ function host(A: HTerm | null, x: string, out = 0): string {
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
-// def a host can call.
+// callable def by its book name: "lib:value" differs from a root "lib.value".
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
@@ -3307,7 +3308,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${host(tele_unbind(
+    return `  ${js_key(k)}run_lib((${ps}) => ${host(tele_unbind(
       FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
     }, ${lays.length}),`;
   }).join("\n")}\n};\n`;
