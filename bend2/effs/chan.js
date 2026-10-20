@@ -15,8 +15,9 @@ function chan_wait(item) {
   return { $: CID(Wait), rest: item === CHAN_RECV ? { $: CID(Unit) } : item };
 }
 
-// Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer).
-// A nested io_run may wake it; its queue and timer belong to the parked IO.
+// Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer, if
+// the poller has not taken it yet). It resumes on the IO that parked it, even
+// from a nested io_run; one that has returned hands it to the running IO.
 function chan_wake(row, x) {
   const w = row.wait.shift();
   if (w.late !== undefined) {
@@ -25,8 +26,7 @@ function chan_wake(row, x) {
     if (at >= 0) ws.splice(at, 1);
     x = { $: CID(Ready), value: x };
   }
-  w.io.runs.push({ fun: w.cont, arg: x });
-  w.cont = null;
+  io_push(w.cont, x, w.io.done, w.io.done ? io_active : w.io);
   return w.item;
 }
 
@@ -54,10 +54,10 @@ function chan_park(row, k, item, ms) {
   const w = { io: io_active, cont: k, item: item };
   if (ms !== undefined) {
     w.late = () => {
-      // Another ready callback may have won since the poller selected us.
-      if (w.cont === null) return undefined;
-      w.cont = null;
-      row.wait.splice(row.wait.indexOf(w), 1);
+      // An earlier callback of the same ready batch may have woken w.
+      const at = row.wait.indexOf(w);
+      if (at < 0) return undefined;
+      row.wait.splice(at, 1);
       return chan_wait(item);
     };
     io_park_on(undefined, false, k, w.late, io_until(ms));
