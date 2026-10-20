@@ -6096,8 +6096,8 @@ int main(int argc, char** argv) {
   io_argc = argc > 0;
   for (int i = 1; i < argc; i += 1) {
     char* a = argv[i];
-    if (!strcmp(a, "--") || !strcmp(a, "--RTS")) {
-      for (i += a[2] == 'R'; i < argc; i += 1) {
+    if (!strcmp(a, "--RTS")) {
+      for (i += 1; i < argc; i += 1) {
         io_argv[io_argc++] = argv[i];
       }
     } else if (!strcmp(a, "+RTS") || !strcmp(a, "-RTS")) {
@@ -6243,8 +6243,8 @@ function cli(argv) {
   cli_args.push(argv[0]);
   for (let i = 1; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === "--" || a === "--RTS") {
-      cli_args.push(...argv.slice(a === "--" ? i : i + 1));
+    if (a === "--RTS") {
+      cli_args.push(...argv.slice(i + 1));
       break;
     } else if (a === "+RTS" || a === "-RTS") {
       rts = a === "+RTS";

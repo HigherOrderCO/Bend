@@ -450,8 +450,8 @@ try {
   check("a plain run gets its arguments: " + argv.err, argv.code === 0
     && argv.out === "3\n");
   // a built program's runtime options are BENDRTS's, then those between
-  // +RTS and -RTS; the rest are its arguments, -- (kept) or --RTS (dropped)
-  // making every one after it the program's, as GHC's RTS reads them
+  // +RTS and -RTS; the rest are its arguments, -- among them, and --RTS
+  // (dropped) makes every one after it the program's
   const argf = path.join(TMP, "args.bend");
   const argo = path.join(TMP, "args");
   fs.writeFileSync(argf, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
@@ -459,9 +459,10 @@ try {
     + "    IO.print(List.show(~&1, ~String, ~(s => \"<\" ++ s ++ \">\"), xs))\n");
   const built = await bend([argf, "-o", argo, "-o", argo + ".js"]);
   const rts   = ["grep", "-e", "--threads", "--help", "+RTS", "--threads", "2",
-    "--gpu", "off", "-RTS", "", "space value", "--", "+RTS", "x"];
+    "--gpu", "off", "-RTS", "", "space value", "--", "+RTS", "--threads", "3",
+    "-RTS", "x"];
   const kept  = ", <grep>, <-e>, <--threads>, <--help>, <>, <space value>,"
-    + " <-->, <+RTS>, <x>]\n";
+    + " <-->, <x>]\n";
   const c_rts  = await run(argo, rts);
   const js_rts = await run(process.execPath, [argo + ".js", ...rts]);
   check("a built program's +RTS options are the runtime's, the rest its own: "
@@ -483,7 +484,8 @@ try {
     && zero.code === 1 && span.code === 1);
   for (const bad of [["+RTS", "--thread", "2"], ["+RTS", "--gpu", "of"],
     ["+RTS", "--gpu", "1e2GB"], ["+RTS", "--gpu", "0.001MB"],
-    ["+RTS", "", "-RTS"], ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
+    ["+RTS", "", "-RTS"], ["+RTS", "--", "-RTS"],
+    ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
     const c  = await run(argo, bad);
     const js = await run(process.execPath, [argo + ".js", ...bad]);
     check("a malformed runtime option fails alike on C and JS: "
