@@ -22,9 +22,9 @@
 # limit now loud AND numbered. The device half of the law (WL_ROOM posting
 # ERR_DEEP on the strided device stacks) rides on no host drive, so
 # a csrc pin holds it verbatim beside the four host trap sites.
-# The print BEFORE the deep call is the trap's flush: stdout is
-# buffered when it goes to a pipe, so a fault that does not flush it
-# loses what the program already printed.
+# The print BEFORE the deep call pins the trap's stdout flush: stdout is
+# buffered when it goes to a pipe, so a trap that skips the flush loses
+# what the program already printed.
 import Base
 
 law deep:

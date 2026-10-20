@@ -3778,31 +3778,25 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// err_exit sends the line in one write(2): a signal handler may call it,
-// and under PIPE_BUF no other thread's line can split it.
-static void err_exit(const char* msg) {
-  char   b[512] = "bend: ";
-  msg = msg ? msg : "(null)";
-  size_t n = strnlen(msg, 504);
-  memcpy(b + 6, msg, n);
-  b[n + 6] = '\n';
-  if (write(2, b, n + 7)) {}
-  _exit(1);
-}
-
 static void err_fail(const char* msg) {
   fflush(stdout);
-  err_exit(msg);
+  fprintf(stderr, "bend: %s\n", msg);
+  _exit(1);
 }
 
 static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A fault flushes stdout only if its lock is free: it never waits.
+// A fault may land inside stdio, so the trap writes its line raw and
+// flushes stdout once, only if no thread holds it; a fault in that flush
+// re-enters (SA_NODEFER) and skips it.
 static void err_trap(int sig) {
-  if (ftrylockfile(stdout) == 0) fflush(stdout);
-  err_exit(ERR_TEXT[ERR_DEEP]);
+  static volatile sig_atomic_t seen;
+  static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
+  if (!seen++ && ftrylockfile(stdout) == 0) fflush(stdout);
+  if (write(2, line, sizeof line - 1)) {}
+  _exit(1);
 }
 
 #endif
@@ -4842,7 +4836,8 @@ static Term* pool_stack(void) {
   }
   stack_t ss = { .ss_sp = p + len + 16384, .ss_size = SIGSTKSZ };
   sigaltstack(&ss, NULL);
-  struct sigaction sa = { .sa_handler = err_trap, .sa_flags = SA_ONSTACK };
+  struct sigaction sa = { .sa_handler = err_trap,
+    .sa_flags = SA_ONSTACK | SA_NODEFER };
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
   return (Term*)p;
@@ -5681,8 +5676,8 @@ OUTLINE void io_errs(Env e, Term s) {
   u64   n;
   char* text = io_cstr(e, s, &n);
   io_sync();
-  io_out(stderr, text, n);
-  io_out(stderr, "\n", 1);
+  text[n] = '\n';
+  io_out(stderr, text, n + 1);
   free(text);
 }
 
