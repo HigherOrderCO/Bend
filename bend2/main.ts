@@ -507,9 +507,17 @@ function cli_base(what?: string): void {
 }
 
 // An inline module script; an empty svg <script/> can't have content.
+// HTMLRewriter keeps character references in attributes. Only ASCII
+// references and HTML whitespace can turn a type into "module"; NBSP cannot.
 function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  const type = el.getAttribute("type")?.replace(
+    /&#(?:[xX]([\da-fA-F]+)|(\d+));?|&(Tab|NewLine);/g, (t, hex, dec, ws) => {
+      if (ws) return ws === "Tab" ? "\t" : "\n";
+      const n = parseInt(hex ?? dec, hex === undefined ? 10 : 16);
+      return n < 128 ? String.fromCharCode(n) : t;
+    });
   return el.canHaveContent && !el.hasAttribute("src")
-    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+    && type?.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, "").toLowerCase() === "module";
 }
 
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
