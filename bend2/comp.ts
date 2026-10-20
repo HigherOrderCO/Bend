@@ -3778,20 +3778,20 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// err_claim lets one thread end the process: the first caller gets 1, a
-// fault in its own exit path (SA_NODEFER) 0, and any other thread waits
-// for its _exit. pthread_self allocates nothing, on any thread.
-static int err_claim(void) {
+// err_claim lets one thread end the process: the first caller gets 1 and
+// flushes stdout. A fault in its own exit path (SA_NODEFER) gets 0, and so
+// does any other thread, after waiting a second for its _exit (it may hold
+// the lock the first one flushes on). pthread_self allocates nothing.
+FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
   if (atomic_compare_exchange_strong(&first, &seen, self)) return 1;
-  if (seen != self) for (;;) pause();
+  if (seen != self) sleep(1);
   return 0;
 }
 
-static void err_fail(const char* msg) {
-  err_claim();
-  fflush(stdout);
+OUTLINE void err_fail(const char* msg) {
+  if (err_claim()) fflush(stdout);
   fprintf(stderr, "bend: %s\n", msg);
   _exit(1);
 }
