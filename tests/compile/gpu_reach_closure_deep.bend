@@ -1,5 +1,5 @@
 # a bang over a chain whose index grows with each link: the walk opens
-# 256 links, then the family once with its index unknown, and stops; the
+# 64 links, then the family once with its index unknown, and stops; the
 # value is the plain call's
 import Base
 

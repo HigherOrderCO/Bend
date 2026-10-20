@@ -1,6 +1,6 @@
 # a family whose index kind holds the family itself: working out which
 # of T's parameters are values walks D, which meets T again before its
-# answer is in, and takes it as all type arguments instead of looping
+# answer is in, and reads its arguments as values instead of looping
 import Base
 
 type D is Data:
