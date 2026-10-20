@@ -3367,7 +3367,6 @@ using namespace metal;
 #include <stdint.h>
 #include <stdbool.h>
 #include <math.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -3779,48 +3778,31 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// the stdio lock API is POSIX and -std=c11 does not ask for it: both
-// calls are in libc, on glibc and on macOS
-extern int  ftrylockfile(FILE*);
-extern void funlockfile (FILE*);
-
-// err_write sends the line to fd 2 in one write: write is
-// async-signal-safe (a fault may call it), and a line under PIPE_BUF
-// cannot interleave with another thread's line. a short write is
-// resumed and EINTR retried, so the line is never cut.
-static void err_write(const char* msg) {
-  char buf[128];
-  const char* m = msg == NULL ? "(null)" : msg;
-  size_t n = strlen(m);
-  if (n > sizeof(buf) - 8) { n = sizeof(buf) - 8; }
-  memcpy(buf, "bend: ", 6);
-  memcpy(buf + 6, m, n);
-  buf[6 + n] = '\n';
-  n += 7;
-  for (size_t off = 0; off < n; ) {
-    ssize_t w = write(2, buf + off, n - off);
-    if (w < 0) { if (errno != EINTR) { break; } } else { off += (size_t)w; }
-  }
+// err_exit sends the line in one write(2): a signal handler may call it,
+// and under PIPE_BUF no other thread's line can split it.
+static void err_exit(const char* msg) {
+  char   b[512] = "bend: ";
+  msg = msg ? msg : "(null)";
+  size_t n = strnlen(msg, 504);
+  memcpy(b + 6, msg, n);
+  b[n + 6] = '\n';
+  if (write(2, b, n + 7)) {}
+  _exit(1);
 }
 
 static void err_fail(const char* msg) {
   fflush(stdout);
-  err_write(msg);
-  _exit(1);
+  err_exit(msg);
 }
 
 static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
+// A fault flushes stdout only if its lock is free: it never waits.
 static void err_trap(int sig) {
-  // a fault loses what the program printed unless stdout is flushed (it
-  // is buffered when it goes to a pipe): the flush is taken only when
-  // the lock is free, so a fault never waits (a hang is worse than a
-  // lost line)
-  if (ftrylockfile(stdout) == 0) { fflush(stdout); funlockfile(stdout); }
-  err_write(ERR_TEXT[ERR_DEEP]);
-  _exit(1);
+  if (ftrylockfile(stdout) == 0) fflush(stdout);
+  err_exit(ERR_TEXT[ERR_DEEP]);
 }
 
 #endif
