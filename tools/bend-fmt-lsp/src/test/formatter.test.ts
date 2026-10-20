@@ -303,8 +303,13 @@ test("mixed line endings and the final-newline state survive formatting", () => 
   }
 });
 
-test("nested cases keep their owner after a dedented body", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
-  const source = "import Base\ndef g(a:Bool,b:Bool)->Nat:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n  10n\n          case False{}:\n  20n\n    case False{}:\n  30n\ndef main()->Nat:\n  g(True{},False{})\n";
+test("nested cases keep their owner and inline anchors after a dedented body", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
+  const cases = [
+    ["import Base\ndef g(a:Bool,b:Bool)->Nat:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n  10n\n          case False{}:\n  20n\n    case False{}:\n  30n\ndef main()->Nat:\n  g(True{},False{})\n", "20n\n"],
+    ["import Base\ndef g(a: Bool, b: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b:case True{}:\n  10n\n              case False{}:\n  20n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{})\n", "20n\n"],
+    ["import Base\ndef  g(a: Bool, b: Bool) -> IO(Unit):\n  match a:\n    case True{}:\n      match b: case True{}:\n  IO.print(\"10\")\n               case False{}:\n                 do IO<Unit>:\n                   IO.print(\"20\")\n                   IO.print(\"21\")\n    case False{}:\n  IO.print(\"30\")\ndef main() -> IO(Unit):\n  g(True{}, False{})\n", "20\n21\n"],
+    ["import Base\ndef  g(a: Bool, b: Bool, c: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b: case True{}:\n  10n\n               case False{}:\n                 match c:\n                   case True{}:\n  20n\n                   case False{}:\n  21n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{}, True{})\n", "20n\n"],
+  ];
   const directory = mkdtempSync(join(tmpdir(), "bend-fmt-cases-"));
   const file = join(directory, "main.bend");
   const run = (text: string) => {
@@ -314,11 +319,14 @@ test("nested cases keep their owner after a dedented body", { skip: !runnable &&
     return result.stdout;
   };
   try {
-    assert.equal(run(source).trim(), "20n");
-    for (const options of [{}, { tabSize: 4 }, { insertSpaces: false }]) {
-      const formatted = formatBend(source, options);
-      assert.equal(run(formatted).trim(), "20n");
-      assert.equal(formatBend(formatted, options), formatted);
+    for (const [source, expected] of cases) {
+      assert.equal(run(source), expected);
+      for (const options of [{}, { tabSize: 4 }, { insertSpaces: false }]) {
+        const formatted = formatBend(source, options);
+        assert.notEqual(formatted, source);
+        assert.equal(run(formatted), expected);
+        assert.equal(formatBend(formatted, options), formatted);
+      }
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
