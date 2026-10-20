@@ -1,5 +1,0 @@
-Artifacts: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-dps-options-weg993fm
-{"name": "tree-matmul", "variant": "fused", "rep": -1, "threads": 1, "code": 0, "seconds": 3.212574, "rss": 2441216, "out": "3797651056", "err": ""}
-{"name": "tree-matmul", "variant": "reuse", "rep": -1, "threads": 1, "code": 0, "seconds": 3.431402, "rss": 2441216, "out": "3797651056", "err": ""}
-{"name": "tree-matmul", "variant": "fused", "rep": 0, "threads": 1, "code": 0, "seconds": 3.135165, "rss": 2441216, "out": "3797651056", "err": ""}
-{"name": "tree-matmul", "variant": "reuse", "rep": 0, "threads": 1, "code": 0, "seconds": 3.336047, "rss": 2424832, "out": "3797651056", "err": ""}

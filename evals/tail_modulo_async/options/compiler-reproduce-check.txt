@@ -1,5 +1,0 @@
-Artifacts: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-dps-options-fnvxj2qj
-{"name": "tree-matmul", "variant": "base", "rep": -1, "threads": 1, "cli_ms": 82.41200004704297, "native_ms": 222.49883296899498, "c_bytes": 140723, "binary_bytes": 89184, "emit_ms": 25.115209}
-{"name": "tree-matmul", "variant": "selected", "rep": -1, "threads": 1, "cli_ms": 81.47291699424386, "native_ms": 227.95829200185835, "c_bytes": 139248, "binary_bytes": 89016, "emit_ms": 24.514417}
-{"name": "tree-matmul", "variant": "base", "rep": 0, "threads": 1, "cli_ms": 79.15158290416002, "native_ms": 223.42537506483495, "c_bytes": 140723, "binary_bytes": 89184, "emit_ms": 22.327583000000004}
-{"name": "tree-matmul", "variant": "selected", "rep": 0, "threads": 1, "cli_ms": 80.57204191572964, "native_ms": 226.90762509591877, "c_bytes": 139248, "binary_bytes": 89016, "emit_ms": 23.666957999999994}

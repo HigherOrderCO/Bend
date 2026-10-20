@@ -1,5 +1,0 @@
-Artifacts and results: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-tma-reproduce-i7fr2os5
-{"name": "tree-matmul", "variant": "prototype", "repetition": -1, "seconds": 2.581479, "rss": 2424832, "code": 0, "stdout": "3797651056", "stderr": ""}
-{"name": "tree-matmul", "variant": "base", "repetition": -1, "seconds": 2.18572, "rss": 2408448, "code": 0, "stdout": "3797651056", "stderr": ""}
-{"name": "tree-matmul", "variant": "base", "repetition": 0, "seconds": 2.356147, "rss": 2408448, "code": 0, "stdout": "3797651056", "stderr": ""}
-{"name": "tree-matmul", "variant": "prototype", "repetition": 0, "seconds": 2.144133, "rss": 2408448, "code": 0, "stdout": "3797651056", "stderr": ""}

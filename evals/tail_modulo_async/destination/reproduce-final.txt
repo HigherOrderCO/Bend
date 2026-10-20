@@ -1,5 +1,0 @@
-Artifacts and results: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-tma-reproduce-cjg6yfe8
-{"name": "tree-radix", "variant": "prototype", "repetition": -1, "seconds": 0.867251, "rss": 685801472, "code": 0, "stdout": "1998173798", "stderr": ""}
-{"name": "tree-radix", "variant": "base", "repetition": -1, "seconds": 0.998735, "rss": 684605440, "code": 0, "stdout": "1998173798", "stderr": ""}
-{"name": "tree-radix", "variant": "base", "repetition": 0, "seconds": 0.730424, "rss": 685096960, "code": 0, "stdout": "1998173798", "stderr": ""}
-{"name": "tree-radix", "variant": "prototype", "repetition": 0, "seconds": 0.62984, "rss": 685719552, "code": 0, "stdout": "1998173798", "stderr": ""}

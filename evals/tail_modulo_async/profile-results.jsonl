@@ -1,4 +1,0 @@
-{"name": "kmeans", "out": "1616398086", "stats": "TMA forks=110868 reused_scopes=77538"}
-{"name": "tree-bitonic", "out": "3787129428", "stats": "TMA forks=6660 reused_scopes=6405"}
-{"name": "tree-matmul", "out": "3797651056", "stats": "TMA forks=0 reused_scopes=0"}
-{"name": "tree-radix", "out": "1998173798", "stats": "TMA forks=49152 reused_scopes=48895"}

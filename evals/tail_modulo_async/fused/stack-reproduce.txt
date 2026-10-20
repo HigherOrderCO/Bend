@@ -1,3 +1,0 @@
-Artifacts: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-dps-stack-h4xmhcvb
-{"variant": "base", "depth": 100000, "backend": "cpu", "code": 0, "stdout": "100000", "stderr": "DPS_STACK=100003"}
-{"variant": "destination", "depth": 100000, "backend": "cpu", "code": 0, "stdout": "100000", "stderr": "DPS_STACK=5"}
