@@ -864,9 +864,8 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words. Its fields are opened once per value arguments
-// (#1513); past 256 of them (an index that grows), once more with DUMMY
-// for those, which covers the rest. A walk 4000 calls deep holds it.
+// but for the words, its fields once per value arguments (#1513), past
+// 256 once with DUMMY for them; 4000 calls deep holds it.
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   seen = new Map<HTerm | string, number>(), d = 0): boolean {
   const t = ty_wnf(A);
@@ -881,11 +880,8 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   }
   seen.set(t, 0);
   const tld = FL.book.tlds[t.k];
-  if (tld?.$ === "ADT" && !FL.vals.has(t.k)) {
-    FL.vals.set(t.k, []);
-    FL.vals.set(t.k, tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K)));
-  }
-  const vs = FL.vals.get(t.k) ?? [];
+  const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, (k) => (FL.vals.set(k, []),
+    tele_unbind(tld.T).doms.map((D) => ty_value(D[2])))) : [];
   if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d + 1))) {
     return true;
   }
@@ -896,11 +892,8 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
-  if (d > 3999) {
-    return true;
-  }
   seen.set(key, 0).set(t.k, n + 1);
-  return tld.c.some((c) =>
+  return d > 3999 || tld.c.some((c) =>
     ctr_doms(c, xs).some((f) => ty_holds(f, p, seen, d + 1)));
 }
 
