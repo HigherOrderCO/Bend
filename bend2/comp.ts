@@ -864,34 +864,40 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words. Its type arguments are looked into on every visit,
-// its fields once: with the arguments first met or, for any, with DUMMY
-// for its value arguments, so the answer covers every index (#1513).
+// but for the words. Its fields are opened once per value arguments
+// (#1513); a walk 1000 calls deep, or an index past 4096 characters (one
+// that grows), is taken to hold it.
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
-  any = false, seen = new Set<Name>()): boolean {
+  seen = new Set<HTerm | string>(), d = 0): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, any, seen);
+    return ty_holds(t.f(DUMMY), p, seen, d);
   }
   if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
   }
-  if (t?.$ !== "ADT" || WORDS[t.k]) {
+  if (t?.$ !== "ADT" || WORDS[t.k] || seen.has(t)) {
     return false;
   }
+  seen.add(t);
   const tld = FL.book.tlds[t.k];
   const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, () =>
     tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K))) : [];
-  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, any, seen))) {
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d + 1))) {
     return true;
   }
-  if (tld?.$ !== "ADT" || seen.has(t.k)) {
+  const key = [t.k, ...t.x.map((x, i) => vs[i]
+    ? Bend.term_key(Bend.term_lower(Bend.term_snf(FL.book, x))) : "")]
+    .join(" ");
+  if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
-  seen.add(t.k);
-  const xs = any ? t.x.map((x, i) => vs[i] ? DUMMY : x) : t.x;
+  if (d > 999 || key.length > 4096) {
+    return true;
+  }
+  seen.add(key);
   return tld.c.some((c) =>
-    ctr_doms(c, xs).some((f) => ty_holds(f, p, any, seen)));
+    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen, d + 1)));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
@@ -2889,7 +2895,7 @@ export function compile_book(book: Bend.Book): string {
   const reach = (from: string[]) => graph_close(new Set(from), edges);
   const live = reach(["main", ...FL.fids].map(seg_fid));
   const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
-    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"), true)));
+    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
   FL.segs = FL.segs.filter((s) => live.has(s.fid));
   FL.spins = FL.spins.filter((s) => live.has(s.fid));
