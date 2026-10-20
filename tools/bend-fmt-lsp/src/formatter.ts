@@ -210,11 +210,11 @@ function indentDepths(lines: Line[], loose = looseLines(lines), anchors: (Token 
     while (level.parent && width < level.col) level = level.parent;
     if (width > level.col) level = { col: width, depth: level.depth + 1, parent: level };
     const head = line.tokens[0];
-    if (width === 0 && head && ["def", "type", "law", "@"].includes(head.text)) scopes.length = 0;
     for (const token of line.tokens) {
       if (token.kind === "symbol" && ["(", "[", "{"].includes(token.text)) brackets++;
       else if (token.kind === "symbol" && [")", "]", "}"].includes(token.text)) brackets--;
       else if (brackets === 0 && head?.text !== "import" && token.kind === "word") {
+        if (["def", "type", "law"].includes(token.text)) scopes.length = 0;
         if (token.text === "match") {
           scopes.push({ parent: scopes.at(-1)?.current ?? -1, current: -1, anchor: scopes.at(-1)?.anchor });
         } else if (token.text === "case") {
