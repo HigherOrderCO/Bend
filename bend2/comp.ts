@@ -4568,7 +4568,7 @@ ${segs}
     Term cont = STK(0);
     u32  idx  = (u32)STK(1);
     u32  wf   = (u32)term_aux(cont);
-    if (wf == FID_EXIT) {
+    if (DEVICE && wf == FID_EXIT) {
       WL_ARGS(term_loc(cont), idx)
       heap_free(e, cls_fit(STAK_LEN), term_loc(cont));
       WL_TAKE(rv)
