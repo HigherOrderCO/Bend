@@ -139,7 +139,7 @@ function shard_script(shard: Test[], tag: number): string {
   const probe = (kind: string, cmd: string): string =>
     `echo "${MARK} ${kind} $m"; perl -e 'alarm 5; exec @ARGV' ${cmd} 2>&1;`
     + ` echo "${MARK} exit $?";`;
-  return `export BUN_JSC_maxPerThreadStackUsage=33554432;`
+  return `export BUN_JSC_maxPerThreadStackUsage=33554432; unset BENDRTS;`
     + ` d=$HOME/bend-test/${tag}; rm -rf $d; mkdir -p $d; cd $d; tar -xzf -;`
     + ` ${tmp}\n`
     + file("main.bend", main) + file("build.txt", build)
