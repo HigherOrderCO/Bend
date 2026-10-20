@@ -6231,7 +6231,7 @@ function io_eff(k, run) {
     throw new Error("bend: " + k + " takes no need: an effect that waits parks itself");
   }
   if (k in $0eff) {
-    throw new Error("bend: two effects register " + k.replace(":", "."));
+    throw new Error("bend: two effects register " + k);
   }
   $0eff[k] = run;
 }
@@ -6541,7 +6541,7 @@ function io_run(m) {
         }
         const run = $0eff[op.$];
         if (run === undefined) {
-          throw "bend: no effect registers " + op.$.replace(":", ".");
+          throw "bend: no effect registers " + op.$;
         }
         const x = run(...op.args, op.kont);
         if (x === undefined) {

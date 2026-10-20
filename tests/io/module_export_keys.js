@@ -37,11 +37,14 @@ def dep.value(x: U32) -> U32:
       return 1;
     }
     const lib = require(output).default;
-    const values = { ["__proto__"]: 6, constructor: 7, toString: 8,
-      ordinary: 9, "dep:value": 15, "dep.value": 25 };
+    const values = { "dep:value": 15, ["__proto__"]: 6, constructor: 7,
+      toString: 8, ordinary: 9, "dep.value": 25 };
     const keys = Object.keys(values);
     if (keys.some((k) => !Object.hasOwn(lib, k))) {
       return 2;
+    }
+    if (Object.keys(lib).join(",") !== keys.join(",")) {
+      return 3;
     }
     if (Object.getPrototypeOf(lib) !== Object.prototype) {
       return 4;
