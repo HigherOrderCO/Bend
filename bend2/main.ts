@@ -372,6 +372,9 @@ function path_real(p: string): string {
 
 // same_file compares device and inode, so links to one file agree.
 function same_file(a: string, b: string): boolean {
+  if (!fs.existsSync(a) || !fs.existsSync(b)) {
+    return false;
+  }
   const x = fs.statSync(a, { bigint: true });
   const y = fs.statSync(b, { bigint: true });
   return x.dev === y.dev && x.ino === y.ino;
@@ -581,9 +584,8 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
   try {
     // Only the page keeps its name in the bundle (chunks and assets are hashed),
     // so it is the input an -o can overwrite: refuse that, through links too.
-    const entry = fs.realpathSync(page);
-    const at = path.join(dir, path.basename(entry));
-    if (fs.existsSync(at) && same_file(at, entry)) {
+    const entry = path_real(page);
+    if (same_file(path.join(dir, path.basename(entry)), entry)) {
       cli_fail("-o " + dir + " would overwrite the page");
     }
     const out = await Bun.build({

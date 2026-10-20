@@ -44,6 +44,10 @@ function bundle_page_input() {
         { encoding: "utf8" }).stdout.trim() !== "42") {
       return 4;
     }
+    const none = build(path.join(dir, "none.html"), path.join(dir, "none"));
+    if (none.status !== 1 || !none.stderr.includes("ModuleNotFound")) {
+      return 5;
+    }
     return 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
