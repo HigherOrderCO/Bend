@@ -1119,14 +1119,16 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
       FL.img.push(...exprs) - exprs.length);
     return `term_ctr(${cid}, STAT_OFF + ${at})`;
   }
-  const alloc = `heap_alloc(e, cls_fit(${exprs.length}))`;
-  const at = sc.spares.findIndex((s) =>
-    cls_fit(s.words) === cls_fit(exprs.length));
+  return `term_ctr(${cid}, ${node_fill(sc, "nd", node_alloc(sc, exprs.length),
+    exprs, FL.hot.has(k))})`;
+}
+
+function node_alloc(sc: Scope, words: number): string {
+  const alloc = `heap_alloc(e, cls_fit(${words}))`;
+  const at = sc.spares.findIndex((s) => cls_fit(s.words) === cls_fit(words));
   const s = at < 0 ? null : sc.spares.splice(at, 1)[0];
-  const got = s === null ? alloc
+  return s === null ? alloc
     : s.z ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}` : s.name;
-  return `term_ctr(${cid}, ${node_fill(sc, "nd", got, exprs,
-    FL.hot.has(k))})`;
 }
 
 function facts_packed(t: HTerm): boolean {
@@ -2659,7 +2661,88 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
   }
 }
 
+// A constructor tail writes its parent before descending. Only unvisited
+// siblings remain on the sequential stack. A continuation packs its 16-bit
+// fid below a 40-bit destination; the last child rewrites that destination.
+// Task boundaries retain the scheduler's completion fence.
+function emit_dps(sc: Scope, x: Of<"Let">): boolean {
+  if (sc.seg.ret !== BOX) return false;
+  const o = term_open(x), b = term_strip(o.b), cs = x.v.map(term_spine);
+  if (b.$ !== "Ctr" || FL.hot.has(b.k)
+    || Bend.book_fam(FL.book, b.k) in OPTIMIZED) return false;
+  const fs = ctr_flds(b.k, b.x), lay = lay_node(b.k);
+  if (cs.length >= WIDE || fs.length !== cs.length || lay.ks.length !== cs.length
+    || !lay.ks.every((k) => k === "box")
+    || fs.some((f, i) => term_strip(f).$ !== "Var"
+      || probe_of(term_strip(f)) !== o.ps[i])
+    || cs.some((c) => c.k === null || c.b || fun_of(c.k).ret !== BOX
+      || brw_of(c.k).some(Boolean)
+      || fun_of(c.k).lays.flatMap((l) => l.ks).length >= WIDE)) return false;
+  const ret = seg_fid("Dps~ret");
+  if (!FL.segs.some((s) => s.fid === ret)) {
+    const r = seg_new("Dps~ret", BOX, [val_new(["root"], BOX), val_new(["value"], BOX)],
+      { pop: 1, at: [0] });
+    r.lines.push("e.mem[STK(1) >> 16] = value;", "r0 = root;", "WL_RETN(1);");
+    FL.segs.push(r);
+  }
+  const args = cs.map((c, i) => emit_args({ ...sc,
+    rest: x.v.filter((_, j) => i !== j) }, c, false, true));
+  bind_dead(sc, []);
+  const alloc = node_alloc(sc, fs.length);
+  spare_flush(sc);
+  const join = seg_new(seg_name(sc, "j"), BOX,
+    [val_new(["root"], BOX), ...cs.map((_, i) => val_new(["v" + i], BOX))]);
+  FL.segs.push(join);
+  const jl = { ...sc, seg: join };
+  emit_put(jl, null, val_new(["root"], BOX));
+  sc.seg.fork ||= cs.length > 1;
+  block(sc, "if (!seq) {", () => {
+    const root = node_fill(sc, "nd", alloc, []);
+    const loc = emit_task(sc, join.fid, cs.length,
+      [`term_ctr(${cid_mac(b.k)}, ${root})`]);
+    const cont = `term_tsk(${join.fid}, ${loc})`;
+    cs.forEach((c, i) => {
+      const fid = seg_fid(c.k!);
+      const child = emit_task(sc, fid, 0, args[i],
+        `term_make(TAG_DST, ${join.fid}, ${loc})`, i);
+      file_push(sc, `e.mem[${loc} + ${i + 1}] = term_tsk(${fid}, ${child});`);
+    });
+    file_push(sc, `return ${cont};`);
+  });
+  const nd = name_local(sc, "nd");
+  file_push(sc, `u64 ${nd} = ${alloc};`);
+  const value = `term_ctr(${cid_mac(b.k)}, ${nd})`;
+  block(sc, "if (STK(-1) >> 16) {", () => {
+    file_push(sc, `e.mem[STK(-1) >> 16] = ${value};`);
+    file_push(sc, `STK(-1) = ((${nd} + ${cs.length - 1}) << 16) | (STK(-1) & 0xFFFF);`);
+  });
+  block(sc, "else {", () => {
+    file_push(sc, `WL_ROOM(2); STK(0) = ${value};`);
+    file_push(sc, `STK(1) = ((${nd} + ${cs.length - 1}) << 16) | ${seg_ref(sc, ret)}; WL_PUSHN(2);`);
+  });
+  // A sibling continuation stores the preceding child's result before
+  // starting the next child. Its destination shares the continuation word.
+  for (let i = cs.length - 1; i > 0; i -= 1) {
+    const name = seg_name(sc, "d"), ws = args[i];
+    file_push(sc, `WL_ROOM(${ws.length + 1});`);
+    ws.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
+    file_push(sc, `STK(${ws.length}) = ((${nd} + ${i - 1}) << 16) | ${seg_ref(sc, seg_fid(name))};`);
+    file_push(sc, `WL_PUSHN(${ws.length + 1});`);
+    const vals = val_new(ws.map((_, j) => "d" + j),
+      { ks: fun_of(cs[i].k!).lays.flatMap((l) => l.ks), arms: null });
+    const seg = seg_new(name, BOX, [vals, val_new(["value"], BOX)],
+      { pop: ws.length, at: ws.map((_, j) => j) });
+    FL.segs.push(seg);
+    const dl = { ...sc, seg };
+    file_push(dl, `e.mem[STK(${ws.length}) >> 16] = value;`);
+    emit_jump(dl, vals.ws, cs[i].k!);
+  }
+  emit_jump(sc, args[0], cs[0].k!);
+  return true;
+}
+
 function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
+  if (emit_dps(sc, x)) return;
   const o = term_open(x);
   const calls = x.v.map(term_spine);
   const fork = calls.length > 1;
@@ -2975,7 +3058,8 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.params.length));
   const rs = [...Array(n).keys()].map((i) => "r" + i);
   const ws = n > 6 ? [...rs.slice(0, 6), "rp", ...rs.slice(6)] : rs;
-  defs.push(`CONSTV Fid FID_T[] = { ${entries.map((s) => `{ ${[s.params.length,
+  defs.push(`#define DPS_ASYNC ${Number(live.has(seg_fid("Dps~ret")))}`,
+  `CONSTV Fid FID_T[] = { ${entries.map((s) => `{ ${[s.params.length,
     s.frame === null ? 0 : s.params.length - s.frame.at.length,
     FL.bangs.has(s.def), !forky.has(s.fid)].map(Number).join(", ")} }`)
     .join(", ")} };`,
@@ -3479,7 +3563,7 @@ using namespace metal;
 #define LANE_STEP (DEVICE ? (long)CUBE : 1)
 #define STK(I)    sp[(long)(I) * LANE_STEP]
 
-#define WL_RETN(N)  { rn = (N); sp -= LANE_STEP; WL_DYN((u32)STK(0)); }
+#define WL_RETN(N)  { rn = (N); sp -= LANE_STEP; WL_DYN((u32)STK(0) & 0xFFFF); }
 #define WL_CONT     STK(-3)
 #define WL_IDX      STK(-2)
 #define WL_POPN(N)  sp -= (N) * LANE_STEP
@@ -3549,6 +3633,7 @@ typedef u32 __attribute__((may_alias)) u32a;
 #define TAG_BUF 4ull
 #define TAG_TSK 5ull
 #define TAG_ARR 6ull
+#define TAG_DST 7ull
 
 #define TERM_HOLE (~0ull)
 #define LOC_MASK  ((1ull << 40) - 1)
@@ -4384,6 +4469,9 @@ INLINE u64 task_tail(Term t) {
 
 INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
   u64 at = cont == TERM_HOLE ? H_ROOT_WORD : term_loc(cont) + idx;
+  if (DPS_ASYNC && term_tag(cont) == TAG_DST) {
+    at = term_loc(H[term_loc(cont)]) + idx;
+  }
   for (u32 j = 0; j < WL_RESW; j += 1) {
     if (j < n) {
       H[at + j] = v[j];
