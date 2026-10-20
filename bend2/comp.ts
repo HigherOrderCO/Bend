@@ -3778,7 +3778,19 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
+// err_claim lets one thread end the process: the first caller gets 1, a
+// fault in its own exit path (SA_NODEFER) 0, and any other thread waits
+// for its _exit. pthread_self allocates nothing, on any thread.
+static int err_claim(void) {
+  static _Atomic uintptr_t first;
+  uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
+  if (atomic_compare_exchange_strong(&first, &seen, self)) return 1;
+  if (seen != self) for (;;) pause();
+  return 0;
+}
+
 static void err_fail(const char* msg) {
+  err_claim();
   fflush(stdout);
   fprintf(stderr, "bend: %s\n", msg);
   _exit(1);
@@ -3788,20 +3800,11 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// The first fault flushes stdout if its lock is free, then prints the
-// line; a fault on another thread waits for its _exit, and one in that
-// flush (its own thread, SA_NODEFER) skips to the line. pool_stack sets
-// err_mine first on every trapping thread, so the trap never allocates it.
-static _Thread_local bool err_mine;
-
+// A fault flushes stdout only if no other thread holds it, then writes the
+// line raw; a fault inside that flush skips it.
 static void err_trap(int sig) {
-  static atomic_flag seen = ATOMIC_FLAG_INIT;
-  static const char  line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
-  if (!err_mine) {
-    if (atomic_flag_test_and_set(&seen)) for (;;) pause();
-    err_mine = true;
-    if (ftrylockfile(stdout) == 0) fflush(stdout);
-  }
+  static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
+  if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
   if (write(2, line, sizeof line - 1)) {}
   _exit(1);
 }
@@ -4844,7 +4847,6 @@ static Term* pool_stack(void) {
   }
   stack_t ss = { .ss_sp = p + len + 16384, .ss_size = alt };
   sigaltstack(&ss, NULL);
-  err_mine = false;
   struct sigaction sa = { .sa_handler = err_trap,
     .sa_flags = SA_ONSTACK | SA_NODEFER };
   sigaction(SIGSEGV, &sa, NULL);
