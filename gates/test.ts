@@ -202,26 +202,41 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
 // State
 // =====
 
-// The comptime twins promise the same C up to definition names. Keep
-// every other byte, naming each FID by its numeric declaration.
+// The comptime twins promise the same C up to FID names. Keep every other
+// byte, naming each FID by its numeric declaration. Only tmpl may declare
+// a List.map instance: without it, the twins match without the template.
 async function comptime_run(): Promise<Fail[]> {
-  const emit = async (file: string): Promise<string[]> => {
+  const fail = (probe: string, want: string, got: string): Fail[] =>
+    [{ name: "comptime_tmpl", probe, want, got }];
+  const emit = async (file: string): Promise<string> => {
     const book = Bend.book_nil();
     await Bend.book_load(book, path.join(TESTS, "comptime", file + ".bend"),
       "", new Map());
     Bend.book_valid(book);
-    const c = Comp.compile_book(book);
-    const ids = new Map([...c.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
-      .map((m) => [m[1], "FID_" + m[2]]));
-    return c.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k).split("\n");
+    return Comp.compile_book(book);
   };
-  const hand = await emit("hand");
-  const tmpl = await emit("tmpl");
+  // main awaits this only after the shards, so a twin that fails to check
+  // must fail here, not reject (its shard fails it too)
+  let c: string[];
+  try {
+    c = [await emit("hand"), await emit("tmpl")];
+  } catch {
+    return fail("C matches hand", "both twins compile", "a twin fails");
+  }
+  const maps = c.map((s) => /^#define FID_List_map\w* /m.test(s));
+  if (maps[0] || !maps[1]) {
+    return fail("only tmpl declares List.map", "false true",
+      maps.join(" "));
+  }
+  const [hand, tmpl] = c.map((s) => {
+    const ids = new Map([...s.matchAll(/^#define (FID_\w+) (\d+)$/gm)]
+      .map((m) => [m[1], "FID_" + m[2]]));
+    return s.replace(/\bFID_\w+\b/g, (k) => ids.get(k) ?? k).split("\n");
+  });
   for (let i = 0; i < hand.length || i < tmpl.length; ++i) {
     if (hand[i] !== tmpl[i]) {
-      return [{ name: "comptime_tmpl",
-        probe: "C matches hand at line " + String(i + 1),
-        want: hand[i] ?? "(end of file)", got: tmpl[i] ?? "(end of file)" }];
+      return fail("C matches hand at line " + String(i + 1),
+        hand[i] ?? "(end of file)", tmpl[i] ?? "(end of file)");
     }
   }
   return [];
