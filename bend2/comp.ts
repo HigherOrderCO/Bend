@@ -6452,9 +6452,9 @@ function io_addr(host, port) {
 
 let io_active;
 
-function io_push(fun, arg, fresh) {
-  io_active.runs.push({ fun, arg });
-  io_active.live += fresh ? 1 : 0;
+function io_push(fun, arg, fresh, io = io_active) {
+  io.runs.push({ fun, arg });
+  io.live += fresh ? 1 : 0;
 }
 
 function io_wait(io, block) {
@@ -6487,7 +6487,7 @@ function io_wait(io, block) {
   for (const w of todo.filter(due)) {
     const x = w.more();
     if (x !== undefined) {
-      io_push(w.k, x, false);
+      io_push(w.k, x, false, io);
     }
   }
 }
@@ -6559,6 +6559,7 @@ function io_run(m) {
   } catch (e) {
     throw e instanceof RangeError ? "bend: ${ERRS[7]}" : e;
   } finally {
+    io.done = true;
     io_active = parent;
   }
 }
