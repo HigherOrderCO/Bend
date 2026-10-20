@@ -3643,8 +3643,7 @@ static const char* CLI_HELP =
   "  --gpu on|off|4GB  run ! calls on the GPU, over this much of its memory\n"
   "                    (default: on if present, over 2GB on Metal)\n"
   "  --gpu-build       write the GPU program and exit\n"
-  "  --bend-help       show this text\n"
-  "  --                the rest are the program's arguments (IO.args)\n";
+  "  --help            show this text\n";
 
 #endif
 
@@ -6116,7 +6115,7 @@ int main(int argc, char** argv) {
     char*       end;
     if (a == NULL) {
       continue;
-    } else if (!strcmp(a, "--bend-help")) {
+    } else if (!strcmp(a, "--help")) {
       printf(CLI_HELP, argv[0]);
       return 0;
     } else if (!strcmp(a, "--gpu-build")) {
@@ -6251,8 +6250,8 @@ function cli(argv) {
       rts = a === "+RTS";
     } else if (!rts) {
       cli_args.push(a);
-    } else if (a === "--bend-help" || a === "--gpu-build") {
-      io_out(1, io_bytes(a === "--bend-help" ? "usage: " + argv[0] + "\n" : ""));
+    } else if (a === "--help" || a === "--gpu-build") {
+      io_out(1, io_bytes(a === "--help" ? "usage: " + argv[0] + "\n" : ""));
       process.exit(0);
     } else {
       const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"

@@ -458,10 +458,10 @@ try {
     + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
     + "    IO.print(List.show(~&1, ~String, ~(s => \"<\" ++ s ++ \">\"), xs))\n");
   const built = await bend([argf, "-o", argo, "-o", argo + ".js"]);
-  const rts   = ["grep", "-e", "--threads", "+RTS", "--threads", "2", "--gpu",
-    "off", "-RTS", "", "space value", "--", "+RTS", "x"];
-  const kept  = ", <grep>, <-e>, <--threads>, <>, <space value>, <-->, <+RTS>,"
-    + " <x>]\n";
+  const rts   = ["grep", "-e", "--threads", "--help", "+RTS", "--threads", "2",
+    "--gpu", "off", "-RTS", "", "space value", "--", "+RTS", "x"];
+  const kept  = ", <grep>, <-e>, <--threads>, <--help>, <>, <space value>,"
+    + " <-->, <+RTS>, <x>]\n";
   const c_rts  = await run(argo, rts);
   const js_rts = await run(process.execPath, [argo + ".js", ...rts]);
   check("a built program's +RTS options are the runtime's, the rest its own: "
@@ -472,6 +472,11 @@ try {
     { BENDRTS: "--threads 2" });
   const zero = await run(argo, ["a"], { BENDRTS: "--threads 0" });
   const span = await run(argo, ["+RTS", "2"], { BENDRTS: "--threads" });
+  const c_help  = await run(argo, ["+RTS", "--help"]);
+  const js_help = await run(process.execPath, [argo + ".js", "+RTS", "--help"]);
+  check("+RTS --help prints the usage on C and JS: " + c_help.err + js_help.err,
+    [c_help, js_help].every((r) => r.code === 0
+      && r.out.startsWith("usage: ")));
   check("--RTS ends the runtime's options; BENDRTS holds some, each value in"
     + " its own span: " + ends.out + ends.err + zero.err + span.err,
     ends.code === 0 && ends.out.endsWith(", <a>, <+RTS>, <b>]\n")
