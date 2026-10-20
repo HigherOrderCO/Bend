@@ -130,7 +130,7 @@ def fetch_read(
                   TCP.recv_bytes(s, U32.max(U32.min(left, 8192), 1))
                 fetch_read(fuel2, left, next, chunk <> chunks)
 
-def fetch_sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(String):
+def fetch_sent(m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO(String):
   (s, r) = m
   match r:
     case Fail{((code, message), rest)}:
@@ -144,6 +144,6 @@ def fetch_sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(
 def main() -> IO(Unit):
   do IO<Unit>:
     c    : Socket <- IO.try(Socket, TCP.connect("208.95.112.1", 80))
-    sent : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "GET /line/?fields=status,country,city,query HTTP/1.1\r\nHost: ip-api.com\r\nConnection: close\r\n\r\n")
+    sent : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "GET /line/?fields=status,country,city,query HTTP/1.1\r\nHost: ip-api.com\r\nConnection: close\r\n\r\n")
     resp : String <- fetch_sent(sent)
     IO.print(http_body(resp))

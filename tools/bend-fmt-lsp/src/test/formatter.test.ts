@@ -289,3 +289,46 @@ test("semicolon pins respect delimiters, literals, and comments", () => {
     assert.equal(formatBend(expected), expected);
   }
 });
+
+test("mixed line endings and the final-newline state survive formatting", () => {
+  for (const source of [
+    "import Base\r\ndef main()->U32:\n    7\r\n",
+    "import Base\ndef main()->U32:\r\n    7",
+    "import Base\r\ndef main()->U32:\r\n    7\r\n",
+  ]) {
+    const formatted = formatBend(source);
+    assert.deepEqual(formatted.match(/\r?\n/g), source.match(/\r?\n/g));
+    assert.equal(formatted.endsWith("\n"), source.endsWith("\n"));
+    assert.equal(formatBend(formatted), formatted);
+  }
+});
+
+test("nested cases keep their owner and inline anchors after a dedented body", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
+  const cases = [
+    ["import Base\ndef g(a:Bool,b:Bool)->Nat:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n  10n\n          case False{}:\n  20n\n    case False{}:\n  30n\ndef main()->Nat:\n  g(True{},False{})\n", "20n\n"],
+    ["import Base\ndef g(a: Bool, b: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b:case True{}:\n  10n\n              case False{}:\n  20n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{})\n", "20n\n"],
+    ["import Base\ndef  g(a: Bool, b: Bool) -> IO(Unit):\n  match a:\n    case True{}:\n      match b: case True{}:\n  IO.print(\"10\")\n               case False{}:\n                 do IO<Unit>:\n                   IO.print(\"20\")\n                   IO.print(\"21\")\n    case False{}:\n  IO.print(\"30\")\ndef main() -> IO(Unit):\n  g(True{}, False{})\n", "20\n21\n"],
+    ["import Base\ndef  g(a: Bool, b: Bool, c: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b: case True{}:\n  10n\n               case False{}:\n                 match c:\n                   case True{}:\n  20n\n                   case False{}:\n  21n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{}, True{})\n", "20n\n"],
+  ];
+  const directory = mkdtempSync(join(tmpdir(), "bend-fmt-cases-"));
+  const file = join(directory, "main.bend");
+  const run = (text: string) => {
+    writeFileSync(file, text);
+    const result = spawnSync(bun, [compiler, file], { encoding: "utf8", timeout: 60_000 });
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    return result.stdout;
+  };
+  try {
+    for (const [source, expected] of cases) {
+      assert.equal(run(source), expected);
+      for (const options of [{}, { tabSize: 4 }, { insertSpaces: false }]) {
+        const formatted = formatBend(source, options);
+        assert.notEqual(formatted, source);
+        assert.equal(run(formatted), expected);
+        assert.equal(formatBend(formatted, options), formatted);
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

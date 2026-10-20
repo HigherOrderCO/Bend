@@ -348,15 +348,17 @@ def TCP.connect(host: String, port: U32) ->
   import "./effs/tcp_connect.c"
   import "./effs/tcp_connect.js"
 
-# A failed send hands back what the kernel did not take. Sent means taken
-# by the kernel, not yet read by the peer.
+# A failed or timed-out send returns the exact unsent bytes: the kernel
+# may stop inside UTF-8. Resume with TCP.send_bytes. Sent means taken by
+# the kernel, not yet read by the peer.
 def TCP.send(sock: Socket, data: String) ->
-  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
 def TCP.try_send(sock: Socket, data: String, ms: U32) ->
-  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
@@ -1064,71 +1066,57 @@ def List.foldr(
     case h <> t:
       f(h, List.foldr(~a, ~A, ~B, ~f, t, z))
 
-# Carry the previous result so strict backends can stop before the next call.
-def List.any.go(
-  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, hit: Bool
-) -> Bool:
-  match xs hit:
-    case _ True{}:
-      True{}
-    case Nil{} False{}:
-      False{}
-    case h <> t False{}:
-      List.any.go(~a, ~A, ~f, t, f(h))
-
-def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  List.any.go(~a, ~A, ~f, xs, False{})
-
-def List.all.go(
-  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, keep: Bool
-) -> Bool:
-  match xs keep:
-    case _ False{}:
-      False{}
-    case Nil{} True{}:
-      True{}
-    case h <> t True{}:
-      List.all.go(~a, ~A, ~f, t, f(h))
-
-def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  List.all.go(~a, ~A, ~f, xs, True{})
-
-def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
+# Searches stop at the first decisive predicate; later elements are not tested.
+def List.any.if(rest: Unit -> Bool, hit: Bool) -> Bool:
   match hit:
     case False{}:
-      r
+      rest(Unit{})
+    case True{}:
+      True{}
+
+def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
+  match xs:
+    case Nil{}:
+      False{}
+    case h <> t:
+      List.any.if(u => List.any(~a, ~A, ~f, t), f(h))
+
+def List.all.if(rest: Unit -> Bool, hit: Bool) -> Bool:
+  match hit:
+    case False{}:
+      False{}
+    case True{}:
+      rest(Unit{})
+
+def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
+  match xs:
+    case Nil{}:
+      True{}
+    case h <> t:
+      List.all.if(u => List.all(~a, ~A, ~f, t), f(h))
+
+def List.find.if(-A: Data, h: A, rest: Unit -> Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
+  match hit:
+    case False{}:
+      rest(Unit{})
     case True{}:
       Some{h}
 
-def List.find.go(
-  ~A: Data, ~f: A -> Bool, xs: List<&2, A>, found: Maybe<&2, A>
-) -> Maybe<&2, A>:
-  match xs found:
-    case _ Some{x}:
-      Some{x}
-    case Nil{} None{}:
-      None{}
-    case +h <> t None{}:
-      List.find.go(~A, ~f, t, List.find.put(A, h, None{}, f(h)))
-
 def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
-  List.find.go(~A, ~f, xs, None{})
-
-def List.contains.go(
-  ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A, hit: Bool
-) -> Bool:
-  match xs hit:
-    case _ True{}:
-      True{}
-    case Nil{} False{}:
-      False{}
-    case h <> t False{}:
-      List.contains.go(~A, ~eq, t, x, eq(h, x))
+  match xs:
+    case Nil{}:
+      None{}
+    case +h <> t:
+      List.find.if(A, h, u => List.find(~A, ~f, t), f(h))
 
 def List.contains(
   ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A
 ) -> Bool:
-  List.contains.go(~A, ~eq, xs, x, False{})
+  match xs:
+    case Nil{}:
+      False{}
+    case h <> t:
+      List.any.if(u => List.contains(~A, ~eq, t, x), eq(h, x))
 
 def List.merge.step(
   -A: Data, acc: List<&2, A>, x: A, xt: List<&2, A>, y: A, yt: List<&2, A>,
@@ -1837,10 +1825,28 @@ def F32.max(a: F32, b: F32) -> F32:
 def F32.clamp(x: F32, lo: F32, hi: F32) -> F32:
   F32.min(F32.max(x, lo), hi)
 
+# At t = 0 and t = 1 return that endpoint as is, keeping signed zero and never
+# multiplying the other one (an infinite endpoint would give NaN). Between them
+# the weighted sum avoids overflowing b - a for finite endpoints of opposite
+# signs.
 def F32.lerp(a: F32, b: F32, t: F32) -> F32:
-  match a:
-    case F32{+x}:
-      F32.add(F32{x}, F32.mul(F32.sub(b, F32{x}), t))
+  match t:
+    case F32{+z}:
+      F32.lerp.zero(a, b, F32{z}, F32.is_eq(F32{z}, 0.0))
+
+def F32.lerp.zero(a: F32, b: F32, +t: F32, zero: Bool) -> F32:
+  match zero:
+    case True{}:
+      a
+    case False{}:
+      F32.lerp.one(a, b, t, F32.is_eq(t, 1.0))
+
+def F32.lerp.one(a: F32, b: F32, +t: F32, one: Bool) -> F32:
+  match one:
+    case True{}:
+      b
+    case False{}:
+      F32.add(F32.mul(a, F32.sub(1.0, t)), F32.mul(b, t))
 
 def F32.square(a: F32) -> F32:
   match a:
@@ -1884,8 +1890,23 @@ def F32.pi() -> F32:
 def F32.from_nat(n: Nat) -> F32:
   U32.to_f32(U32.from_nat(n))
 
+# Preserve the direct cast below 2^32; wider Nats need both word halves.
+# Past 2^48-1 no Nat fits, so the direct cast gives 0.
+def F32.to_nat.wide(+a: F32, wide: Bool) -> Nat:
+  match wide:
+    case False{}:
+      U32.to_nat(F32.to_u32(a))
+    case True{}:
+      +hi = U32.to_nat(F32.to_u32(F32.div(a, 4294967296.0)))
+      +lo = U32.to_nat(F32.to_u32(F32.mod(a, 4294967296.0)))
+      Nat.add(Nat.mul(hi, Nat.mul(65536n, 65536n)), lo)
+
 def F32.to_nat(a: F32) -> Nat:
-  U32.to_nat(F32.to_u32(a))
+  match a:
+    case F32{+x}:
+      +wide = Bool.and(F32.is_ge(F32{x}, 4294967296.0),
+        F32.is_lt(F32{x}, 281474976710656.0))
+      F32.to_nat.wide(F32{x}, wide)
 
 # Char
 # ----
@@ -2043,23 +2064,30 @@ law String.starts_with:
   for p: String
   Bool
 
-def String.starts_with.if(t: String, pt: String, same: Bool) -> Bool:
+law String.starts_with.go:
+  for p: String
+  for s: String
+  Bool
+
+def String.starts_with.go.if(pt: String, t: String, same: Bool) -> Bool:
   match same:
     case False{}:
       False{}
     case True{}:
-      String.starts_with(t, pt)
+      String.starts_with.go(pt, t)
+
+# Match the prefix first so an exhausted prefix never inspects the tail.
+def String.starts_with.go(p, s):
+  match p s:
+    case SNil{} _:
+      True{}
+    case SCon{y, yt} SNil{}:
+      False{}
+    case SCon{y, yt} SCon{x, xt}:
+      String.starts_with.go.if(yt, xt, Char.is_eq(x, y))
 
 def String.starts_with(s, p):
-  match s p:
-    case SNil{} SNil{}:
-      True{}
-    case SNil{} SCon{h, t}:
-      False{}
-    case SCon{h, t} SNil{}:
-      True{}
-    case SCon{x, xt} SCon{y, yt}:
-      String.starts_with.if(xt, yt, Char.is_eq(x, y))
+  String.starts_with.go(p, s)
 
 def String.ends_with(s: String, p: String) -> Bool:
   String.starts_with(String.reverse(s), String.reverse(p))
