@@ -5925,7 +5925,7 @@ int main(int argc, char** argv) {
   int    gpu = -1;
   u64    mem = 0;
   char*  env = strdup(getenv("BENDRTS") != NULL ? getenv("BENDRTS") : "");
-  char** rts = malloc((argc + strlen(env)) * sizeof(char*));
+  char** rts = malloc((argc + strlen(env) + 1) * sizeof(char*));
   int    nr  = 0;
   bool   in  = false;
   for (char* w = strtok(env, " \t\n"); w != NULL; w = strtok(NULL, " \t\n")) {
@@ -5974,12 +5974,12 @@ int main(int argc, char** argv) {
       double n   = strtod(v, &end);
       u64    mul = !strcmp(end, "GB") ? 1ull << 30
         : !strcmp(end, "MB") ? 1ull << 20 : 0;
+      mem = (u64)(n * (double)mul);
       if (!strcmp(v, "off")) {
         gpu = 0;
       } else if (!strcmp(v, "on")
-        || (mul != 0 && n > 0 && end == v + strspn(v, "0123456789."))) {
+        || (mem >= 16384 && end == v + strspn(v, "0123456789."))) {
         gpu = 1;
-        mem = (u64)(n * (double)mul);
       } else {
         err_fail("expected on, off or a size like 4GB after --gpu");
       }
@@ -6095,8 +6095,10 @@ function cli(argv) {
       process.exit(0);
     } else {
       const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"
-        ? /^(on|off|(?=.*[1-9])\d*\.?\d*[GM]B)$/ : undefined;
-      if (!re?.test(argv[++i])) {
+        ? /^(on|off|(\d*\.?\d*)([GM])B)$/ : undefined;
+      const m  = re?.exec(argv[++i]);
+      if (!m || m[3]
+        && !(m[2] * (m[3] === "G" ? 2 ** 30 : 2 ** 20) >= 16384)) {
         io_errs("bend: " + (re === undefined ? "unknown runtime option " + a
           : a === "--gpu" ? "expected on, off or a size like 4GB after --gpu"
           : "expected a thread count of 1 or more after --threads"));

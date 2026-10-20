@@ -76,7 +76,7 @@ let total = 0;
 function run(bin: string, args: string[], env: Record<string, string> = {},
   input?: string): Promise<lib.Exec> {
   return lib.exec(bin, args, input, 25_000, { HOME, PATH: PATHS,
-    BEND_ORIGIN: ORIGIN, ...env }, TMP);
+    BEND_ORIGIN: ORIGIN, BENDRTS: "", ...env }, TMP);
 }
 
 function bend(args: string[], env: Record<string, string> = {}):
@@ -418,8 +418,8 @@ try {
     ends.code === 0 && ends.out.endsWith(", <a>, <+RTS>, <b>]\n")
     && zero.code === 1 && span.code === 1);
   for (const bad of [["+RTS", "--thread", "2"], ["+RTS", "--gpu", "of"],
-    ["+RTS", "--gpu", "1e2GB"], ["+RTS", "", "-RTS"],
-    ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
+    ["+RTS", "--gpu", "1e2GB"], ["+RTS", "--gpu", "0.001MB"],
+    ["+RTS", "", "-RTS"], ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
     const c  = await run(argo, bad);
     const js = await run(process.execPath, [argo + ".js", ...bad]);
     check("a malformed runtime option fails alike on C and JS: "
