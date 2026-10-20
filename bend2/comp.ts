@@ -162,7 +162,7 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
 const WIDE = 247;
 
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
-  + " --gpu 8GB|a function the device does not hold|a Nat past the"
+  + " +RTS --gpu 8GB|a function the device does not hold|a Nat past the"
   + " largest immediate 2^48-1|*|memory fault (machine stack overflow?)|an"
   + " array past the deepest block class 31|a value has more than 2^24-1 live"
   + " copies: keep fewer alive at once, or build it again for some of them"
@@ -3638,13 +3638,12 @@ static bool io_gpu;
 static DEV Term*  io_stk;
 
 static const char* CLI_HELP =
-  "usage: %s [options] [arguments]\n"
+  "usage: %s [+RTS options -RTS] [arguments]\n"
   "  --threads N       worker threads, 1 to 128 (default: the CPU count)\n"
   "  --gpu on|off|4GB  run ! calls on the GPU, over this much of its memory\n"
   "                    (default: on if present, over 2GB on Metal)\n"
   "  --gpu-build       write the GPU program and exit\n"
-  "  --bend-help       show this text\n"
-  "  --                the rest are the program's arguments (IO.args)\n";
+  "  --help            show this text\n";
 
 #endif
 
@@ -6098,20 +6097,41 @@ ${reqs}
 // ====
 
 int main(int argc, char** argv) {
-  long thr = cpu_count();
-  int  gpu = -1;
-  u64  mem = 0;
+  long   thr = cpu_count();
+  int    gpu = -1;
+  u64    mem = 0;
+  char*  env = strdup(getenv("BENDRTS") != NULL ? getenv("BENDRTS") : "");
+  char** rts = malloc((argc + strlen(env) + 1) * sizeof(char*));
+  int    nr  = 0;
+  bool   in  = false;
+  for (char* w = strtok(env, " \t\n"); w != NULL; w = strtok(NULL, " \t\n")) {
+    rts[nr++] = w;
+  }
+  rts[nr++] = NULL;
   io_argv = argv;
-  io_argc = 1;
+  io_argc = argc > 0;
   for (int i = 1; i < argc; i += 1) {
-    const char* a = argv[i];
-    const char* v = i + 1 < argc ? argv[i + 1] : "";
-    char*       end;
-    if (!strcmp(a, "--")) {
-      while (i + 1 < argc) {
-        io_argv[io_argc++] = argv[++i];
+    char* a = argv[i];
+    if (!strcmp(a, "--RTS")) {
+      for (i += 1; i < argc; i += 1) {
+        io_argv[io_argc++] = argv[i];
       }
-    } else if (!strcmp(a, "--bend-help")) {
+    } else if (!strcmp(a, "+RTS") || !strcmp(a, "-RTS")) {
+      in        = a[0] == '+';
+      rts[nr++] = NULL;
+    } else if (in) {
+      rts[nr++] = a;
+    } else {
+      io_argv[io_argc++] = a;
+    }
+  }
+  for (int i = 0; i < nr; i += 1) {
+    const char* a = rts[i];
+    const char* v = i + 1 < nr && rts[i + 1] != NULL ? rts[i + 1] : "";
+    char*       end;
+    if (a == NULL) {
+      continue;
+    } else if (!strcmp(a, "--help")) {
       printf(CLI_HELP, argv[0]);
       return 0;
     } else if (!strcmp(a, "--gpu-build")) {
@@ -6121,8 +6141,8 @@ int main(int argc, char** argv) {
       }
       return 0;
     } else if (!strcmp(a, "--threads")) {
-      thr = strtol(v, &end, 10);
-      if (thr < 1 || *end != 0) {
+      thr = strtol(v, NULL, 10);
+      if (thr < 1 || v[strspn(v, "0123456789")] != 0) {
         err_fail("expected a thread count of 1 or more after --threads");
       }
       i += 1;
@@ -6130,17 +6150,19 @@ int main(int argc, char** argv) {
       double n   = strtod(v, &end);
       u64    mul = !strcmp(end, "GB") ? 1ull << 30
         : !strcmp(end, "MB") ? 1ull << 20 : 0;
+      mem = (u64)(n * (double)mul);
       if (!strcmp(v, "off")) {
         gpu = 0;
-      } else if (!strcmp(v, "on") || (mul != 0 && n > 0)) {
+      } else if (!strcmp(v, "on")
+        || (mem >= 16384 && end == v + strspn(v, "0123456789."))) {
         gpu = 1;
-        mem = (u64)(n * (double)mul);
       } else {
         err_fail("expected on, off or a size like 4GB after --gpu");
       }
       i += 1;
     } else {
-      io_argv[io_argc++] = argv[i];
+      fprintf(stderr, "bend: unknown runtime option %s\n", a);
+      return 1;
     }
   }
   const char* why = gpu != 0 && BANGS != 0 ? gpu_probe() : "";
@@ -6233,19 +6255,31 @@ const RUNTIME_MAIN: string = String.raw`
 let cli_args = [];
 
 function cli(argv) {
+  let rts = false;
   cli_args.push(argv[0]);
   for (let i = 1; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === "--") {
+    if (a === "--RTS") {
       cli_args.push(...argv.slice(i + 1));
       break;
-    } else if (a === "--bend-help") {
-      io_out(1, io_bytes("usage: " + argv[0] + "\n"));
-      process.exit(0);
-    } else if (a === "--threads" || a === "--gpu") {
-      i += 1;
-    } else {
+    } else if (a === "+RTS" || a === "-RTS") {
+      rts = a === "+RTS";
+    } else if (!rts) {
       cli_args.push(a);
+    } else if (a === "--help" || a === "--gpu-build") {
+      io_out(1, io_bytes(a === "--help" ? "usage: " + argv[0] + "\n" : ""));
+      process.exit(0);
+    } else {
+      const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"
+        ? /^(on|off|(\d*\.?\d*)([GM])B)$/ : undefined;
+      const m  = re?.exec(argv[++i]);
+      if (!m || m[3]
+        && !(m[2] * (m[3] === "G" ? 2 ** 30 : 2 ** 20) >= 16384)) {
+        io_errs("bend: " + (re === undefined ? "unknown runtime option " + a
+          : a === "--gpu" ? "expected on, off or a size like 4GB after --gpu"
+          : "expected a thread count of 1 or more after --threads"));
+        process.exit(1);
+      }
     }
   }
 }
