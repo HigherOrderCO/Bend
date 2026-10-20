@@ -3778,8 +3778,18 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-static void err_fail(const char* msg) {
-  fflush(stdout);
+// The first to fail gets 1; others wait a second for its _exit, then 0.
+FAR int err_claim(void) {
+  static _Atomic uintptr_t first;
+  uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
+  if (atomic_compare_exchange_strong(&first, &seen, self)) return 1;
+  struct timespec t = { seen != self, 0 };
+  while (nanosleep(&t, &t)) {}
+  return 0;
+}
+
+OUTLINE void err_fail(const char* msg) {
+  if (err_claim()) fflush(stdout);
   fprintf(stderr, "bend: %s\n", msg);
   _exit(1);
 }
@@ -3788,8 +3798,12 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
+// A trap never waits on a lock: it flushes only if free, then writes raw.
 static void err_trap(int sig) {
-  err_post(NULL, ERR_DEEP);
+  static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
+  if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
+  if (write(2, line, sizeof line - 1)) {}
+  _exit(1);
 }
 
 #endif
@@ -4823,13 +4837,15 @@ static void* pool_mmap(u64 bytes) {
 
 static Term* pool_stack(void) {
   u64   len = 1ull << 31;
-  char* p   = pool_mmap(len + 16384 + SIGSTKSZ);
+  u64   alt = 4 * SIGSTKSZ;
+  char* p   = pool_mmap(len + 16384 + alt);
   if (mprotect(p + len, 16384, PROT_NONE)) {
     err_fail("stack guard failed");
   }
-  stack_t ss = { .ss_sp = p + len + 16384, .ss_size = SIGSTKSZ };
+  stack_t ss = { .ss_sp = p + len + 16384, .ss_size = alt };
   sigaltstack(&ss, NULL);
-  struct sigaction sa = { .sa_handler = err_trap, .sa_flags = SA_ONSTACK };
+  struct sigaction sa = { .sa_handler = err_trap,
+    .sa_flags = SA_ONSTACK | SA_NODEFER };
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
   return (Term*)p;
@@ -5668,8 +5684,8 @@ OUTLINE void io_errs(Env e, Term s) {
   u64   n;
   char* text = io_cstr(e, s, &n);
   io_sync();
-  io_out(stderr, text, n);
-  io_out(stderr, "\n", 1);
+  text[n] = '\n';
+  io_out(stderr, text, n + 1);
   free(text);
 }
 
