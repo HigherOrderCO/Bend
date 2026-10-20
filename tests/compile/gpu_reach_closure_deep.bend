@@ -1,6 +1,6 @@
 # a bang over a chain whose index grows with each link: the walk opens
-# the family once, with its index unknown, and stops at the next link;
-# the value is the plain call's
+# 256 links, then the family once with its index unknown, and stops; the
+# value is the plain call's
 import Base
 
 type Ch<-n: Nat> is Type:

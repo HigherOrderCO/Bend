@@ -1,8 +1,7 @@
 # a bang over a chain whose later links are another instance of its own
 # value-indexed family: the first link holds a word, the next a closure.
-# The walk opens the family once with its index unknown, so the field's
-# type is stuck and taken to hold a closure: the lambda minted on the
-# host is on the device
+# The walk opens each instance of the family, so it finds the closure:
+# the lambda minted on the host is on the device
 import Base
 
 type Tag is Data:

@@ -865,10 +865,10 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words. Its fields are opened once per value arguments
-// (#1513); a walk 1000 calls deep, or an index past 4096 characters (one
-// that grows), is taken to hold it.
+// (#1513); past 256 of them (an index that grows), once more with DUMMY
+// for those, which covers the rest. A walk 4000 calls deep holds it.
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
-  seen = new Set<HTerm | string>(), d = 0): boolean {
+  seen = new Map<HTerm | string, number>(), d = 0): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
     return ty_holds(t.f(DUMMY), p, seen, d);
@@ -879,25 +879,29 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   if (t?.$ !== "ADT" || WORDS[t.k] || seen.has(t)) {
     return false;
   }
-  seen.add(t);
+  seen.set(t, 0);
   const tld = FL.book.tlds[t.k];
-  const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, () =>
-    tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K))) : [];
+  if (tld?.$ === "ADT" && !FL.vals.has(t.k)) {
+    FL.vals.set(t.k, []);
+    FL.vals.set(t.k, tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K)));
+  }
+  const vs = FL.vals.get(t.k) ?? [];
   if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d + 1))) {
     return true;
   }
-  const key = [t.k, ...t.x.map((x, i) => vs[i]
-    ? Bend.term_key(Bend.term_lower(Bend.term_snf(FL.book, x))) : "")]
-    .join(" ");
+  const n = seen.get(t.k) ?? 0;
+  const xs = n < 256 ? t.x : t.x.map((x, i) => vs[i] ? DUMMY : x);
+  const key = t.k + "<" + xs.map((x, i) =>
+    vs[i] ? Bend.term_key(Bend.term_lower(x)) : "").join(",");
   if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
-  if (d > 999 || key.length > 4096) {
+  if (d > 3999) {
     return true;
   }
-  seen.add(key);
+  seen.set(key, 0).set(t.k, n + 1);
   return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen, d + 1)));
+    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen, d + 1)));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
