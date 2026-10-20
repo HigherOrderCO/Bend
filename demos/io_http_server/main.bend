@@ -12,7 +12,7 @@ import Base
 def http_response(page: String) -> String:
   "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n" ++ page
 
-def http_sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Unit):
+def http_sent(m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>) -> IO(Unit):
   (s, r) = m
   Socket.close(s)
 
@@ -21,7 +21,7 @@ def http_reply(m: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>) -> I
   match r:
     case Done{Some{req}}:
       do IO<Unit>:
-        sent : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, http_response("<h1>Hello, world!</h1>"))
+        sent : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(s, http_response("<h1>Hello, world!</h1>"))
         http_sent(sent)
     case Done{None{}}:
       Socket.close(s)

@@ -99,7 +99,7 @@ def poll(m):
   (s, show_poll(r))
 
 law sent:
-  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>
   IO(Socket)
 
 def sent(m):
@@ -120,7 +120,7 @@ law run:
 
 def run(l, c, a):
   do IO<U32>:
-    s0 : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "hello")
+    s0 : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "hello")
     c1 : Socket <- sent(s0)
     p0 : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String), Maybe<&1, String>>, Unit> <- TCP.try_recv(a, 0, 100)
     a1 : Socket <- told("try_recv: ", poll(p0))

@@ -13,7 +13,7 @@
 import Base
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>
   IO(Socket)
 
 def send_go(m):
@@ -78,7 +78,7 @@ def step_accept(c, p):
   (l, ar) = p
   do IO<U32>:
     a  : Socket <- IO.pass(Socket, ar)
-    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "abcdef")
+    sm : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(c, "abcdef")
     c2 : Socket <- send_go(sm)
     rm : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a, 3)
     step_two(l, c2, rm)

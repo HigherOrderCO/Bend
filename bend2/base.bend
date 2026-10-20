@@ -348,15 +348,17 @@ def TCP.connect(host: String, port: U32) ->
   import "./effs/tcp_connect.c"
   import "./effs/tcp_connect.js"
 
-# A failed send hands back what the kernel did not take. Sent means taken
-# by the kernel, not yet read by the peer.
+# A failed or timed-out send returns the exact unsent bytes: the kernel
+# may stop inside UTF-8. Resume with TCP.send_bytes. Sent means taken by
+# the kernel, not yet read by the peer.
 def TCP.send(sock: Socket, data: String) ->
-  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
 def TCP.try_send(sock: Socket, data: String, ms: U32) ->
-  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 

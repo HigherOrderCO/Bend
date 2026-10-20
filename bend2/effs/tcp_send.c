@@ -3,27 +3,22 @@
 
 // Sends what is left; a full socket (non-blocking, so EAGAIN) parks the
 // computation until the socket is writable, and the loop resumes here.
-static Term tcp_send_with(Env e, IoWork* w, IoPack more,
-  Term (*make)(Env, const char*, u64)) {
+static Term tcp_send_more(Env e, IoWork* w) {
   int fd = (int)w->hand;
   w->code = 0;
   while (w->code == 0 && (u64)w->made < w->size) {
     w->made += io_sys_end(w, send(fd, w->data + w->made,
       w->size - (u64)w->made, 0));
     if (io_again(w)) {
-      return io_wait_on(w, fd, POLLOUT, w->time, more);
+      return io_wait_on(w, fd, POLLOUT, w->time, tcp_send_more);
     }
   }
   u64  left = w->size - (u64)w->made;
-  Term r    = io_poll_end(e, w, make(e, w->data + w->made, left), w->code == 0
+  Term r    = io_poll_end(e, w, io_list(e, w->data + w->made, left), w->code == 0
     ? io_done(e, term_pak(CID(Unit), 0)) : io_box(e, CID(Fail),
-      io_tup(e, io_err(e, w->code, NULL), make(e, w->data + w->made, left))));
+      io_tup(e, io_err(e, w->code, NULL), io_list(e, w->data + w->made, left))));
   free(w->data);
   return io_tup(e, io_hand(w->hand), r);
-}
-
-static Term tcp_send_more(Env e, IoWork* w) {
-  return tcp_send_with(e, w, tcp_send_more, io_str);
 }
 
 // at is the try_ deadline (past it, Wait{rest}), 0 for the blocking twins.
@@ -34,12 +29,6 @@ static Term tcp_send_start(Env e, Term* f, IoWork* w, u64 at) {
   w->code = 0;
   w->time = at;
   return tcp_send_more(e, w);
-}
-
-#ifdef CID(Con)
-
-static Term tcp_send_bytes_more(Env e, IoWork* w) {
-  return tcp_send_with(e, w, tcp_send_bytes_more, io_list);
 }
 
 // A value past 255 fails with EINVAL before any byte is sent, list kept.
@@ -59,10 +48,8 @@ static Term tcp_send_bytes_start(Env e, Term* f, IoWork* w, u64 at) {
   w->made = 0;
   w->code = 0;
   w->time = at;
-  return tcp_send_bytes_more(e, w);
+  return tcp_send_more(e, w);
 }
-
-#endif
 
 #ifdef CID(TCP.send)
 
