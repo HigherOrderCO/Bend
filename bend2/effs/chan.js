@@ -24,11 +24,12 @@ function chan_head(row) {
   return row.wait[0];
 }
 
-// Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer, if
-// the poller has not taken it yet), on the IO that parked it: a nested io_run
-// may wake an outer one.
+// Wakes the first live waiter with x, as Ready{x} if try_ (cutting its timer,
+// if the poller has not taken it yet), on the IO that parked it: a nested
+// io_run may wake an outer one.
 function chan_wake(row, x) {
-  const w = row.wait.shift();
+  const w = chan_head(row);
+  row.wait.shift();
   if (w.late !== undefined) {
     const ws = w.io.waits;
     const at = ws.findIndex((t) => t.more === w.late);

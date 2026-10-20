@@ -6486,7 +6486,7 @@ function io_wait(io, block) {
   for (const w of todo.filter(due)) {
     const x = w.more();
     if (x !== undefined) {
-      io_push(w.k, x, false);
+      io_push(w.k, x, false, io);
     }
   }
 }
