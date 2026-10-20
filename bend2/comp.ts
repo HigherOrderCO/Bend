@@ -75,6 +75,8 @@ type File = {
   steps: Map<string, HTerm>;
   opens: Map<string, boolean>;
   srcs: Map<Name, Set<Name> | null>;
+  fids: Set<Name>;
+  effs: Map<string, [string, string]>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
   funs: Map<Name, Fun>;
@@ -1448,6 +1450,8 @@ function file_new(book: Bend.Book, js: boolean): File {
     steps: new Map(),
     opens: new Map(),
     srcs: new Map(),
+    fids: new Set(),
+    effs: new Map(),
     loops: new Map(),
     flats: new Map(),
     funs: new Map(),
@@ -1498,6 +1502,9 @@ function file_book(roots: Name[]): void {
     const tld = FL.book.tlds[d];
     for (const x of tld?.$ === "ADT" ? tld.c : tld ? [tld] : []) {
       ty_srcs(x.T);
+    }
+    if (def_foreign(tld)) {
+      effect_src(d, tld);
     }
     if (!done_live(tld)) {
       continue;
@@ -2829,38 +2836,56 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
 // namespace, else as is. An effect source is read once, in one namespace.
-// effect_srcs splices a C source's backslash-newlines first, as C does even
+// effect_src splices a C source's backslash-newlines first, as C does even
 // in a comment; JS does not.
 
-function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
-    if (!p) {
+const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
+
+function c_ids(src: string, m = "", use?: (p: string, k: Name) => void): string {
+  const replace = (t: string, p: string | undefined, k: string | undefined, at: number): string => {
+    // '#' starts a private JS name, but C's ## may paste an ID macro.
+    if (!p || !k || (FL.js && src[at - 1] === "#")) {
       return t;
     }
     const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.book.ctrs
-      || q in FL.book.tlds || FL.ids.has(p + "_" + q))
-      ?? die(`${p}(${k}) names no constructor or def`);
+      || q in FL.book.tlds || FL.ids.has(p + "_" + q));
+    if (use) {
+      if (q !== undefined) use(p, q);
+      return t;
+    }
+    if (q === undefined) die(`${p}(${k}) names no constructor or def`);
     return FL.js ? JSON.stringify(p === "CID" && q in FL.book.ctrs
       ? js_tag(q) : q) : name_id(p + "_", q);
-  });
+  };
+  if (use) {
+    for (const hit of src.matchAll(ID_WORDS)) replace(hit[0], hit[1], hit[2], hit.index);
+    return src;
+  }
+  return src.replace(ID_WORDS, replace);
 }
 
-function effect_srcs(ext: string, miss: string): string[] {
-  const seen = new Map<string, string>();
-  for (const [k, tld] of done_defs(def_foreign)) {
-    const path = fs.realpathSync(tld.i!.find((x) => x.endsWith(ext))
-      ?? die(miss + Bend.name_key(k)));
-    const m = tld.m ?? "";
-    if ((seen.get(path) ?? m) !== m) {
-      die(path + " is imported from two namespaces, '" + seen.get(path)
-        + "' and '" + m + "'");
-    }
-    seen.set(path, m);
+function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
+  const ext = FL.js ? ".js" : ".c";
+  const miss = FL.js ? "a foreign def without a .js import: " : "no .c import: ";
+  const path = fs.realpathSync(tld.i.find((x) => x.endsWith(ext))
+    ?? die(miss + Bend.name_key(k)));
+  const m = tld.m ?? "";
+  const seen = FL.effs.get(path);
+  if (seen && seen[0] !== m) {
+    die(path + " is imported from two namespaces, '" + seen[0] + "' and '" + m + "'");
   }
-  return [...seen].map(([p, m]) => {
-    const src = fs.readFileSync(p, "utf8");
-    return c_ids(ext === ".c" ? src.replace(/\\[ \t]*\r?\n/g, "") : src, m);
-  });
+  if (!seen) {
+    const raw = fs.readFileSync(path, "utf8");
+    const src = FL.js ? raw : raw.replace(/\\[ \t]*\r?\n/g, "");
+    FL.effs.set(path, [m, src]);
+    if (!FL.js) c_ids(src, m, (p, q) => {
+      const d = FL.book.tlds[q];
+      if (p === "FID" && fun_runs(d)) {
+        src_add(q);
+        FL.fids.add(q);
+      }
+    });
+  }
 }
 
 // C
@@ -2911,7 +2936,7 @@ export function compile_book(book: Bend.Book): string {
   const edges = [...FL.segs, ...FL.spins].flatMap((s) =>
     [...s.refs].map((r) => [s.fid, r]));
   const reach = (from: string[]) => graph_close(new Set(from), edges);
-  const live = reach([seg_fid("main")]);
+  const live = reach(["main", ...FL.fids].map(seg_fid));
   const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
     ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
@@ -2990,7 +3015,7 @@ export function compile_book(book: Bend.Book): string {
       .join("\n");
   }).join("\n\n");
   const c = c_ids(runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
-    effect_srcs(".c", "no .c import: ").join("")));
+    [...FL.effs.values()].map(([m, src]) => c_ids(src, m)).join("")));
   // keep nothing memoized: clang may run next, while this process waits
   FL = file_new(book, false);
   return c;
@@ -3278,8 +3303,8 @@ export function js_lib(book: Bend.Book, mod = false): string {
     memo_gc();
     js_def(sc, k, def);
   }
-  const effs = effect_srcs(".js", "a foreign def without a .js import: ")
-    .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
+  const effs = [...FL.effs.values()]
+    .map(([m, src]) => `(() => {\n${c_ids(src, m)}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
