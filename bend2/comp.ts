@@ -3786,7 +3786,8 @@ FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
   if (atomic_compare_exchange_strong(&first, &seen, self)) return 1;
-  if (seen != self) sleep(1);
+  struct timespec t = { seen != self, 0 };
+  while (nanosleep(&t, &t)) {}
   return 0;
 }
 
