@@ -3788,24 +3788,19 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// The first fault flushes stdout, waiting at most 100ms for its lock, and
-// prints the line; a fault on another thread waits for it, and a fault in
-// that flush (its own thread, SA_NODEFER) skips the flush.
+// The first fault flushes stdout if its lock is free, then prints the
+// line; a fault on another thread waits for its _exit, and one in that
+// flush (its own thread, SA_NODEFER) skips to the line. pool_stack sets
+// err_mine first on every trapping thread, so the trap never allocates it.
+static _Thread_local bool err_mine;
+
 static void err_trap(int sig) {
   static atomic_flag seen = ATOMIC_FLAG_INIT;
-  static pthread_t   first;
   static const char  line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
-  if (!atomic_flag_test_and_set(&seen)) {
-    first = pthread_self();
-    for (u32 i = 0; i < 100; i += 1) {
-      if (ftrylockfile(stdout) == 0) {
-        fflush(stdout);
-        break;
-      }
-      nanosleep(&(struct timespec){ 0, 1000000 }, NULL);
-    }
-  } else if (!pthread_equal(first, pthread_self())) {
-    for (;;) pause();
+  if (!err_mine) {
+    if (atomic_flag_test_and_set(&seen)) for (;;) pause();
+    err_mine = true;
+    if (ftrylockfile(stdout) == 0) fflush(stdout);
   }
   if (write(2, line, sizeof line - 1)) {}
   _exit(1);
@@ -4849,6 +4844,7 @@ static Term* pool_stack(void) {
   }
   stack_t ss = { .ss_sp = p + len + 16384, .ss_size = alt };
   sigaltstack(&ss, NULL);
+  err_mine = false;
   struct sigaction sa = { .sa_handler = err_trap,
     .sa_flags = SA_ONSTACK | SA_NODEFER };
   sigaction(SIGSEGV, &sa, NULL);
