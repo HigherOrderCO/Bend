@@ -1,0 +1,443 @@
+[
+  {
+    "name": "kmeans",
+    "variant": "all",
+    "emit_ms": 27.831457999999998,
+    "cli_ms": 81.5135420000006,
+    "native_ms": 222.43274999999267,
+    "c_bytes": 128125,
+    "binary_bytes": 87840
+  },
+  {
+    "name": "kmeans",
+    "variant": "base",
+    "emit_ms": 27.407458,
+    "cli_ms": 82.85945800000627,
+    "native_ms": 212.3957919999957,
+    "c_bytes": 124284,
+    "binary_bytes": 87808
+  },
+  {
+    "name": "kmeans",
+    "variant": "fused",
+    "emit_ms": 29.473999999999997,
+    "cli_ms": 83.22350000002189,
+    "native_ms": 214.6730000000025,
+    "c_bytes": 125056,
+    "binary_bytes": 87808
+  },
+  {
+    "name": "kmeans",
+    "variant": "join",
+    "emit_ms": 28.663709000000004,
+    "cli_ms": 83.32200000000012,
+    "native_ms": 214.7174159999995,
+    "c_bytes": 125056,
+    "binary_bytes": 87808
+  },
+  {
+    "name": "kmeans",
+    "variant": "return",
+    "emit_ms": 27.915375000000004,
+    "cli_ms": 82.97420799999963,
+    "native_ms": 217.11437500000466,
+    "c_bytes": 125065,
+    "binary_bytes": 87808
+  },
+  {
+    "name": "kmeans",
+    "variant": "reuse",
+    "emit_ms": 28.361375000000002,
+    "cli_ms": 82.84520799999882,
+    "native_ms": 213.94566700002179,
+    "c_bytes": 124975,
+    "binary_bytes": 87808
+  },
+  {
+    "name": "kmeans",
+    "variant": "specialize",
+    "emit_ms": 28.031709,
+    "cli_ms": 83.67112500000803,
+    "native_ms": 217.01558300000033,
+    "c_bytes": 128278,
+    "binary_bytes": 87840
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "all",
+    "emit_ms": 231.863,
+    "cli_ms": 302.3560409999918,
+    "native_ms": 1109.0619580000057,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "base",
+    "emit_ms": 227.62929099999997,
+    "cli_ms": 295.9725829999952,
+    "native_ms": 1098.3716249999998,
+    "c_bytes": 885430,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "fused",
+    "emit_ms": 225.15954100000002,
+    "cli_ms": 294.97675000000163,
+    "native_ms": 1106.5084999999963,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "join",
+    "emit_ms": 227.338875,
+    "cli_ms": 296.1002920000028,
+    "native_ms": 1111.3589999999967,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "return",
+    "emit_ms": 225.095375,
+    "cli_ms": 294.66916600000695,
+    "native_ms": 1107.3222080000123,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "reuse",
+    "emit_ms": 228.54829200000003,
+    "cli_ms": 298.4752500000177,
+    "native_ms": 1112.8435409999802,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_hvm5_mini",
+    "variant": "specialize",
+    "emit_ms": 226.69858299999999,
+    "cli_ms": 299.6859589999949,
+    "native_ms": 1111.1206660000025,
+    "c_bytes": 886070,
+    "binary_bytes": 325856
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "all",
+    "emit_ms": 358.858709,
+    "cli_ms": 411.57712499999616,
+    "native_ms": 179.1010829999941,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "base",
+    "emit_ms": 357.392375,
+    "cli_ms": 409.7792079999999,
+    "native_ms": 178.5793330000015,
+    "c_bytes": 100578,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "fused",
+    "emit_ms": 359.948,
+    "cli_ms": 412.12316600000486,
+    "native_ms": 178.5252079999991,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "join",
+    "emit_ms": 361.175916,
+    "cli_ms": 414.7060829999973,
+    "native_ms": 181.40154200000688,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "return",
+    "emit_ms": 360.549833,
+    "cli_ms": 413.8190830000094,
+    "native_ms": 179.63254199999938,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "reuse",
+    "emit_ms": 357.706708,
+    "cli_ms": 412.44408300000214,
+    "native_ms": 178.74891599999683,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sort",
+    "variant": "specialize",
+    "emit_ms": 358.245875,
+    "cli_ms": 412.4234579999975,
+    "native_ms": 180.734375,
+    "c_bytes": 101218,
+    "binary_bytes": 71392
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "all",
+    "emit_ms": 9.588042000000002,
+    "cli_ms": 61.76641599999857,
+    "native_ms": 159.91729199999827,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "base",
+    "emit_ms": 9.347875000000002,
+    "cli_ms": 62.06662500000675,
+    "native_ms": 157.75904099999752,
+    "c_bytes": 88214,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "fused",
+    "emit_ms": 9.686208,
+    "cli_ms": 62.28437500000291,
+    "native_ms": 158.8650830000006,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "join",
+    "emit_ms": 9.295375,
+    "cli_ms": 61.658542000019224,
+    "native_ms": 160.06300000000192,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "return",
+    "emit_ms": 9.296667,
+    "cli_ms": 61.359167000016896,
+    "native_ms": 158.05516699999862,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "reuse",
+    "emit_ms": 9.595666999999999,
+    "cli_ms": 62.394249999997555,
+    "native_ms": 160.07404199999291,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "pure_par_sum",
+    "variant": "specialize",
+    "emit_ms": 9.625125000000004,
+    "cli_ms": 63.56779100000858,
+    "native_ms": 158.7139170000155,
+    "c_bytes": 88854,
+    "binary_bytes": 70896
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "all",
+    "emit_ms": 15.565124999999995,
+    "cli_ms": 68.80112499999814,
+    "native_ms": 189.64154200001212,
+    "c_bytes": 106638,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "base",
+    "emit_ms": 14.677875,
+    "cli_ms": 68.25950000001467,
+    "native_ms": 183.0046250000014,
+    "c_bytes": 105918,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "fused",
+    "emit_ms": 15.198917000000002,
+    "cli_ms": 68.92962499998976,
+    "native_ms": 181.79758399999992,
+    "c_bytes": 106629,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "join",
+    "emit_ms": 15.049582999999998,
+    "cli_ms": 69.08024999999907,
+    "native_ms": 185.6935410000151,
+    "c_bytes": 106629,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "return",
+    "emit_ms": 15.268958000000005,
+    "cli_ms": 69.44454199999745,
+    "native_ms": 186.9028330000001,
+    "c_bytes": 106638,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "reuse",
+    "emit_ms": 15.437750000000001,
+    "cli_ms": 70.34187499999825,
+    "native_ms": 183.27420800000255,
+    "c_bytes": 106629,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-bitonic",
+    "variant": "specialize",
+    "emit_ms": 15.654916999999998,
+    "cli_ms": 69.1026669999992,
+    "native_ms": 183.19358400000056,
+    "c_bytes": 106629,
+    "binary_bytes": 71408
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "all",
+    "emit_ms": 22.461042,
+    "cli_ms": 75.88962500001071,
+    "native_ms": 239.6756250000035,
+    "c_bytes": 150217,
+    "binary_bytes": 89472
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "base",
+    "emit_ms": 22.229999999999997,
+    "cli_ms": 77.17379200000141,
+    "native_ms": 224.72950000000128,
+    "c_bytes": 140723,
+    "binary_bytes": 89488
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "fused",
+    "emit_ms": 23.549583000000005,
+    "cli_ms": 77.73674999999639,
+    "native_ms": 226.10975000000326,
+    "c_bytes": 139904,
+    "binary_bytes": 89328
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "join",
+    "emit_ms": 22.72566700000001,
+    "cli_ms": 76.48124999999709,
+    "native_ms": 228.34204200000386,
+    "c_bytes": 139904,
+    "binary_bytes": 89328
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "return",
+    "emit_ms": 22.830583000000004,
+    "cli_ms": 77.00095899999724,
+    "native_ms": 231.83695799999987,
+    "c_bytes": 139913,
+    "binary_bytes": 89328
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "reuse",
+    "emit_ms": 22.616875000000007,
+    "cli_ms": 76.16995899999893,
+    "native_ms": 222.5601250000036,
+    "c_bytes": 139742,
+    "binary_bytes": 89328
+  },
+  {
+    "name": "tree-matmul",
+    "variant": "specialize",
+    "emit_ms": 22.616624999999992,
+    "cli_ms": 76.783792000002,
+    "native_ms": 232.98550000000978,
+    "c_bytes": 150532,
+    "binary_bytes": 89456
+  },
+  {
+    "name": "tree-radix",
+    "variant": "all",
+    "emit_ms": 15.532375000000002,
+    "cli_ms": 69.54133300000103,
+    "native_ms": 200.99775000000227,
+    "c_bytes": 113720,
+    "binary_bytes": 71552
+  },
+  {
+    "name": "tree-radix",
+    "variant": "base",
+    "emit_ms": 14.365790999999994,
+    "cli_ms": 69.04229099999793,
+    "native_ms": 186.9789579999997,
+    "c_bytes": 106702,
+    "binary_bytes": 71504
+  },
+  {
+    "name": "tree-radix",
+    "variant": "fused",
+    "emit_ms": 14.812874999999998,
+    "cli_ms": 68.06395800001337,
+    "native_ms": 187.74579200000153,
+    "c_bytes": 107182,
+    "binary_bytes": 71440
+  },
+  {
+    "name": "tree-radix",
+    "variant": "join",
+    "emit_ms": 15.10725,
+    "cli_ms": 67.72583300000406,
+    "native_ms": 193.03562500000407,
+    "c_bytes": 107182,
+    "binary_bytes": 71440
+  },
+  {
+    "name": "tree-radix",
+    "variant": "return",
+    "emit_ms": 14.692374999999998,
+    "cli_ms": 69.52866699997685,
+    "native_ms": 193.17370899999514,
+    "c_bytes": 107191,
+    "binary_bytes": 71440
+  },
+  {
+    "name": "tree-radix",
+    "variant": "reuse",
+    "emit_ms": 15.026291999999998,
+    "cli_ms": 68.55008400000224,
+    "native_ms": 190.03591599999345,
+    "c_bytes": 107022,
+    "binary_bytes": 71440
+  },
+  {
+    "name": "tree-radix",
+    "variant": "specialize",
+    "emit_ms": 15.133415999999997,
+    "cli_ms": 67.79391699999906,
+    "native_ms": 193.73254100000486,
+    "c_bytes": 114031,
+    "binary_bytes": 71552
+  }
+]

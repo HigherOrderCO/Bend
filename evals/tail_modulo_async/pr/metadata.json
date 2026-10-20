@@ -1,0 +1,13 @@
+{
+  "baseline_git_commit": "99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172",
+  "comp_sha256": "1c61c5aee576c3c469e65a759ae9778b6ee01f14541fa4216068cb4ed27d27eb",
+  "comp_tokens": 67278,
+  "cap": 66000,
+  "test_gate": "PASS: 1678 / 1678",
+  "default_enabled": true,
+  "experimental_flags": false,
+  "generated_c_identical_programs": 20,
+  "compiler_repetitions": 7,
+  "compiler_warmups": 1,
+  "compiler_node": "cluster-02"
+}

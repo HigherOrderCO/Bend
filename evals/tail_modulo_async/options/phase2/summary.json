@@ -1,0 +1,1082 @@
+[
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "all_once",
+    "median_seconds": 2.40619,
+    "min_seconds": 2.36349,
+    "max_seconds": 2.427888,
+    "vs_fused_percent": 19.345368441048972,
+    "vs_base_percent": 19.466306806559295
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "base",
+    "median_seconds": 2.014116,
+    "min_seconds": 1.982304,
+    "max_seconds": 2.04205,
+    "vs_fused_percent": -0.1012321957069906,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "fused",
+    "median_seconds": 2.016157,
+    "min_seconds": 1.981378,
+    "max_seconds": 2.029503,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": 0.10133477912892541
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "join_once",
+    "median_seconds": 2.01074,
+    "min_seconds": 1.985683,
+    "max_seconds": 2.027581,
+    "vs_fused_percent": -0.2686794728783526,
+    "vs_base_percent": -0.1676169594998389
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "reuse",
+    "median_seconds": 2.057642,
+    "min_seconds": 2.007015,
+    "max_seconds": 2.090705,
+    "vs_fused_percent": 2.057627456591904,
+    "vs_base_percent": 2.1610473279592535
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "reuse_join",
+    "median_seconds": 2.04754,
+    "min_seconds": 2.019953,
+    "max_seconds": 2.063028,
+    "vs_fused_percent": 1.5565752071887262,
+    "vs_base_percent": 1.6594873383658282
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "reuse_return",
+    "median_seconds": 2.21617,
+    "min_seconds": 2.17321,
+    "max_seconds": 2.25743,
+    "vs_fused_percent": 9.920507182724347,
+    "vs_base_percent": 10.031894885895355
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "reuse_spec",
+    "median_seconds": 1.901087,
+    "min_seconds": 1.869203,
+    "max_seconds": 1.920314,
+    "vs_fused_percent": -5.707392827046709,
+    "vs_base_percent": -5.611841621833102
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu1",
+    "variant": "reuse_spec_return",
+    "median_seconds": 2.406115,
+    "min_seconds": 2.354944,
+    "max_seconds": 2.434885,
+    "vs_fused_percent": 19.341648492652098,
+    "vs_base_percent": 19.462583088560926
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "all_once",
+    "median_seconds": 3.906001,
+    "min_seconds": 3.843859,
+    "max_seconds": 3.947655,
+    "vs_fused_percent": -2.980384208509168,
+    "vs_base_percent": -3.3651004609330126
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "base",
+    "median_seconds": 4.042019,
+    "min_seconds": 3.972963,
+    "max_seconds": 4.072889,
+    "vs_fused_percent": 0.3981131602132093,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "fused",
+    "median_seconds": 4.025991,
+    "min_seconds": 3.957738,
+    "max_seconds": 4.068108,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -0.39653450416733405
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "join_once",
+    "median_seconds": 4.03213,
+    "min_seconds": 3.954976,
+    "max_seconds": 4.076646,
+    "vs_fused_percent": 0.15248419581663786,
+    "vs_base_percent": -0.24465496080051663
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "reuse",
+    "median_seconds": 3.903034,
+    "min_seconds": 3.80374,
+    "max_seconds": 3.927733,
+    "vs_fused_percent": -3.054080349409638,
+    "vs_base_percent": -3.4385043712065633
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "reuse_join",
+    "median_seconds": 3.881346,
+    "min_seconds": 3.80344,
+    "max_seconds": 3.914532,
+    "vs_fused_percent": -3.592780013666208,
+    "vs_base_percent": -3.9750679054205262
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "reuse_return",
+    "median_seconds": 3.926021,
+    "min_seconds": 3.84597,
+    "max_seconds": 3.97927,
+    "vs_fused_percent": -2.4831153373169546,
+    "vs_base_percent": -2.8698034323935584
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "reuse_spec",
+    "median_seconds": 3.943165,
+    "min_seconds": 3.856569,
+    "max_seconds": 3.955822,
+    "vs_fused_percent": -2.0572822939743385,
+    "vs_base_percent": -2.445658963997932
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu1",
+    "variant": "reuse_spec_return",
+    "median_seconds": 3.922292,
+    "min_seconds": 3.841633,
+    "max_seconds": 3.964161,
+    "vs_fused_percent": -2.5757384951928697,
+    "vs_base_percent": -2.9620593074896395
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "all_once",
+    "median_seconds": 6.041512,
+    "min_seconds": 5.950202,
+    "max_seconds": 6.081339,
+    "vs_fused_percent": 5.471998257005151,
+    "vs_base_percent": 4.883555440436282
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "base",
+    "median_seconds": 5.760209,
+    "min_seconds": 5.68891,
+    "max_seconds": 5.783132,
+    "vs_fused_percent": 0.5610439254255084,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "fused",
+    "median_seconds": 5.728072,
+    "min_seconds": 5.685661,
+    "max_seconds": 5.780523,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -0.5579137840310944
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "join_once",
+    "median_seconds": 5.739736,
+    "min_seconds": 5.64611,
+    "max_seconds": 5.770784,
+    "vs_fused_percent": 0.20362872533723486,
+    "vs_base_percent": -0.35542113142075227
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "reuse",
+    "median_seconds": 5.740901,
+    "min_seconds": 5.648374,
+    "max_seconds": 5.799842,
+    "vs_fused_percent": 0.22396715683741242,
+    "vs_base_percent": -0.33519617083337394
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "reuse_join",
+    "median_seconds": 5.737134,
+    "min_seconds": 5.642161,
+    "max_seconds": 5.789006,
+    "vs_fused_percent": 0.15820331867337778,
+    "vs_base_percent": -0.40059310347939636
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "reuse_return",
+    "median_seconds": 6.04697,
+    "min_seconds": 5.940741,
+    "max_seconds": 6.13538,
+    "vs_fused_percent": 5.567283372136389,
+    "vs_base_percent": 4.978308946776067
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "reuse_spec",
+    "median_seconds": 5.718633,
+    "min_seconds": 5.661915,
+    "max_seconds": 5.756306,
+    "vs_fused_percent": -0.16478493985411236,
+    "vs_base_percent": -0.7217793659917593
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu1",
+    "variant": "reuse_spec_return",
+    "median_seconds": 6.048197,
+    "min_seconds": 5.937531,
+    "max_seconds": 6.100157,
+    "vs_fused_percent": 5.588704192265737,
+    "vs_base_percent": 4.999610257197262
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "all_once",
+    "median_seconds": 3.125837,
+    "min_seconds": 3.099118,
+    "max_seconds": 3.136924,
+    "vs_fused_percent": -0.5753001662890056,
+    "vs_base_percent": -15.582190532235318
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "base",
+    "median_seconds": 3.702817,
+    "min_seconds": 3.69382,
+    "max_seconds": 3.712984,
+    "vs_fused_percent": 17.776924633038192,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "fused",
+    "median_seconds": 3.143924,
+    "min_seconds": 3.128898,
+    "max_seconds": 3.147102,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -15.093724588603752
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "join_once",
+    "median_seconds": 3.139922,
+    "min_seconds": 3.134976,
+    "max_seconds": 3.144552,
+    "vs_fused_percent": -0.12729315339684577,
+    "vs_base_percent": -15.20180446400673
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "reuse",
+    "median_seconds": 3.053125,
+    "min_seconds": 3.043228,
+    "max_seconds": 3.062817,
+    "vs_fused_percent": -2.888078719460141,
+    "vs_base_percent": -17.545884660246504
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "reuse_join",
+    "median_seconds": 3.057675,
+    "min_seconds": 3.052498,
+    "max_seconds": 3.07366,
+    "vs_fused_percent": -2.743355119271329,
+    "vs_base_percent": -17.42300524168491
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "reuse_return",
+    "median_seconds": 3.074917,
+    "min_seconds": 3.067846,
+    "max_seconds": 3.083523,
+    "vs_fused_percent": -2.194932193017385,
+    "vs_base_percent": -16.957359761500502
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "reuse_spec",
+    "median_seconds": 3.107925,
+    "min_seconds": 3.09896,
+    "max_seconds": 3.1122,
+    "vs_fused_percent": -1.145034040263071,
+    "vs_base_percent": -16.06593034438375
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu1",
+    "variant": "reuse_spec_return",
+    "median_seconds": 3.113764,
+    "min_seconds": 3.104437,
+    "max_seconds": 3.116,
+    "vs_fused_percent": -0.9593107212515273,
+    "vs_base_percent": -15.908239591640626
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "all_once",
+    "median_seconds": 0.489316,
+    "min_seconds": 0.487059,
+    "max_seconds": 0.490147,
+    "vs_fused_percent": 10.421179953783932,
+    "vs_base_percent": 9.840665532304627
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "base",
+    "median_seconds": 0.445478,
+    "min_seconds": 0.440671,
+    "max_seconds": 0.446583,
+    "vs_fused_percent": 0.5285059214326981,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "fused",
+    "median_seconds": 0.443136,
+    "min_seconds": 0.442722,
+    "max_seconds": 0.445319,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -0.5257274208827378
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "join_once",
+    "median_seconds": 0.446853,
+    "min_seconds": 0.44568,
+    "max_seconds": 0.450843,
+    "vs_fused_percent": 0.8387944107452361,
+    "vs_base_percent": 0.30865721764037346
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "reuse",
+    "median_seconds": 0.437509,
+    "min_seconds": 0.433113,
+    "max_seconds": 0.440172,
+    "vs_fused_percent": -1.2698133304448245,
+    "vs_base_percent": -1.788864994455397
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "reuse_join",
+    "median_seconds": 0.439153,
+    "min_seconds": 0.436279,
+    "max_seconds": 0.442752,
+    "vs_fused_percent": -0.8988211294049586,
+    "vs_base_percent": -1.4198232011457312
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "reuse_return",
+    "median_seconds": 0.470509,
+    "min_seconds": 0.465877,
+    "max_seconds": 0.475598,
+    "vs_fused_percent": 6.177110413056042,
+    "vs_base_percent": 5.618908228913666
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "reuse_spec",
+    "median_seconds": 0.419775,
+    "min_seconds": 0.419161,
+    "max_seconds": 0.421896,
+    "vs_fused_percent": -5.271745017331019,
+    "vs_base_percent": -5.769757429098621
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "cpu8",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.490103,
+    "min_seconds": 0.485428,
+    "max_seconds": 0.498184,
+    "vs_fused_percent": 10.598777801848659,
+    "vs_base_percent": 10.01732969978315
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "all_once",
+    "median_seconds": 0.846249,
+    "min_seconds": 0.844363,
+    "max_seconds": 0.850863,
+    "vs_fused_percent": -2.68637665160244,
+    "vs_base_percent": -1.502402936832259
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "base",
+    "median_seconds": 0.859157,
+    "min_seconds": 0.856093,
+    "max_seconds": 0.866307,
+    "vs_fused_percent": -1.202033095295596,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "fused",
+    "median_seconds": 0.86961,
+    "min_seconds": 0.865525,
+    "max_seconds": 0.875875,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": 1.2166577237920473
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "join_once",
+    "median_seconds": 0.867413,
+    "min_seconds": 0.865551,
+    "max_seconds": 0.86918,
+    "vs_fused_percent": -0.25264198893757417,
+    "vs_base_percent": 0.9609419465825164
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "reuse",
+    "median_seconds": 0.838174,
+    "min_seconds": 0.834404,
+    "max_seconds": 0.840501,
+    "vs_fused_percent": -3.614953829877765,
+    "vs_base_percent": -2.442277721068442
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "reuse_join",
+    "median_seconds": 0.838031,
+    "min_seconds": 0.836866,
+    "max_seconds": 0.841606,
+    "vs_fused_percent": -3.631397983003881,
+    "vs_base_percent": -2.458921943253678
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "reuse_return",
+    "median_seconds": 0.853123,
+    "min_seconds": 0.845501,
+    "max_seconds": 0.855345,
+    "vs_fused_percent": -1.895907360770921,
+    "vs_base_percent": -0.702316340319642
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "reuse_spec",
+    "median_seconds": 0.853995,
+    "min_seconds": 0.847642,
+    "max_seconds": 0.854176,
+    "vs_fused_percent": -1.7956325249249727,
+    "vs_base_percent": -0.6008215029383424
+  },
+  {
+    "name": "kmeans",
+    "backend": "cpu8",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.847448,
+    "min_seconds": 0.843354,
+    "max_seconds": 0.850905,
+    "vs_fused_percent": -2.5484987523142544,
+    "vs_base_percent": -1.3628475354329872
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "all_once",
+    "median_seconds": 1.435943,
+    "min_seconds": 1.414309,
+    "max_seconds": 1.469323,
+    "vs_fused_percent": 1.948457187403041,
+    "vs_base_percent": 2.2449932854557098
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "base",
+    "median_seconds": 1.404414,
+    "min_seconds": 1.365778,
+    "max_seconds": 1.424558,
+    "vs_fused_percent": -0.2900250550408545,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "fused",
+    "median_seconds": 1.408499,
+    "min_seconds": 1.325165,
+    "max_seconds": 1.464092,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": 0.2908686469943911
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "join_once",
+    "median_seconds": 1.361372,
+    "min_seconds": 1.321836,
+    "max_seconds": 1.498519,
+    "vs_fused_percent": -3.3459022690111917,
+    "vs_base_percent": -3.064765802676417
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "reuse",
+    "median_seconds": 1.371188,
+    "min_seconds": 1.328846,
+    "max_seconds": 1.407552,
+    "vs_fused_percent": -2.6489901661271964,
+    "vs_base_percent": -2.36582660098803
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "reuse_join",
+    "median_seconds": 1.370717,
+    "min_seconds": 1.314383,
+    "max_seconds": 1.460374,
+    "vs_fused_percent": -2.6824300194746353,
+    "vs_base_percent": -2.399363720384451
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "reuse_return",
+    "median_seconds": 1.47076,
+    "min_seconds": 1.444134,
+    "max_seconds": 1.513344,
+    "vs_fused_percent": 4.420379425189513,
+    "vs_base_percent": 4.724105570009973
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "reuse_spec",
+    "median_seconds": 1.360181,
+    "min_seconds": 1.334559,
+    "max_seconds": 1.386821,
+    "vs_fused_percent": -3.4304603695139213,
+    "vs_base_percent": -3.1495698561820107
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "cpu8",
+    "variant": "reuse_spec_return",
+    "median_seconds": 1.412991,
+    "min_seconds": 1.36761,
+    "max_seconds": 1.490538,
+    "vs_fused_percent": 0.31892106419673105,
+    "vs_base_percent": 0.6107173525755183
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "all_once",
+    "median_seconds": 0.595634,
+    "min_seconds": 0.594185,
+    "max_seconds": 0.599119,
+    "vs_fused_percent": -2.1190444498125793,
+    "vs_base_percent": -17.540704684932386
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "base",
+    "median_seconds": 0.722337,
+    "min_seconds": 0.720919,
+    "max_seconds": 0.723444,
+    "vs_fused_percent": 18.702148952638243,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "fused",
+    "median_seconds": 0.608529,
+    "min_seconds": 0.607526,
+    "max_seconds": 0.609475,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -15.75552685242484
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "join_once",
+    "median_seconds": 0.607446,
+    "min_seconds": 0.605855,
+    "max_seconds": 0.607993,
+    "vs_fused_percent": -0.17797015425722318,
+    "vs_base_percent": -15.905456871238766
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "reuse",
+    "median_seconds": 0.590328,
+    "min_seconds": 0.588622,
+    "max_seconds": 0.591336,
+    "vs_fused_percent": -2.9909831741790516,
+    "vs_base_percent": -18.275264869444598
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "reuse_join",
+    "median_seconds": 0.592187,
+    "min_seconds": 0.589894,
+    "max_seconds": 0.592419,
+    "vs_fused_percent": -2.685492392309974,
+    "vs_base_percent": -18.01790576974459
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "reuse_return",
+    "median_seconds": 0.594217,
+    "min_seconds": 0.592663,
+    "max_seconds": 0.5951,
+    "vs_fused_percent": -2.351901059768724,
+    "vs_base_percent": -17.73687350917923
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "reuse_spec",
+    "median_seconds": 0.59497,
+    "min_seconds": 0.594735,
+    "max_seconds": 0.596368,
+    "vs_fused_percent": -2.22816003838765,
+    "vs_base_percent": -17.63262853764933
+  },
+  {
+    "name": "tree-radix",
+    "backend": "cpu8",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.596624,
+    "min_seconds": 0.595319,
+    "max_seconds": 0.597928,
+    "vs_fused_percent": -1.9563570511840767,
+    "vs_base_percent": -17.403649543080302
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "all_once",
+    "median_seconds": 0.895535,
+    "min_seconds": 0.798407,
+    "max_seconds": 0.910664,
+    "vs_fused_percent": -2.12732240437159,
+    "vs_base_percent": -2.5498195256195233
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "base",
+    "median_seconds": 0.918967,
+    "min_seconds": 0.762579,
+    "max_seconds": 0.92801,
+    "vs_fused_percent": 0.4335519125683085,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "fused",
+    "median_seconds": 0.915,
+    "min_seconds": 0.753158,
+    "max_seconds": 0.933305,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -0.4316803541367542
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "join_once",
+    "median_seconds": 0.924981,
+    "min_seconds": 0.911495,
+    "max_seconds": 0.97192,
+    "vs_fused_percent": 1.0908196721311603,
+    "vs_base_percent": 0.6544304637707388
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "reuse",
+    "median_seconds": 0.87572,
+    "min_seconds": 0.831199,
+    "max_seconds": 0.899875,
+    "vs_fused_percent": -4.292896174863381,
+    "vs_base_percent": -4.706044939589771
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "reuse_join",
+    "median_seconds": 0.895227,
+    "min_seconds": 0.841675,
+    "max_seconds": 0.914337,
+    "vs_fused_percent": -2.160983606557376,
+    "vs_base_percent": -2.5833354190085145
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "reuse_return",
+    "median_seconds": 0.880362,
+    "min_seconds": 0.788925,
+    "max_seconds": 0.937195,
+    "vs_fused_percent": -3.7855737704918124,
+    "vs_base_percent": -4.200912546370006
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "reuse_spec",
+    "median_seconds": 0.872009,
+    "min_seconds": 0.861352,
+    "max_seconds": 0.905029,
+    "vs_fused_percent": -4.698469945355188,
+    "vs_base_percent": -5.109867927792832
+  },
+  {
+    "name": "tree-matmul",
+    "backend": "metal",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.878532,
+    "min_seconds": 0.874969,
+    "max_seconds": 0.905464,
+    "vs_fused_percent": -3.9855737704918126,
+    "vs_base_percent": -4.400049185661725
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "all_once",
+    "median_seconds": 0.487738,
+    "min_seconds": 0.479427,
+    "max_seconds": 0.490472,
+    "vs_fused_percent": -1.4634875611638343,
+    "vs_base_percent": -22.825655266260014
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "base",
+    "median_seconds": 0.631995,
+    "min_seconds": 0.611785,
+    "max_seconds": 0.639568,
+    "vs_fused_percent": 27.680400499412094,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "fused",
+    "median_seconds": 0.494982,
+    "min_seconds": 0.48286,
+    "max_seconds": 0.498684,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -21.679443666484698
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "join_once",
+    "median_seconds": 0.489294,
+    "min_seconds": 0.482044,
+    "max_seconds": 0.492395,
+    "vs_fused_percent": -1.1491326957343895,
+    "vs_base_percent": -22.579450786794197
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "reuse",
+    "median_seconds": 0.484015,
+    "min_seconds": 0.475444,
+    "max_seconds": 0.499899,
+    "vs_fused_percent": -2.2156361241418843,
+    "vs_base_percent": -23.41474220523897
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "reuse_join",
+    "median_seconds": 0.474982,
+    "min_seconds": 0.470057,
+    "max_seconds": 0.490503,
+    "vs_fused_percent": -4.040550969530199,
+    "vs_base_percent": -24.844025664760004
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "reuse_return",
+    "median_seconds": 0.488982,
+    "min_seconds": 0.481377,
+    "max_seconds": 0.50579,
+    "vs_fused_percent": -1.2121652908590463,
+    "vs_base_percent": -22.628818265967286
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "reuse_spec",
+    "median_seconds": 0.483255,
+    "min_seconds": 0.476233,
+    "max_seconds": 0.496283,
+    "vs_fused_percent": -2.369177060984029,
+    "vs_base_percent": -23.53499632117343
+  },
+  {
+    "name": "kmeans",
+    "backend": "metal",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.482487,
+    "min_seconds": 0.48012,
+    "max_seconds": 0.497996,
+    "vs_fused_percent": -2.524334218213986,
+    "vs_base_percent": -23.65651626990719
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "all_once",
+    "median_seconds": 1.651849,
+    "min_seconds": 1.598332,
+    "max_seconds": 1.692856,
+    "vs_fused_percent": -0.05179387731023555,
+    "vs_base_percent": 1.0815243165511523
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "base",
+    "median_seconds": 1.634175,
+    "min_seconds": 1.574995,
+    "max_seconds": 1.698727,
+    "vs_fused_percent": -1.1211922272880037,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "fused",
+    "median_seconds": 1.652705,
+    "min_seconds": 1.635298,
+    "max_seconds": 1.872327,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": 1.1339054874784038
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "join_once",
+    "median_seconds": 1.610683,
+    "min_seconds": 1.524386,
+    "max_seconds": 1.738172,
+    "vs_fused_percent": -2.5426195237504556,
+    "vs_base_percent": -1.4375449385775618
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "reuse",
+    "median_seconds": 1.715212,
+    "min_seconds": 1.645048,
+    "max_seconds": 1.945866,
+    "vs_fused_percent": 3.782102674100929,
+    "vs_base_percent": 4.958893631343031
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "reuse_join",
+    "median_seconds": 1.664336,
+    "min_seconds": 1.5807,
+    "max_seconds": 1.882545,
+    "vs_fused_percent": 0.703755358639313,
+    "vs_base_percent": 1.8456407667477581
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "reuse_return",
+    "median_seconds": 1.570196,
+    "min_seconds": 1.50563,
+    "max_seconds": 1.702142,
+    "vs_fused_percent": -4.992361008165414,
+    "vs_base_percent": -3.9150641761133254
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "reuse_spec",
+    "median_seconds": 1.643412,
+    "min_seconds": 1.588147,
+    "max_seconds": 1.746848,
+    "vs_fused_percent": -0.5622903058924655,
+    "vs_base_percent": 0.565239340951873
+  },
+  {
+    "name": "tree-bitonic",
+    "backend": "metal",
+    "variant": "reuse_spec_return",
+    "median_seconds": 1.608214,
+    "min_seconds": 1.527925,
+    "max_seconds": 1.703167,
+    "vs_fused_percent": -2.6920109759455024,
+    "vs_base_percent": -1.588630348646869
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "all_once",
+    "median_seconds": 0.83475,
+    "min_seconds": 0.833255,
+    "max_seconds": 0.864356,
+    "vs_fused_percent": -1.4758266116182361,
+    "vs_base_percent": -28.698942549156936
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "base",
+    "median_seconds": 1.17074,
+    "min_seconds": 1.151606,
+    "max_seconds": 1.179253,
+    "vs_fused_percent": 38.18052201582995,
+    "vs_base_percent": 0.0
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "fused",
+    "median_seconds": 0.847254,
+    "min_seconds": 0.844448,
+    "max_seconds": 0.86812,
+    "vs_fused_percent": 0.0,
+    "vs_base_percent": -27.630900114457525
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "join_once",
+    "median_seconds": 0.852927,
+    "min_seconds": 0.831899,
+    "max_seconds": 0.871488,
+    "vs_fused_percent": 0.6695748854534722,
+    "vs_base_percent": -27.14633479679518
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "reuse",
+    "median_seconds": 0.820916,
+    "min_seconds": 0.818476,
+    "max_seconds": 0.848685,
+    "vs_fused_percent": -3.108630941842705,
+    "vs_base_percent": -29.88058834583255
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "reuse_join",
+    "median_seconds": 0.833628,
+    "min_seconds": 0.824565,
+    "max_seconds": 0.850271,
+    "vs_fused_percent": -1.608254431374756,
+    "vs_base_percent": -28.794779370312785
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "reuse_return",
+    "median_seconds": 0.861319,
+    "min_seconds": 0.845957,
+    "max_seconds": 0.871671,
+    "vs_fused_percent": 1.660068881350818,
+    "vs_base_percent": -26.429523207543948
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "reuse_spec",
+    "median_seconds": 0.872362,
+    "min_seconds": 0.862158,
+    "max_seconds": 0.881958,
+    "vs_fused_percent": 2.963456059221903,
+    "vs_base_percent": -25.486273638895053
+  },
+  {
+    "name": "tree-radix",
+    "backend": "metal",
+    "variant": "reuse_spec_return",
+    "median_seconds": 0.847744,
+    "min_seconds": 0.829993,
+    "max_seconds": 0.864037,
+    "vs_fused_percent": 0.057833896328629564,
+    "vs_base_percent": -27.589046244255755
+  }
+]

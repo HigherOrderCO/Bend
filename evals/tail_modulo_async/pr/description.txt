@@ -1,0 +1,138 @@
+Constructor tails currently wait for their children and then allocate/rebuild the parent. On sequential paths this retains constructor continuations down the recursive spine; on parallel paths results travel through the join before becoming constructor fields. This change allocates the parent first, lets children fill its fields, and reuses a consumed node when the existing ownership analysis permits it.
+
+The selected implementation is destination passing with fused sibling continuations and owned-node reuse. It is enabled automatically in the C emitter; CPU, Metal and CUDA share the emitted runtime. The JS emitter and language/checker are unchanged.
+
+**Draft / merge blocker:** `comp.ts` is 67,278 tokens against the permanent 66,000-token cap. The repository gate reports that failure; the cap has not been changed. Removing the experimental switches saved 91 tokens, but another 1,278 must be removed by simplification before merging. This PR preserves the measured design for review rather than claiming the size gate passes.
+
+## Transformation
+
+For an eligible constructor tail:
+
+```text
+left, right = f(a), g(b)
+return Node(left, right)
+```
+
+the operational transformation is:
+
+```text
+parent = reuse_owned_node_or_allocate(2)
+root = Node(parent)
+
+sequential:
+  publish root into the incoming destination, or save it in a root frame
+  redirect the final child's destination to parent[1]
+  save g's arguments and a continuation:
+    parent[0] = returned_value
+    tail-jump g(b)
+  tail-jump f(a)
+
+parallel:
+  retain root in an ordinary join record
+  launch f(a) with destination parent[0]
+  launch g(b) with destination parent[1]
+  return root only after both children complete
+```
+
+A unary constructor tail needs no sibling continuation: it stores the parent, updates the current destination and tail-jumps to its child. Self-tail calls become worker-loop iterations; cross-function tails use the existing tail-transfer machinery. Branching retains only pending sibling work. There is no subtree merging or shared scope-wide completion counter.
+
+## Chosen design: all pieces
+
+1. **Conservative eligibility in `emit_dps`.** The current segment and callees return one boxed value. The body is an unshared, non-native constructor whose boxed fields are exactly the call-result variables, once each and in order. Calls are statically known, have no explicit bang and no borrowed parameters. Constructor and argument arities leave room within `WIDE`. Everything else keeps the existing lowering.
+2. **One allocation/reuse helper.** `node_alloc` extracts the existing size-class matching logic from `ctr_build`. Both ordinary constructors and destination parents use it. Arguments are captured and dead bindings processed before selecting a spare; selection happens before flushing the other spares. A possibly static node retains the existing `HEAP_OFF` check, so static storage is never overwritten. This adds no new ownership analysis or free list.
+3. **Allocate before descending.** Each eligible tail constructs its parent reference before starting the children. Reused storage follows the same destination protocol as fresh storage.
+4. **Packed sequential continuations.** A continuation word holds the 16-bit function id below a 40-bit heap destination. `WL_RETN` masks the id before dispatch. An existing destination is filled immediately and redirected to the final child's field. At an ordinary caller boundary, a two-word root frame saves the result root and its final destination. The compiler's existing function-id limit bounds the encoding.
+5. **One root-return segment.** `Dps~ret` stores the final result into its destination and returns the saved root. Its returned value is captured as a segment input before `WL_OPEN` resets output registers.
+6. **Fused sibling continuations.** Each pending sibling saves its argument words and one packed continuation word. That segment stores the preceding child's result and immediately tail-jumps to the sibling. There is no separate `Dps~put` frame or handler per child.
+7. **Ordinary parallel joins remain the completion boundary.** The parent root occupies the first join payload slot; the following slots retain child tasks for the scheduler. A `TAG_DST` continuation identifies result delivery into the parent's field. `task_deliver` resolves that destination through the join's root, writes the result, and uses the existing release/acquire completion protocol. The ready join returns the root; a consumer never receives a partially filled tree.
+8. **Small runtime surface.** The runtime adds one continuation tag, destination selection in delivery, and the return-id mask. `DPS_ASYNC` is emitted from segment reachability so the delivery branch can disappear when unused. It is not a user-facing switch. There are no cloned destination entries, per-return root checks, cascading joins, benchmark-specific rules or additional compiler pass.
+
+## Runtime measurements
+
+Elapsed seconds, median of five measured runs after a warm-up. Each cell is **production baseline → selected**, followed by elapsed-time change; negative is better.
+
+| Workload | CPU, 1 thread | CPU, 8 threads | Metal |
+| --- | ---: | ---: | ---: |
+| tree-matmul | 2.0141 → 2.0576 (+2.2%) | 0.4455 → 0.4375 (-1.8%) | 0.8786 → 0.8661 (-1.4%) |
+| kmeans | 4.0420 → 3.9030 (-3.4%) | 0.8592 → 0.8382 (-2.4%) | 0.6296 → 0.4894 (-22.3%) |
+| tree-bitonic | 5.7602 → 5.7409 (-0.3%) | 1.4044 → 1.3712 (-2.4%) | 1.7313 → 1.6150 (-6.7%) |
+| tree-radix | 3.7028 → 3.0531 (-17.5%) | 0.7223 → 0.5903 (-18.3%) | 1.1702 → 0.8339 (-28.7%) |
+
+These compare the whole transformation against baseline commit `99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172`. Reuse's incremental contribution over fused destination passing is smaller: Metal matmul improves 4.6%, radix 2.0%, and kmeans 0.5% in the final paired batch. CPU radix improves another 2.9%/3.0% at one/eight threads.
+
+Single-thread matrix multiplication still regresses about 2.2% against production. Allocation reduction does not guarantee lower elapsed time. Bitonic's Metal result varies across batches, including a sign change in the incremental reuse comparison; the final number is not a robust universal gain. Small differences are exploratory.
+
+Hardware: Apple M4 minis, 10 cores, 16 GiB, Apple clang 21, `-O3 -std=c11`. Variants rotate/reverse order on the same leased mini for each comparison. Every run checks output. Times include process startup; Metal archives are built before timing. Metal uses eight host threads and 4 GB spans for matmul/radix, 1 GB otherwise. There is no thermal control.
+
+CPU data come from the phase2 reuse variant, whose full assembly matches the simplified candidate under clang 17 and 21. This PR's default-enabled source emits byte-identical C to that candidate for all 17 runtime benchmarks and three pure demos. Metal data come from the final paired baseline/fused/selected batch. Earlier clang 17 timing investigations are kept separate.
+
+[CPU medians and ranges](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/options/phase2/summary.json) · [Metal medians and ranges](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/options/final/summary.json) · [generated-code equivalence](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/pr/generated-code.json)
+
+## Profiles and compiler cost
+
+Untimed, single-thread matrix instrumentation:
+
+| Counter | Fused destination passing | With reuse |
+| --- | ---: | ---: |
+| Heap allocations | 244,669,839 | 125,578,383 |
+| Heap frees | 244,669,839 | 125,578,383 |
+| Explicit stack writes | 5,235,850,887 | 5,235,850,887 |
+| Generated segment entries | 3,815,571,348 | 3,815,571,348 |
+
+Reuse removes **48.7% of allocation/free calls**. Relative to production, destination passing reduces matrix segment entries from 4,183,573,524 and stack writes from 5,806,776,711. These are semantic counters, not hardware instruction/cache measurements.
+
+A fresh 100,000-node unary-chain check returns the same result with **5 explicit worker-stack words instead of 100,003**. This bounds the recursive construction spine, not heap usage or all branching programs. The earlier Metal stress check also completed with the destination design where baseline exhausted its stack.
+
+Fresh compiler timings for the default-enabled PR source use seven measured repetitions plus warm-up on the four workloads above and three pure demos. Sum of per-workload medians:
+
+| Stage | Baseline | PR | Change |
+| --- | ---: | ---: | ---: |
+| `compile_book`, after checking | 672.05 ms | 675.01 ms | +0.44% |
+| Whole Bend-to-C CLI | 1,067.83 ms | 1,071.36 ms | +0.33% |
+| Native C compilation | 2,229.19 ms | 2,232.51 ms | +0.15% |
+| Generated C, aggregate | 1,551,849 bytes | 1,551,052 bytes | -0.05% |
+
+There is no claimed compiler-speed improvement. The choice favors runtime gains with one shared allocation helper and no specialization pass.
+
+[Profiles](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/options/phase2/profile-results.json) · [stack check](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/pr/stack-results.json) · [compiler medians](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/pr/compiler-summary.json)
+
+## Tried and discarded
+
+The four later optimizations—reuse, known-destination specialization, root-return inlining and cascading join completion—were profiled and timed individually and together. Further batches tested combinations and bounded forwarding. Comparisons below use each experiment's paired fused-DPS control unless stated otherwise.
+
+| Attempt | Evidence and reason to discard |
+| --- | --- |
+| Shared scope/counter prototype | Added synchronization instead of making the sequential constructor tail a loop; severe Metal kmeans regression. Replaced by destination passing with ordinary per-fork completion boundaries. |
+| Separate destination frames / `Dps~put` | Genuine destination passing, but extra frames and dispatches caused the early matrix regressions. Replaced by stores fused into sibling continuations. Those earlier timings used a different CPU toolchain and are not mixed into the final table. |
+| Known-destination entry specialization | Alone was mixed. With reuse it improved matrix CPU1/CPU8/Metal by 5.7%/5.3%/4.7% against fused, but Metal radix was 6.3% slower than reuse alone. Adds cloned entries and compiler machinery; not chosen as a general default. |
+| Root-return inlining into every return | Removed 121,335,936 matrix segment entries but slowed matrix CPU1/CPU8 by 13.2%/9.8%. The extra return-path work outweighed fewer dispatches. |
+| Cascading completed joins | Metal kmeans went from 0.4866 s to 3.9067 s, about 8.0× slower. GPU occupancy/divergence was not measured, so the precise hardware cause remains unknown. |
+| All four together | Matrix CPU1/CPU8 slowed 19.9%/11.7%; Metal kmeans retained a roughly 7.8× regression. |
+| At most one parent forwarded | Removed the catastrophic kmeans regression (0.4893 s versus fused 0.4950 s), but other gains were small/mixed and required more runtime machinery. |
+| Reuse + specialization + root-return inlining | Matrix CPU1 slowed 19.3% in the combination batch. Fewer destination tests/entries did not make it faster. |
+
+Reuse alone is the selected additional optimization. No tested combination won on every workload/backend.
+
+[Full experiment report](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/options/report.txt) includes individual/combinations tables, methodology, raw-data locations and the preserved experimental patches.
+
+## Validation and reproduction
+
+- Default-enabled PR compiler: **PASS 1678 / 1678** through the cluster test gate.
+- Added fixtures cover unary and mutual constructor tails, sibling destinations with unequal leaf work, completion before consumption, and mutually recursive names also exercised by the discarded specialization experiment.
+- All 17 runtime benchmarks and three pure demos matched baseline outputs at one/eight CPU threads: 40 checks on the measured candidate, with byte-identical generated C verified again for this PR.
+- Every timed CPU/Metal variant checked outputs; deep-chain stack behavior was rechecked on this PR.
+- Whitespace checks pass for the implementation, tests and reports; archived unified diffs retain their blank-line context markers. Repository gate **fails only the compiler token cap: 67,278 > 66,000**.
+- CUDA and interactive window/network demos were not benchmarked. This is not a claim that the full perf/ping gate suite passed.
+
+From this PR checkout, the helper extracts the recorded baseline into a temporary directory and builds the chosen variant separately:
+
+```sh
+python3 evals/tail_modulo_async/options/reproduce.py --phase pr
+python3 evals/tail_modulo_async/options/reproduce.py --phase pr --threads 8
+python3 evals/tail_modulo_async/options/reproduce.py --phase pr --backend gpu
+python3 evals/tail_modulo_async/options/reproduce.py --phase pr --mode compiler
+python3 evals/tail_modulo_async/options/reproduce.py --phase phase1
+python3 evals/tail_modulo_async/options/reproduce.py --phase phase2 --variants base,fused,reuse,reuse_spec,join_once,reuse_join,all_once
+```
+
+`--bench` is repeatable; `--mode profile` runs separate instrumented CPU binaries. Runtime defaults to five measured repetitions, compiler measurements here used `--repetitions 7`. The historical reports are snapshots; their opt-in switches and “production unchanged” statements do not describe the default-enabled PR source. See [the evidence index](https://github.com/nicolas-abril/bend/blob/codex/tail-modulo-async-reuse/evals/tail_modulo_async/INDEX.txt).

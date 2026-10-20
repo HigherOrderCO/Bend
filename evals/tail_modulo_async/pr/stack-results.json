@@ -1,0 +1,16 @@
+[
+  {
+    "variant": "base",
+    "depth": 100000,
+    "c_sha256": "20033b1d1765f43c6a13fa522a23e0b9e46bbe9a10f7df24c8ca87bc94997a73",
+    "stdout": "100000",
+    "stderr": "DPS_STACK=100003"
+  },
+  {
+    "variant": "pr",
+    "depth": 100000,
+    "c_sha256": "b026c5066ab4089ccee8f9fe426135b345f0da019992b2202146b2e116a2f982",
+    "stdout": "100000",
+    "stderr": "DPS_STACK=5"
+  }
+]

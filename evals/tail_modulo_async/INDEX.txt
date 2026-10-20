@@ -1,0 +1,43 @@
+Tail modulo async / destination passing investigation
+
+Start with pr/description.txt for the chosen design, performance against
+the production baseline, validation, discarded alternatives and merge status.
+pr/ contains the default-enabled compiler's checks. The PR remains a draft:
+comp.ts is 67,278 tokens against its unchanged 66,000-token cap.
+
+The records below are chronological snapshots, not current status reports:
+  report.txt             initial shared-scope/counter experiment
+  destination/report.txt sequential destination passing, separate handlers
+  destination/matmul/    diagnosis of the separate-handler matrix regression
+  fused/report.txt       destination stores fused into sibling continuations
+  options/report.txt     four independent options and their combinations
+  options/final/         simplified reuse-only candidate measurements
+  pr/                    default-enabled reuse-only compiler checks
+
+Statements that production was unchanged, or that flags are required, refer
+to those historical experiments. The actual PR compiler enables the chosen
+transformation automatically. It has no BEND_DPS* switches.
+
+The original baseline is commit 99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172.
+Patches retain the measured experimental sources, including rejected
+implementations; they are evidence, not additional production compilers.
+No source is moved out of comp.ts to evade its cap.
+
+The options reproduction helper now extracts the baseline from git and can
+run from this PR checkout:
+  python3 evals/tail_modulo_async/options/reproduce.py --phase pr
+  python3 evals/tail_modulo_async/options/reproduce.py --phase pr --backend gpu
+  python3 evals/tail_modulo_async/options/reproduce.py --phase pr --mode compiler
+  python3 evals/tail_modulo_async/options/reproduce.py --phase phase1
+  python3 evals/tail_modulo_async/options/reproduce.py --phase phase2 --variants base,fused,reuse,reuse_spec,join_once,reuse_join,all_once --threads 8
+
+Use --phase selected to reconstruct the historical opt-in reuse-only source;
+--phase pr uses the current checkout's compiler. --bench is repeatable and
+accepts a runtime benchmark or pure demo directory name. The older root
+reproduce.py and destination/stack.py require a checkout of the recorded
+baseline, as their usage messages specify.
+
+All final runtime comparisons use Apple M4 minis and Apple clang 21.
+Earlier local clang 17 measurements, smoke checks and instrumented run times
+are not mixed into those medians. Raw data, source hashes and toolchain
+records are preserved so the claims can be checked.

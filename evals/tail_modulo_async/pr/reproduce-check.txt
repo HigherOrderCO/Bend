@@ -1,0 +1,5 @@
+Artifacts: /var/folders/rg/h0_4_ww91836bk315x2n0qfm0000gn/T/bend-dps-options-6m0mgxyb
+{"name": "pure_par_sum", "variant": "base", "rep": -1, "threads": 1, "cli_ms": 68.13283381052315, "native_ms": 157.7435419894755, "c_bytes": 88214, "binary_bytes": 70576, "emit_ms": 9.231791000000001}
+{"name": "pure_par_sum", "variant": "selected", "rep": -1, "threads": 1, "cli_ms": 65.55745890364051, "native_ms": 160.46412498690188, "c_bytes": 88360, "binary_bytes": 70584, "emit_ms": 9.603459}
+{"name": "pure_par_sum", "variant": "base", "rep": 0, "threads": 1, "cli_ms": 67.18891696073115, "native_ms": 160.0012918934226, "c_bytes": 88214, "binary_bytes": 70576, "emit_ms": 9.223458999999998}
+{"name": "pure_par_sum", "variant": "selected", "rep": 0, "threads": 1, "cli_ms": 66.36500009335577, "native_ms": 160.1810420397669, "c_bytes": 88360, "binary_bytes": 70584, "emit_ms": 9.281416999999998}

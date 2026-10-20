@@ -1,0 +1,99 @@
+Fused destination continuations, 2026-10-20
+
+This improves the destination-passing prototype in ../destination.patch.
+The new patch is ../fused.patch, applied to the same recorded baseline.
+Production comp.ts and bend.ts remain unchanged.
+
+The earlier worker installed a two-word destination frame for every child
+and dispatched a generic Dps~put handler on each return. This revision
+packs a 40-bit destination address above the 16-bit continuation id in one
+stack word. A pending sibling continuation stores the preceding child's
+result and immediately starts the next sibling. There is no Dps~put handler
+and no separate per-child destination frame.
+
+On entering a constructor tail with an encoded destination, the worker
+writes the new parent there and rewrites that same continuation word to
+point at the parent's final child. Its saved sibling arguments remain in
+place. Otherwise a two-word root frame preserves the result and combines
+the final field write with returning that root. Only pending siblings
+consume additional stack space; a unary constructor chain stays constant.
+WL_RETN masks the continuation word to its low 16 bits when dispatching.
+The compiler already rejects more than 65,536 function ids, and heap
+locations use 40 bits. Normal continuations have no encoded destination.
+
+The returned child is captured as a segment input before WL_OPEN creates
+fresh output registers. This applies to both sibling and root handlers.
+Parallel delivery retains the previous prototype's direct result-field
+writes and per-fork completion barriers. Eligibility and the two opt-in
+environment flags remain unchanged. No benchmark inputs were altered.
+
+Reproduce from the recorded baseline:
+  python3 evals/tail_modulo_async/reproduce.py --fused --threads 1
+  python3 evals/tail_modulo_async/reproduce.py --fused --threads 8
+  python3 evals/tail_modulo_async/reproduce.py --fused --backend gpu
+  python3 evals/tail_modulo_async/destination/stack.py --fused
+  python3 evals/tail_modulo_async/destination/stack.py --fused --backend gpu
+
+Measurements
+
+Five measured runs after warm-up, alternating baseline/fused order; full
+benchmark inputs, whole-process elapsed seconds. CPU processes ran serially
+on the local M4; Metal ran on a separately leased M4 (cluster-02). GPU
+archives were built before timing. Threads/spans/compiler flags match the
+previous report. Small differences remain exploratory without thermal
+control. CUDA and interactive window/network demos were not tested.
+
+                    CPU 1 thread       CPU 8 threads      Metal
+                    base -> fused      base -> fused      base -> fused
+  kmeans            2.0482 -> 2.0392   0.4179 -> 0.4222   0.6228 -> 0.4925
+  tree-bitonic      6.0593 -> 6.0408   1.4437 -> 1.3746   1.6419 -> 1.6841
+  tree-matmul       2.0227 -> 2.1020   0.4787 -> 0.4817   0.8858 -> 0.8848
+  tree-radix        3.8235 -> 3.2782   0.7354 -> 0.6202   1.1704 -> 0.8494
+
+Matrix multiplication's elapsed-time penalty is now 3.9% at one CPU thread,
+0.6% at eight threads, and -0.1% on Metal. The previous prototype regressed
+12.7%, 14.8%, and 8.8%, respectively, in its own paired runs. Thus the large
+regression is removed, but one-thread matrix multiplication still has a
+small remaining penalty; this revision does not claim zero overhead.
+
+Metal kmeans improves 20.9% and radix 27.4% against baseline. CPU radix
+improves 14.3% at one thread and 15.7% at eight threads. Metal bitonic is
+2.6% slower in this sample. These values are elapsed-time reductions, not
+throughput percentages. Compare variants within each paired run rather
+than comparing raw times collected in different sessions.
+
+Dispatch and stack evidence
+
+Separate, untimed host instrumentation on full-size tree-matmul:
+                         baseline       prior destination   fused
+  generated entries      4,183,573,524   4,645,945,236       3,815,571,348
+  explicit stack writes  5,806,776,711   7,728,969,735       5,235,850,887
+
+The new lowering removes the earlier excess in both counts. It does not
+establish the precise cause of the remaining 3.9% single-thread timing
+penalty: fewer entries/writes do not imply an identical instruction stream,
+allocation order or memory access pattern. Profile counters are preserved
+in profile.json; baseline/prior counts are in ../destination/matmul/.
+Instrumentation was excluded from timing binaries.
+
+A 100,000-node unary chain uses 5 explicit worker-stack words, versus 7 in
+the previous destination prototype and 100,003 in baseline. Both CPU results
+are 100000. On Metal, fused completes with 100000 and baseline reports a
+machine stack overflow. The stack reproduction helper verified these CPU
+bounds from the patch in an isolated compiler copy.
+
+Validation and status
+
+Full enabled cluster gate: PASS: 1677 / 1677, including the two destination
+regressions. The final source differs from the gated source only in the
+explanatory comment above emit_dps; both hashes are recorded in metadata.
+All 17 runtime benchmarks and 3 pure demos match baseline at one and eight
+CPU threads (40 paired checks). The four paired Metal benchmark outputs
+also match. coverage.json records generated C hashes and checked outputs.
+The reproduction helper was exercised on full-size matrix multiplication;
+its check timings were not included in the reported medians.
+
+The compiler remains an opt-in prototype patch: 67,347 tokens against the
+fixed 66,000-token cap (1,347 over), with a remaining one-thread matrix
+regression. Production comp.ts and the cap are unchanged. The repository
+gate passes 54/54, patch --dry-run succeeds, and git diff --check is clean.

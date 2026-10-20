@@ -1,0 +1,74 @@
+[
+  {
+    "name": "kmeans",
+    "cpu_1": {
+      "baseline_seconds": 2.048166,
+      "fused_seconds": 2.039231,
+      "elapsed_change_percent": -0.43624393725899546
+    },
+    "cpu_8": {
+      "baseline_seconds": 0.417927,
+      "fused_seconds": 0.422173,
+      "elapsed_change_percent": 1.015966903310872
+    },
+    "metal": {
+      "baseline_seconds": 0.622795,
+      "fused_seconds": 0.492483,
+      "elapsed_change_percent": -20.92373895101919
+    }
+  },
+  {
+    "name": "tree-bitonic",
+    "cpu_1": {
+      "baseline_seconds": 6.059346,
+      "fused_seconds": 6.040751,
+      "elapsed_change_percent": -0.30688130369184163
+    },
+    "cpu_8": {
+      "baseline_seconds": 1.443707,
+      "fused_seconds": 1.37457,
+      "elapsed_change_percent": -4.788852585739345
+    },
+    "metal": {
+      "baseline_seconds": 1.641904,
+      "fused_seconds": 1.68414,
+      "elapsed_change_percent": 2.572379383934753
+    }
+  },
+  {
+    "name": "tree-matmul",
+    "cpu_1": {
+      "baseline_seconds": 2.02265,
+      "fused_seconds": 2.102035,
+      "elapsed_change_percent": 3.924801621634977
+    },
+    "cpu_8": {
+      "baseline_seconds": 0.478676,
+      "fused_seconds": 0.481713,
+      "elapsed_change_percent": 0.6344583810343529
+    },
+    "metal": {
+      "baseline_seconds": 0.885825,
+      "fused_seconds": 0.884829,
+      "elapsed_change_percent": -0.1124375582084447
+    }
+  },
+  {
+    "name": "tree-radix",
+    "cpu_1": {
+      "baseline_seconds": 3.823459,
+      "fused_seconds": 3.278153,
+      "elapsed_change_percent": -14.262111873044802
+    },
+    "cpu_8": {
+      "baseline_seconds": 0.735426,
+      "fused_seconds": 0.620246,
+      "elapsed_change_percent": -15.661670922703308
+    },
+    "metal": {
+      "baseline_seconds": 1.170359,
+      "fused_seconds": 0.84935,
+      "elapsed_change_percent": -27.428250647878116
+    }
+  }
+]

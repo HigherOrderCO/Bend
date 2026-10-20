@@ -1,0 +1,143 @@
+Destination-passing worker prototype, 2026-10-20
+
+This replaces the earlier scope-counter experiment with an actual tail
+lowering in the sequential worker, plus direct result-field writes at parallel
+forks. The patch is ../destination.patch. Neither bend.ts nor the benchmark
+or demo sources were changed.
+
+Lowering
+
+For a constructor-only continuation, allocate the result node first. If the
+worker already has a destination, write the new node there and reuse that
+destination frame. Otherwise retain the result in one outer return frame.
+Save only the arguments and destination of each pending sibling, install the
+first child's destination, and tail-jump into that child. A self-call enters
+the existing worker loop; another function uses the existing tail-transfer
+mechanism. A leaf writes its result and advances to the next pending sibling.
+There is no per-node continuation that reconstructs the parent in this path.
+
+The sequential path creates no child tasks, heap completion records or
+completion-counter operations. A unary constructor chain has constant worker
+stack use. A branching tree still requires space for pending siblings.
+
+Parallel forks allocate their result node before dispatch too. Each child's
+continuation identifies the existing join record and a result-field index.
+task_deliver writes to the actual result field, then decrements the existing
+per-fork counter. The ready join returns the already allocated result. This
+preserves the original completion barrier: a consumer cannot observe an
+unfinished result. It adds no shared scope counter or counter splitting.
+
+Parallel child tasks and per-fork completion records remain. This prototype
+does not flatten the entire asynchronous completion graph or implement every
+transformation from the Tail Modulo Async-Await paper.
+
+Eligibility is deliberately narrow: an unshared boxed constructor whose
+fields are exactly the call results, each used once and in the same order.
+The children must return boxed values and have no borrowed parameters or
+explicit GPU transition at the transformed call. Native constructor families,
+nonmatching continuations, and arities without room for the additional
+destination/root word retain the original lowering. Unary tails are included.
+
+BEND_DPS=1 enables the worker lowering. BEND_DPS_ASYNC=1 additionally enables
+parallel destination writes. The measured replacement enables both. Setting
+only BEND_DPS=1 is an ablation that retains the original parallel delivery.
+
+Evidence that the worker actually loops
+
+A separate instrumented host run builds a 100,000-node unary chain through
+two mutually recursive functions. At one CPU thread, the explicit worker
+stack high-water mark is 100,003 words in the baseline and 7 words with the
+replacement. Both print 100000. The instrumentation observes WL_ROOM checks
+relative to each work_loop entry and is not used in performance timings.
+
+On Metal, the same baseline stress program exits with:
+  bend: memory fault (machine stack overflow?)
+The replacement finishes and prints 100000.
+
+Measured results
+
+Unchanged full benchmark inputs; median of five measured runs after warm-up.
+Variant order alternates. All values are whole-process elapsed seconds.
+
+                       CPU, 1 thread       CPU, 8 threads       Metal
+                       base -> destination base -> destination base -> destination
+  kmeans               2.032 -> 2.044       0.414 -> 0.427       0.627 -> 0.524
+  tree-bitonic         6.031 -> 6.019       1.389 -> 1.344       1.642 -> 1.643
+  tree-matmul           2.024 -> 2.282       0.477 -> 0.547       0.903 -> 0.982
+  tree-radix            3.820 -> 3.302       0.728 -> 0.629       1.165 -> 0.922
+
+Kmeans takes 16.5% less elapsed time on Metal (1.20x throughput). Radix takes
+20.8% less time on Metal (1.26x) and about 13.6% less on CPU (1.16x).
+Bitonic is effectively unchanged on Metal; small CPU differences need more
+controlled measurements. Matrix multiplication regresses 8.8% on Metal,
+12.7% at one CPU thread, and 14.8% at eight threads.
+
+The final Metal ablation, with the same worker lowering but original parallel
+delivery, measures kmeans at 0.557s and radix at 0.931s. Thus direct parallel
+writes add a smaller benefit on top of the sequential destination loop.
+
+An earlier three-way diagnostic used the first version of the worker loop:
+  kmeans Metal baseline                  0.622s
+  worker loop alone                     0.549s
+  worker loop + old shared-scope scheme  4.355s
+The earlier implementation's regression survives adding the worker loop.
+These measurements do not identify its precise hardware/scheduling cause.
+They do establish that the replacement avoids it. Initial diagnostic results
+are preserved separately; they are not mixed into the final medians.
+
+CPU: local Apple M4, 10 cores, 16 GiB; clang 17.0.0, -std=c11 -O3,
+-lpthread -lm, --gpu off, threads 1 and 8.
+Metal: cluster-02, Apple M4, 10 cores, 16 GiB; -O3 -DBEND_METAL=1,
+Objective-C ARC, Metal and Foundation. GPU archives are built before timing.
+Matrix multiplication and radix use 4 GB GPU spans; other cases use 1 GB.
+
+CPU benchmark processes ran serially. Metal measurements ran on a separate
+leased mini. Runs used normal machine conditions, without thermal control;
+small percentage differences should be treated as exploratory. RSS records
+describe the host process, not peak GPU allocation. CUDA was not tested.
+
+Validation and status
+
+The final enabled compiler snapshot passes the full cluster gate:
+  PASS: 1677 / 1677
+The two added Bend regressions cover a unary destination tail across different
+functions and a branching tree with uneven leaf work and a waiting consumer.
+The gate's remote shard script explicitly exports both BEND_DPS=1 and
+BEND_DPS_ASYNC=1; compiler-state checks run with the same settings.
+
+All 17 runtime benchmarks and 3 pure demos match the baseline at both one
+and eight CPU threads (40 paired checks). The output checks are in coverage.json.
+Generated C hashes there also verify that the final emitter produces the
+same sources as the measured build after formatting and the arity guard.
+All paired Metal benchmark outputs also match. Interactive window/network
+demos were not benchmarked.
+
+The baseline is commit 99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172.
+Compiler hashes and hardware are recorded in metadata.json.
+The baseline compiler is 65,916 tokens; the replacement is 67,408 against the
+fixed 66,000-token cap. The prototype is therefore 1,408 tokens over the cap,
+and matrix multiplication still regresses. It is preserved as an opt-in
+patch, with the production compiler restored. The cap was not changed.
+After restoration, the repository gate passes 54/54 and git diff --check
+is clean.
+
+Reproduction from the recorded baseline
+
+  python3 evals/tail_modulo_async/reproduce.py --destination --threads 1
+  python3 evals/tail_modulo_async/reproduce.py --destination --threads 8
+  python3 evals/tail_modulo_async/reproduce.py --destination --backend gpu
+
+The runner applies the patch in an isolated temporary copy, builds both
+versions, compares outputs, and records paired timings. --bench NAME can be
+repeated to select existing benchmarks or pure demos.
+
+  python3 evals/tail_modulo_async/destination/stack.py
+  python3 evals/tail_modulo_async/destination/stack.py --depth 1000
+  python3 evals/tail_modulo_async/destination/stack.py --backend gpu
+
+The stack runner also uses isolated compiler copies. Its CPU run instruments
+both binaries; its GPU run expects the destination version to succeed and
+records the baseline's result, including a stack fault at large depth.
+
+Both reproduction helpers were exercised from the restored checkout: the
+benchmark helper on full-size radix, and the stack helper at depth 100000.

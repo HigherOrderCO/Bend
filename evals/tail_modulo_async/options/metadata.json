@@ -1,0 +1,136 @@
+{
+  "baseline_comp_sha256": "3fadc4e69dc46b8b25b6ede208ba0df16709a3be4de4ae10e21fb841acb26427",
+  "baseline_git_commit": "99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172",
+  "flags": {
+    "BEND_DPS": "1",
+    "BEND_DPS_ASYNC": "1"
+  },
+  "options": {
+    "fused": 0,
+    "reuse": 1,
+    "specialize": 2,
+    "root_return": 4,
+    "join_cascade": 8,
+    "all": 15,
+    "join_once": 16,
+    "reuse_join": 17,
+    "reuse_spec": 3,
+    "reuse_return": 5,
+    "reuse_spec_return": 7,
+    "all_once": 23
+  },
+  "runtime_repetitions": 5,
+  "compiler_repetitions": 7,
+  "warmups": 1,
+  "selected_comp_tokens": 67369,
+  "cap": 66000,
+  "compilers": {
+    "phase1_measured": "205e8367f46f671b5c5c47041e08af7687aadd2ddcf4b2a4ae91422a3ab2264a",
+    "phase1_name_fix": "bb6e775291e603b3d714ae48b7275a19a78f8604445220b345d93011ec92aaac",
+    "phase2": "5e895202a68eede9608c91f7febb4f614404f7f2d7727b3dddfde65541863c1c",
+    "selected": "b68083a87919236efe111eb8ea3e86d04eef800da0691c74a900c5e549f9c0b2"
+  },
+  "nodes": {
+    "phase1": [
+      {
+        "kind": "cpu",
+        "node": "cluster-32"
+      },
+      {
+        "kind": "profile",
+        "node": "cluster-33"
+      },
+      {
+        "kind": "compiler",
+        "node": "cluster-34"
+      },
+      {
+        "kind": "compiler",
+        "code": 0
+      },
+      {
+        "kind": "profile",
+        "code": 0
+      },
+      {
+        "kind": "cpu",
+        "code": 0
+      }
+    ],
+    "phase2": [
+      {
+        "kind": "gpu",
+        "node": "cluster-02"
+      },
+      {
+        "kind": "tree-matmul",
+        "node": "cluster-03"
+      },
+      {
+        "kind": "kmeans",
+        "node": "cluster-04"
+      },
+      {
+        "kind": "tree-bitonic",
+        "node": "cluster-05"
+      },
+      {
+        "kind": "tree-radix",
+        "node": "cluster-06"
+      },
+      {
+        "kind": "compiler",
+        "node": "cluster-07"
+      },
+      {
+        "kind": "tree-matmul",
+        "code": 0
+      },
+      {
+        "kind": "tree-radix",
+        "code": 0
+      },
+      {
+        "kind": "compiler",
+        "code": 0
+      },
+      {
+        "kind": "gpu",
+        "code": 0
+      },
+      {
+        "kind": "kmeans",
+        "code": 0
+      },
+      {
+        "kind": "tree-bitonic",
+        "code": 0
+      }
+    ],
+    "final": [
+      {
+        "kind": "gpu",
+        "node": "cluster-02"
+      },
+      {
+        "kind": "compiler",
+        "node": "cluster-03"
+      },
+      {
+        "kind": "compiler",
+        "code": 0
+      },
+      {
+        "kind": "gpu",
+        "code": 0
+      }
+    ]
+  },
+  "notes": [
+    "Phase1 GPU: cluster-02. Node labels are hexadecimal.",
+    "Phase1 naming fix preserves all 24 measured generated C files byte for byte; phase1 compiler timings precede that naming-only correction. Phase2 timings include it.",
+    "CPU/GPU timing and compiler/profiling jobs used separate leased nodes. Local incomplete timings and reproduction checks are excluded.",
+    "All runtime measurements use cluster Apple clang 21.0.0. Earlier reports used local clang 17; do not mix them.",
+    "Final selected CPU assembly matches phase2 reuse on all four benchmarks, verified with clang 17 locally and clang 21 remotely."
+  ]
+}

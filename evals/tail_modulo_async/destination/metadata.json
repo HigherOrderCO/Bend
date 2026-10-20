@@ -1,0 +1,34 @@
+{
+  "baseline_comp_sha256": "3fadc4e69dc46b8b25b6ede208ba0df16709a3be4de4ae10e21fb841acb26427",
+  "prototype_comp_sha256": "7eca620b4f0f23a2dcf580645cba842f07058472a56d082232ed22ae3b5a7534",
+  "baseline_comp_tokens": 65916,
+  "prototype_comp_tokens": 67408,
+  "cap": 66000,
+  "cpu": "Apple M4, 10 cores, 16 GiB",
+  "cpu_threads": [
+    1,
+    8
+  ],
+  "cpu_compiler": "Apple clang 17.0.0 (clang-1700.6.4.2)",
+  "gpu": "Apple M4, cluster-02, 16 GiB",
+  "gpu_span": "4 GB for tree-matmul/tree-radix; 1 GB otherwise",
+  "repetitions": 5,
+  "baseline_git_commit": "99a3d5fb42455f5c9cc75a6c2c459b2cd0a06172",
+  "prototype": "Destination-passing worker loop with per-fork completion barriers",
+  "environment": {
+    "BEND_DPS": "1",
+    "BEND_DPS_ASYNC": "1"
+  },
+  "gate_comp_sha256": "7eca620b4f0f23a2dcf580645cba842f07058472a56d082232ed22ae3b5a7534",
+  "gate": "PASS: 1677 / 1677",
+  "coverage": {
+    "runtime_benchmarks": 17,
+    "pure_demos": 3,
+    "cpu_output_pairs": 40,
+    "cpu_threads": [
+      1,
+      8
+    ],
+    "metal_benchmarks": 4
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "cpu": {
+    "depth": 100000,
+    "threads": 1,
+    "baseline_stack_words": 100003,
+    "destination_stack_words": 7,
+    "baseline_output": "100000",
+    "destination_output": "100000",
+    "measurement": "Explicit work-loop stack high-water mark at WL_ROOM, relative to task entry; separate untimed instrumented run"
+  },
+  "metal": [
+    {
+      "name": "deep",
+      "variant": "base",
+      "code": 1,
+      "out": "",
+      "err": "bend: memory fault (machine stack overflow?)"
+    },
+    {
+      "name": "deep",
+      "variant": "direct",
+      "code": 0,
+      "out": "100000",
+      "err": ""
+    }
+  ]
+}
