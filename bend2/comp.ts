@@ -84,7 +84,7 @@ type File = {
   holds: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
   memo: {
-    opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
+    opens: Map<Of<"Lam"> | Of<"Let">, Open>;
     uses: Map<HTerm, Bend.PMap<number>>;
     folds: Map<HTerm, HTerm | null>;
     spines: Map<HTerm, Spine>;
@@ -110,6 +110,8 @@ type Of<K> = Extract<HTerm, { $: K }>;
 
 type Row = [HTerm, number, number, number];
 
+type Open = { ps: Of<"Var">[]; b: HTerm };
+
 type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
@@ -119,13 +121,11 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // Constants
 // =========
 
-// CLO_APPLY and IO_EMIT are the runtime's own segments, named with a ~
-// so that no file declares them. FOLD_FUEL caps the nodes that unfolds
-// add to a segment, so a literal-bounded loop does not unroll into its
-// caller. A spin of SPIN_FAR characters of C is a call on the device
-// (DFAR). WIDE is the widest flat layout or segment; a node past
-// it pads to its size class and keeps 240 plus log2 of it in CID_T. An
-// argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
+// CLO_APPLY and IO_EMIT are the runtime's own segments (a ~ keeps any file
+// from declaring them). FOLD_FUEL caps the nodes unfolds add to a segment.
+// A spin of SPIN_FAR characters is a call on the device (DFAR). A node past
+// WIDE pads to its size class (240 + log2 in CID_T). An argument nested past
+// TPL_DEEP brackets goes to a local (clang allows 256).
 
 const CLO_APPLY = "Clo~apply";
 
@@ -274,10 +274,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // Optimized
 // ---------
 
-// Per native constructor: its builder, field readers and optional
-// test. RUNTIME_ADTS are the datatypes the runtime or the elaborator
-// lays out itself; OWNED are the Base names the compiler encodes,
-// which a file without `import Base` may declare but not compile.
+// Per native constructor: its builder, field readers and test. The runtime
+// lays out RUNTIME_ADTS itself; OWNED are the Base names the compiler
+// encodes, which only Base may declare.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -327,11 +326,9 @@ const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
 // Native
 // ------
 
-// On Metal, sin, cos and tan are fast:: (cheap, the same pixels)
-// and the rest precise::. Metal's atan2 is NaN at the origin,
-// where libm answers +-0 or +-pi, so atan2_c99 answers as libm
-// does. Metal folds a constant dividend within 128 of 2^32 through
-// an f32, so its U32_QUO divides the half and then fixes the odd bit.
+// On Metal, sin, cos and tan are fast:: (same pixels), the rest precise::;
+// atan2_c99 answers libm's +-0 or +-pi at the origin, not NaN; U32_QUO
+// halves the dividend, as Metal folds one near 2^32 through an f32.
 
 const SHIMS = "sqrt exp log log2 log10 sin cos tan pow fmod".split(" ")
   .map((n) => "#define " + n.padEnd(5) + ("sin cos tan".includes(n)
@@ -426,25 +423,20 @@ static int f32_text(char* buf, f32 v) {
   }
   int ex = atoi(ep + 1);
   if (ex >= 21 || ex <= -7) {
-    n = (int)(ep - buf) + sprintf(ep, "e%+d", ex);
-  } else {
-    // The scientific form has the rounded digits. Move its decimal point.
-    int s = *buf == '-';
-    memmove(buf + s + 1, buf + s + 2, p);
-    if (ex < 0) {
-      memmove(buf + s + 1 - ex, buf + s, p + 1);
-      buf[s] = '0';
-      buf[s + 1] = '.';
-      memset(buf + s + 2, '0', -ex - 1);
-      n = s + p - ex + 2;
-    } else if (ex < p) {
-      memmove(buf + s + ex + 2, buf + s + ex + 1, p - ex);
-      buf[s + ex + 1] = '.';
-      n = s + p + 2;
-    } else {
-      memset(buf + s + 1 + p, '0', ex - p);
-      n = s + 1 + ex;
+    return (int)(ep - buf) + sprintf(ep, "e%+d", ex);
+  }
+  // The scientific form has the rounded digits d, d[i] at the place ex - i:
+  // write each place from the highest down, with a point before place -1.
+  int  s = *buf == '-';
+  char d[9];
+  d[0] = buf[s];
+  memcpy(d + 1, buf + s + 2, p);
+  n = s;
+  for (int q = ex > 0 ? ex : 0; q >= 0 || q >= ex - p; q -= 1) {
+    if (q == -1) {
+      buf[n++] = '.';
     }
+    buf[n++] = q <= ex && q >= ex - p ? d[ex - q] : '0';
   }
   buf[n] = 0;
   return n;
@@ -606,9 +598,8 @@ function cid_mac(k: string): string {
 // Char
 // ====
 
-// A Char past the Unicode scalars keeps its code as 0xDC00 and three 11-bit
-// pieces; str_out writes it as U+FFFD, as str_in does a host's surrogate.
-// The JS runtime holds this function's text.
+// A Char past the Unicode scalars is 0xDC00 and three 11-bit pieces, which
+// str_out writes as U+FFFD. The JS runtime holds this function's text.
 function char_new(c: number): string {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
     : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
@@ -691,11 +682,11 @@ function term_strip(t: HTerm): HTerm {
   return term_force(Bend.term_strip(t));
 }
 
-function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
+function term_open(t: Of<"Lam"> | Of<"Let">): Open {
   return memo(FL.memo.opens, t, open_of);
 }
 
-function open_of(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
+function open_of(t: Of<"Lam"> | Of<"Let">): Open {
   const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
   return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
 }
@@ -972,15 +963,12 @@ function ty_srcs(T: HTerm): void {
 // Lay
 // ===
 
-// An Array, an IO.OP, a recursive datatype, and a datatype with a field
-// that re-enters it under layout (a family hid the cycle) are one box.
-// A lay without arms is W32, W64 or BOX itself. An Array cell takes
-// the open layout of its element type (the return type of its
-// constructors), so all callers agree. lay_el refuses an open element
-// type: one that reduces to neither a datatype nor a type former (a type
-// variable, a hole, a law or family with no body). A former is a box
-// whatever its parts mention: a function is one even when its arguments
-// are erased. adt_of and js_expr call it only for that check.
+// An Array, an IO.OP and a datatype that re-enters itself (maybe through a
+// family) are one box. A lay without arms is W32, W64 or BOX. An Array cell
+// takes its element type's open layout, so all callers agree. lay_el refuses
+// an open element type (a variable, a hole, a bodiless law or family); a
+// type former, such as a function, is a box. adt_of and js_expr call it
+// only for that check.
 
 function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
@@ -1137,12 +1125,11 @@ function facts_packed(t: HTerm): boolean {
 // Mat
 // ===
 
-// A Nat or word match's rows hold the arm, the low bits known (32: a
-// hit), their value and the fields bound; a Nat row knows its level
-// and binds the scrutinee less it. A default covers the deeper rows
-// that are its instance (the flattener's substitution replayed). A U32
-// match reads a table when its hits cover over half of 0..max and all
-// other rows share one body. The default arm of a match is named "".
+// A Nat or word match's row holds the arm, the low bits known (32: a hit),
+// their value and the fields bound; a Nat row binds the scrutinee less its
+// level. A default covers the deeper rows that replay it. A U32 match reads
+// a table when its hits cover over half of 0..max and the rest share one
+// body. A default arm is named "".
 
 function mat_head(t: HTerm): boolean {
   return t.$ === "Mat" || t.$ === "Efq";
@@ -1429,13 +1416,11 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // File
 // ====
 
-// A File is the book being compiled (FL): its facts, its output and its
-// caches. The emitter is the analysis: a boxed parameter starts borrowed
-// (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
-// asked by a holder or passed on from a lent root (k~i<j~q). A shared value
-// heats its type (hot); a family stuck on an open index heats its arms'
-// types once, its arguments at every instantiation. compile_book emits until
-// a pass changes no fact.
+// A File (FL) is the book being compiled: its facts, output and caches. The
+// emitter is the analysis: a boxed parameter starts borrowed (brwl) and
+// becomes owned (own) when owned or unlent; a lend is asked by a holder or
+// passed on from a lent root (k~i<j~q). A shared value heats its type (hot).
+// compile_book emits until a pass changes no fact.
 
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
@@ -1480,9 +1465,8 @@ function file_new(book: Bend.Book, js: boolean): File {
   };
 }
 
-// A scope is where the emitter writes: its segment, its locals' names, the
-// bindings and spare nodes it holds, the def it is in. A nested arm, closure
-// or fork copies its scope; the book's facts and output live in FL.
+// A scope is where the emitter writes; a nested arm, closure or fork copies
+// it. The book's facts and output live in FL.
 function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
@@ -1913,10 +1897,9 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // Bind
 // ====
 
-// A binding counts its uses: the last takes the value, an earlier
-// one shares it. A fresh binding of a shared box of a flat type
-// unboxes before its first share, so its words copy, not its node.
-// A share may wrap its word: a frame slot holding it takes the new one.
+// A binding counts its uses: the last takes the value, an earlier one
+// shares it. A shared box of a flat type unboxes first, so its words copy,
+// not its node. A frame slot holding a shared word takes the wrapped one.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -2064,9 +2047,8 @@ function show_main(): (number | Name)[] | null {
 // ANF
 // ===
 
-// A statement in normal form is a fork, a cut, a let of a
-// value, or a tail. A live over-application cuts its call prefix;
-// a variable applied to erased arguments is the variable.
+// A statement in normal form is a fork, a cut, a let of a value, or a tail.
+// A live over-application cuts its call prefix.
 
 function anf(t: HTerm, ty: HTerm | null = null): HTerm {
   const binds: [Of<"Var">, HTerm][] = [];
@@ -2164,16 +2146,13 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
 // Emit
 // ====
 
-// A call emits its nested arguments first, then pops the owned ones
-// before it reads the borrowed ones (a read asks a lend). A closure
-// moves its captures into a node, each one use of its binding. A jump's
-// returns must agree or both be one word (a box holds a word as is);
-// else the call becomes a cut. A fork runs a join task and a kid per
-// call in parallel; in sequence, one frame serves every step and the
-// last jumps into the joiner. A self-jump reads its parameters back, so
-// the device's loop carries them typed (raytrace GPU 1.72x). A foreign
-// def short of its continuation is an IO action that awaits it. On the C
-// lane, an F32 table row is its bits, as a NaN payload has no JS number.
+// A call emits its nested arguments, pops the owned ones, then reads the
+// borrowed ones (a read asks a lend). A closure moves its captures into a
+// node. A jump's returns must agree or both be one word, else it is a cut.
+// A fork runs a join task and a task per call; in sequence one frame serves
+// every step. A self-jump reads its parameters back, so the device's loop
+// keeps them typed. A foreign def short of its continuation is an IO action.
+// On C, an F32 table row is its bits (a NaN payload has no JS number).
 
 function emit_hold(sc: Scope, exprs: string[], k: string,
   ks?: Kind[]): string[] {
@@ -2326,7 +2305,7 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[], f: Fun): string {
     const seg = sl.seg;
     seg.fid = name;
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
-    emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, ers, vals, dst);
+    emit_body(sl, f.h!, FL.book.tlds[k].T, ers, vals, dst);
     FUEL = fuel;
     const body = [...seg_text(["u32 wpoll = 0;", ...seg.ks.flatMap((k, i) =>
       arr_q(k) ? [`Term h${i} = r${i};`] : []),
@@ -2888,10 +2867,9 @@ function effect_srcs(ext: string, miss: string): string[] {
 // -
 
 // A segment may fork if one it reaches does; Clo~apply reaches every
-// closure. The device holds what the bangs reach, and every closure when a
-// bang's parameter may hold one. One bank serves both lanes: rp pads the
-// host's twelfth slot, which keeps rax free for the tail call. WL_LOAD is a
-// ladder, as clang builds the phi cascade of a fallthrough switch in O(n^2).
+// closure. The device holds what the bangs reach (every closure, if a bang
+// may take one). rp pads the host's twelfth slot to keep rax free for the
+// tail call. WL_LOAD is a ladder: clang is O(n^2) on a fallthrough switch.
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
@@ -3021,13 +2999,11 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(CID(k), run), as a C source does. A
-// def on a tail cycle is one loop over the cycle's bodies ($pc picks
-// one), each turn binding its parameters afresh, so a closure keeps its
-// own; any other call is direct. Only a closure's tail call bounces
-// (run_tail), so a call passes through run_loop only when its callee
-// may return one: a marker per call resolves once every def is out.
+// Each effect source runs once in its own closure and registers with
+// io_eff(CID(k), run). A def on a tail cycle is one loop over the cycle's
+// bodies ($pc picks one). Only a closure's tail call bounces (run_tail), so
+// a call goes through run_loop only if its callee may return one: a marker
+// per call resolves once every def is out.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -3396,13 +3372,10 @@ using namespace metal;
 // =======
 
 // Metal needs coherent(device) (MSL 3.2), or M1-class parts lose stores
-// across the threadgroups of a dispatch. CUDA keeps plain data cacheable
-// in L1: lanes hand off through a32 and FENCE. Only clang 19+ has both
-// preserve_none and preserve_most, and compiles preserve_most soundly; at
-// -O0 its register allocator cannot place a preserve_none segment, so an
-// unoptimized build takes neither. A segment is a case of the device's
-// switch; on the host, a preserve_none function (WL_SIG) entered by
-// musttail, its words fresh at WL_OPEN.
+// across threadgroups; CUDA lanes hand off through a32 and FENCE. The
+// preserve_* attributes need clang 19+ and an optimized build. A segment is
+// a case of the device's switch, or a host preserve_none function entered
+// by musttail.
 
 #ifdef __METAL_VERSION__
 #if __METAL_VERSION__ >= 320
@@ -3449,12 +3422,9 @@ using namespace metal;
 #endif
 #define FAR static __attribute__((noinline))
 
-// A long spin is a call on the device, which inlines every spin into the
-// one kernel it compiles, once per caller: a 14 KB native at eight call
-// sites took Metal's back end from 56 to 369 ms, and hvm5 under a bang 32
-// s against 2.6. Shorter ones gain from inlining (histogram's 5 KB spins
-// lose 23% on the GPU as calls; lexer's 1 KB loop 3%). On the host clang
-// decides (a forced call cost raytrace 31% on PAR-CPU).
+// The device inlines every spin into its kernel once per caller, so a long
+// spin is a call there; short ones gain from inlining. The host lets clang
+// decide.
 #if DEVICE
 #define DFAR       FAR
 #define LOCK(l)
@@ -3849,11 +3819,10 @@ INLINE void bank_push(DEV u64* H, u32 c, u64 head) {
 // Heap
 // ====
 
-// Per lane and class: HOT, a LIFO free chain; LEN, its length in words;
-// on the host COLD, one parked generation. A host free reaching KEEP_WORDS
-// parks HOT as COLD and banks the old COLD. A miss takes COLD, a bank entry
-// or a fresh quantum. A device lane banks its complete generations at the
-// kernel end (dev_cut).
+// Per lane and class: a LIFO free chain, its length in words, and on the
+// host COLD, one parked generation. A host free reaching KEEP_WORDS parks the
+// chain as COLD and banks the old COLD. A miss takes COLD, a bank entry or a
+// fresh quantum. A device lane banks its generations at the end (dev_cut).
 
 #define ALC_AT(e, i)   (e).alc[(i) * LANE_STEP]
 #define ALC_LEN(e, c)  ALC_AT(e, NCLS_ALL + (c))
@@ -4050,9 +4019,9 @@ INLINE u32 blk_span(Term t) {
   return blk_wcls(term_tag(t) == TAG_ARR, blk_cls(t));
 }
 
-// A node's first word holds its frame; free it before its last live child.
-// Swap the spine to the end for cell-by-cell list drops. Ends <256 fit the frame;
-// a wider end goes in the trivial last cell, then the counter.
+// A node's first word holds its frame, freed before its last live child; a
+// spine field swaps to the end, so a list drops cell by cell. A live end
+// under 256 fits the frame, a wider one the (trivial) last cell.
 FAR void term_drop(Env e, Term t) {
   DEV u64* H = e.mem;
   u64  cur = 0;
@@ -4444,8 +4413,7 @@ ${spins}
 // Work
 // ====
 
-// A host self-jump is a tail call: as a loop, clang hoisted constants into
-// symreg's entry (3.05 s against 2.51 s).
+// A host self-jump is a tail call: as a loop, clang hoists constants badly.
 #if !DEVICE
 #undef  WL_SPIN
 #undef  WL_SPUN
@@ -4565,10 +4533,8 @@ ${segs}
 // Monk
 // ====
 
-// One turn on a ring: its head task below put0 runs (a growing
-// lane skips a fork-free one). The host grows a row ring by
-// ring and drains a ring; a device lane does both. A host grow
-// runs a fork-free task in place if a forking frame follows it.
+// One turn on a ring: its head task below put0 runs (a growing lane skips a
+// fork-free one, unless on the host a forking frame follows it).
 INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 stride,
   TG u32* cur) {
   DEV u64* H   = e.mem;
@@ -4614,13 +4580,11 @@ INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 strid
 // Dev
 // ===
 
-// One kernel: pass 0 grows the frontier, pass 1 runs the c-th deal on lane
-// c, pass 2 packs the banks: in one group, each bank's [top, wr) slides onto
-// rd, CUBE_T entries a step (loads, barrier, stores: rd <= top), off the
-// host's pages. A grow pass ends when its group is full or nothing grew,
-// so a spine of forks unrolls whole. TG_HOLD words of threadgroup memory
-// hold one group per Apple core (bitonic 1.35x without). Pass 3 is pass 1
-// after a grow from under CUBE_T roots, on the lane's own ring to ring_held.
+// One kernel: pass 0 grows the frontier until its group is full or nothing
+// grew, pass 1 runs the c-th deal on lane c, pass 3 is pass 1 on the lane's
+// own ring after a small grow, and pass 2 slides each bank's [top, wr) onto
+// rd in one group. TG_HOLD words of threadgroup memory keep one group per
+// Apple core.
 
 #if DEVICE
 
@@ -4675,8 +4639,6 @@ extern "C" __global__ void bend_dev(DEV u64* H, u32 pass, u32 at) {
   u32 grids = gridDim.x;
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
-#endif
-#ifndef __METAL_VERSION__
   if (!turn_groups(H[H_FRONT], at)) {
     return;
   }
@@ -4787,9 +4749,8 @@ static u64 io_tick(void) {
   return ts.tv_sec * 1000000000ull + ts.tv_nsec;
 }
 
-// A row runs what precedes its forks on one thread: in a turn with fewer
-// rows than threads, a grow past 1 ms (a bench's: under 0.3) deals its
-// forks over the rows, for idle threads to grow (#1475: 3.2 s -> 1.1 s).
+// A row runs what precedes its forks on one thread; with fewer rows than
+// threads, a grow past 1 ms deals its forks over the rows for idle threads.
 static u32 row_grow(Env e, DEV Term* stk, u32 base, u32 stride, u32 want,
   u32 rows) {
   u64* H = e.mem;
@@ -4849,8 +4810,7 @@ static Term* pool_stack(void) {
   return (Term*)p;
 }
 
-// A wait yields a while before it sleeps, so a turn that ends (or follows)
-// within microseconds never pays a condvar wake.
+// A wait yields a while before it sleeps, so a short turn pays no wake.
 
 #define POOL_WAIT(c, cv) \
   for (u32 s = 0; s < 128 && (c); s += 1) { \
@@ -4967,12 +4927,10 @@ OUTLINE void pool_turn(bool grow, u32 rows) {
 // Gpu
 // ===
 
-// gpu_make compiles the device program into <binary>.gpu
-// (--gpu-build): Metal's binary archive, or CUDA's cubin behind a
-// hash of the text. A launch loads it, else notes and compiles. CUDA
-// shapes the bag by the device: a group of 128 lanes per 64 KB of
-// L2, a power of two in 16..128 (Apple keeps the tuned 128). CUDA
-// runs one stream: the default 8 cost about half of the startup.
+// gpu_make compiles the device program into <binary>.gpu: Metal's binary
+// archive, or CUDA's cubin behind a hash of the text; a launch loads it or
+// compiles. CUDA sizes the bag by L2 (a group per 64 KB, 16..128) and runs
+// one stream, which starts faster.
 
 static const char* gpu_path(void) {
   static char path[4096];
@@ -5099,9 +5057,9 @@ static void gpu_kernel(u32 pass, u32 at) {
   [gpu_enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
 }
 
-// A bang gives each round its own command buffer, GPU_DEEP in flight, each
-// waiting on the last through one event, until the pack empties the
-// frontier. A round queued past that dispatches no groups.
+// A bang queues each round in its own command buffer, GPU_DEEP in flight,
+// chained by one event, until the pack empties the frontier (a round queued
+// past that dispatches no groups).
 
 #define GPU_DEEP 3
 
@@ -5303,14 +5261,11 @@ static void gpu_pass(u64* H) {
 // Cube
 // ====
 
-// The host's column grows to the rows that give a LINE of tasks a thread,
-// no more: every task a grow starts early is live at once (tree-matmul's
-// 2048 at 16 threads start 384 rounds: 15 MB -> 68 MB), and pool_step
-// splits the few rows finely instead. A turn visits only the rows below
-// its bound: a drain deals task g to ring_flip(g), whose row is at most g,
-// a row grows into itself, and a column grow's cur tasks land in rows 0
-// to cur - 1, so those rows hold every task. A slow grow deals task g to
-// row g % CUBE_T, and the grows repeat over g rows until none deals.
+// The host's column grows only to a LINE of tasks a thread, as every task a
+// grow starts is live at once; pool_step splits the few rows instead. A turn
+// visits only the rows below its bound, which hold every task: a drain deals
+// task g to ring_flip(g), at row g at most, and a grow's cur tasks land in
+// rows 0 to cur - 1. A slow grow deals task g to row g % CUBE_T.
 
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
@@ -5372,9 +5327,8 @@ static void cube_run(u64* H, bool gpu) {
 // Corpus
 // ======
 
-// The cores map 8 GiB at a high base and double it in place, so one
-// base holds every location; the banks move up past the pages. The GPU maps
-// its whole span at once, and never grows it.
+// The cores map 8 GiB at a high base and double it in place; the banks move
+// up past the pages. The GPU maps its whole span once.
 
 static u64 corpus_size;
 
@@ -5484,15 +5438,12 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 // Io
 // ==
 
-// Base's opaque, linear handles pack host fds or pointers into aux and loc:
-// no forging, copying, reuse or host wrapper. A request's cont applied to
-// its item is the next request. A parked request keeps its fd, deadline and
-// readiness in word, time and evts; the loop then calls pack: a value
-// resumes, IO_PARK parks again. The edge is UTF-8, decoded as WHATWG does: a
-// broken sequence yields one U+FFFD and its breaking byte is read again as a
-// lead. inet_aton reads a leading zero as octal, so io_sys_addr refuses it.
-// macOS poll misses FIFO EOF, so io_wait selects, its sets sized to the
-// highest fd (_DARWIN_UNLIMITED_SELECT allows fds past FD_SETSIZE).
+// Base's opaque, linear handles pack host fds or pointers into aux and loc.
+// A request's cont applied to its item is the next request. A parked
+// request keeps its fd, deadline and events in word, time and evts; once
+// due, pack resumes it or parks it again (IO_PARK). Text is UTF-8, decoded
+// as WHATWG does. io_sys_addr refuses a leading zero (octal to some libcs).
+// macOS poll misses FIFO EOF, so io_wait selects, sized to the highest fd.
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -5593,7 +5544,7 @@ static void io_spawn(Term m) {
 }
 
 // io_park stays in deadline order (time 0, none, sorts last; ties keep
-// their park order), so io_wait wakes due timers in the order they expire.
+// their park order).
 static void io_park_add(IoWork* w) {
   IoWork* p = io_park;
   if (p == NULL || p->time - 1 <= w->time - 1) {
@@ -5895,12 +5846,9 @@ ${NATIVE.IO}
 // Show
 // ====
 
-// show_val prints a pure main's value as term_show spells it: d
-// is a SHOW_DESC node (see show_main), w its words, and chain the
-// bracket of the [a, b] or (a, b) the value continues, or 0. Con
-// or Nil spell a list, Tuple a tuple, and their tails continue
-// it. show_f32 prints the shortest text that reads back, with a
-// point before an e.
+// show_val prints a pure main's value as term_show does: d is a SHOW_DESC
+// node (see show_main), w its words, chain the bracket of the list or tuple
+// the value continues, or 0.
 
 #if MAIN_PURE
 
@@ -6302,13 +6250,10 @@ function show_val(D, d, v, chain) {
 // Io
 // ==
 
-// Apple arm64 passes variadic fcntl flags on the stack, so io_sys
-// binds fcntl there with the flags as the ninth fixed argument. A
-// parked effect waits for fd (a write when out) or until at
-// (performance.now()), either one undefined when unused; once due, io_wait
-// calls more at once, as C calls pack, and resumes k with its value, while
-// undefined parks it again. The waits stay in deadline order, as io_park
-// does in C.
+// Apple arm64 passes variadic fcntl flags on the stack, so io_sys passes
+// them as the ninth argument. A parked effect waits for fd (a write when
+// out) and/or until at; once due, io_wait calls more and resumes k with its
+// value, or parks it again on undefined. Waits stay in deadline order.
 
 function io_exit(main, show) {
   try {
@@ -6548,9 +6493,7 @@ function io_run(m) {
           break;
         }
         if (left === 1) {
-          s.fun = op.kont;
-          s.arg = x;
-          io.runs.push(s);
+          io_push(op.kont, x, false, io);
           break;
         }
         op = op.kont(x);
