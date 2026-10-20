@@ -15,9 +15,18 @@ function chan_wait(item) {
   return { $: CID(Wait), rest: item === CHAN_RECV ? { $: CID(Unit) } : item };
 }
 
+// The first waiter, past those whose IO has returned (a nested io_run): their
+// computations are gone with it, so the row drops them and their items.
+function chan_head(row) {
+  while (row.wait.length > 0 && row.wait[0].io.done) {
+    row.wait.shift();
+  }
+  return row.wait[0];
+}
+
 // Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer, if
-// the poller has not taken it yet). It resumes on the IO that parked it, even
-// from a nested io_run; one that has returned hands it to the running IO.
+// the poller has not taken it yet), on the IO that parked it: a nested io_run
+// may wake an outer one.
 function chan_wake(row, x) {
   const w = row.wait.shift();
   if (w.late !== undefined) {
@@ -26,13 +35,13 @@ function chan_wake(row, x) {
     if (at >= 0) ws.splice(at, 1);
     x = { $: CID(Ready), value: x };
   }
-  io_push(w.cont, x, w.io.done, w.io.done ? io_active : w.io);
+  io_push(w.cont, x, false, w.io);
   return w.item;
 }
 
 function chan_take(row) {
   const v = row.ring.shift();
-  if (row.wait.length > 0) {
+  if (chan_head(row) !== undefined) {
     row.ring.push(chan_wake(row, chan_done()));
   }
   return v;
@@ -41,7 +50,7 @@ function chan_take(row) {
 // A handle is the row (a stale copy keeps it, shut).
 function chan_shut(row) {
   row.shut = true;
-  while (row.wait.length > 0) {
+  while (chan_head(row) !== undefined) {
     const item = row.wait[0].item;
     chan_wake(row, item === CHAN_RECV ? { $: CID(None) }
       : { $: CID(Fail), error: item });
@@ -71,7 +80,7 @@ function chan_put(row, value) {
   if (row.shut) {
     return { $: CID(Fail), error: value };
   }
-  if (row.wait.length > 0 && row.wait[0].item === CHAN_RECV) {
+  if (chan_head(row)?.item === CHAN_RECV) {
     chan_wake(row, { $: CID(Some), value: value });
     return chan_done();
   }
@@ -87,7 +96,8 @@ function chan_get(row) {
   if (row.ring.length > 0) {
     return { $: CID(Some), value: chan_take(row) };
   }
-  if (row.wait.length > 0 && row.wait[0].item !== CHAN_RECV) {
+  const w = chan_head(row);
+  if (w !== undefined && w.item !== CHAN_RECV) {
     return { $: CID(Some), value: chan_wake(row, chan_done()) };
   }
   if (row.shut) {
