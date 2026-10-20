@@ -370,11 +370,11 @@ function path_real(p: string): string {
   return fs.existsSync(p) ? fs.realpathSync(p) : path.resolve(p);
 }
 
-// Device/inode identity catches hard links and case aliases too.
-function path_id(p: string): string {
-  const s = fs.statSync(p, { bigint: true, throwIfNoEntry: false });
-  return s === undefined ? path.resolve(p)
-    : s.isDirectory() ? "" : s.dev + ":" + s.ino;
+// same_file compares device and inode, so links to one file agree.
+function same_file(a: string, b: string): boolean {
+  const x = fs.statSync(a, { bigint: true });
+  const y = fs.statSync(b, { bigint: true });
+  return x.dev === y.dev && x.ino === y.ino;
 }
 
 function cli_emit(book: Bend.Book, out: string): void {
@@ -512,36 +512,6 @@ function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
 // error points at the page's own line and column.
 // Virtual names must not shadow real files; only their diagnostics map to a page.
 async function cli_bundle(page: string, dir: string): Promise<void> {
-  let parent = path.resolve(dir);
-  while (!fs.existsSync(parent)) {
-    parent = path.dirname(parent);
-  }
-  if (!fs.statSync(parent).isDirectory()) {
-    throw new Error("-o " + dir + " is not a directory");
-  }
-  const inputs = new Set<string>([page]);
-  const dirs = new Set<string>();
-  const reads: BunPlugin = {
-    name: "bend bundle inputs",
-    setup(build) {
-      build.onResolve({ filter: /.*/, namespace: "file" }, (a) => {
-        dirs.add(a.resolveDir);
-        const pkg = !path.isAbsolute(a.path)
-          && a.path.match(/^(@[^/]+\/[^/]+|[^./][^/]*)/)?.[0];
-        if (pkg) {
-          for (let d = path.resolve(a.resolveDir); ; d = path.dirname(d)) {
-            dirs.add(path.join(d, "node_modules", pkg));
-            if (path.dirname(d) === d) break;
-          }
-        } else {
-          dirs.add(path.resolve(a.resolveDir, a.path));
-        }
-        return undefined;
-      });
-      build.onLoad({ filter: /\.bend$/, namespace: "file" }, async (a) =>
-        ({ contents: await load_js(a.path, inputs), loader: "js" }));
-    },
-  };
   type Inline = { id: string; page: string; text: string };
   const code = new Map<string, Inline>();
   const inline: BunPlugin = {
@@ -608,45 +578,23 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
       });
     },
   };
-  const stage = fs.mkdtempSync(path.join(os.tmpdir(), "bend-bundle-"));
   try {
+    // Only the page keeps its name in the bundle (chunks and assets are hashed),
+    // so it is the input an -o can overwrite: refuse that, through links too.
     const entry = fs.realpathSync(page);
+    const at = path.join(dir, path.basename(entry));
+    if (fs.existsSync(at) && same_file(at, entry)) {
+      cli_fail("-o " + dir + " would overwrite the page");
+    }
     const out = await Bun.build({
       entrypoints: [entry],
-      root: path.dirname(entry),
-      outdir: stage,
-      metafile: true,
+      outdir: dir,
       target: "browser",
       minify: true,
-      plugins: [reads, inline, PLUGIN],
+      plugins: [inline, PLUGIN],
     });
-    // Bun reports ordinary inputs; the Bend loader adds its transitive reads.
-    const meta = typeof out.metafile === "string" ? JSON.parse(out.metafile) : out.metafile;
-    if (!meta?.inputs) throw new Error("bundler did not report its input files");
-    for (const file of Object.keys(meta.inputs)) {
-      if (fs.existsSync(file)) inputs.add(path.resolve(file));
-    }
-    for (const file of inputs) dirs.add(path.dirname(path.resolve(file)));
-    bundle_configs(inputs, dirs);
-    const ins = new Set([...inputs].map(path_id));
-    const outputs = new Set<string>();
-    const files = out.outputs.map((a) => {
-      const name = path.resolve(dir, path.relative(stage, a.path));
-      return { from: a.path, at: bundle_path(name), name, size: a.size };
-    });
-    for (const f of files) {
-      const id = path_id(f.at);
-      if (ins.has(id)) {
-        throw new Error("-o " + dir + " would overwrite an input file: " + f.name);
-      }
-      if (id === "" || outputs.has(id)) {
-        throw new Error("bundle outputs overlap or name a directory: " + f.name);
-      }
-      outputs.add(id);
-    }
-    bundle_write(files);
-    for (const f of files) {
-      cli_say(1, f.name + " (" + (f.size / 1024).toFixed(1) + "kb)\n");
+    for (const a of out.outputs) {
+      cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
     }
   } catch (e) {
     let message = book_err(e);
@@ -654,118 +602,6 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
       message = message.replaceAll(id + ":", mod.page + ":");
     }
     throw message;
-  } finally {
-    fs.rmSync(stage, { recursive: true, force: true });
-  }
-}
-
-// Bun omits resolver configs from metadata. Protect candidates conservatively,
-// including packages redirected by browser maps and extended JSONC configs.
-function bundle_configs(inputs: Set<string>, dirs: Set<string>): void {
-  const configs = new Set<string>();
-  function config(file: string, extend: boolean): void {
-    if (configs.has(file) || !fs.existsSync(file) || !fs.statSync(file).isFile()) return;
-    configs.add(file);
-    inputs.add(file);
-    if (extend) {
-      let base: unknown;
-      try {
-        base = (Bun.JSONC.parse(fs.readFileSync(file, "utf8")) as { extends?: unknown } | null)?.extends;
-      } catch {
-        // Bun can ignore malformed configs; their identities are still protected.
-      }
-      if (typeof base === "string") config(path.resolve(path.dirname(file), base), true);
-    }
-  }
-  const seen = new Set<string>();
-  for (const start of dirs) {
-    for (let dir = path.resolve(start); !seen.has(dir); dir = path.dirname(dir)) {
-      seen.add(dir);
-      config(path.join(dir, "package.json"), false);
-      config(path.join(dir, "tsconfig.json"), true);
-      config(path.join(dir, "jsconfig.json"), true);
-    }
-  }
-}
-
-// Resolve output links, including a dangling link and missing parent directories.
-function bundle_path(file: string): string {
-  try {
-    return fs.realpathSync(file);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-  }
-  const dir = path.dirname(file);
-  return fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()
-    ? bundle_path(path.resolve(dir, fs.readlinkSync(file)))
-    : path.join(bundle_path(dir), path.basename(file));
-}
-
-// Prepare every replacement on its destination filesystem before installing any.
-// Backups survive a failed rollback; caught publication errors restore old files.
-function bundle_write(files: { from: string; at: string }[]): void {
-  const made: string[] = [];
-  const edits: { at: string; work: string; old: boolean; done: boolean }[] = [];
-  let keep = false;
-  function mkdir(dir: string): void {
-    if (fs.existsSync(dir)) return;
-    mkdir(path.dirname(dir));
-    fs.mkdirSync(dir);
-    made.push(dir);
-  }
-  try {
-    for (const f of files) {
-      mkdir(path.dirname(f.at));
-      const stat = fs.statSync(f.at, { throwIfNoEntry: false });
-      if (stat !== undefined) {
-        // Renaming alone could replace a read-only file; retain write semantics.
-        fs.closeSync(fs.openSync(f.at, fs.constants.O_WRONLY));
-      }
-      const work = fs.mkdtempSync(path.join(path.dirname(f.at), ".bend-bundle-"));
-      const edit = { at: f.at, work, old: stat !== undefined, done: false };
-      edits.push(edit);
-      fs.copyFileSync(f.from, path.join(work, "next"));
-      if (stat !== undefined) {
-        fs.chmodSync(path.join(work, "next"), stat.mode & 0o7777);
-        fs.linkSync(f.at, path.join(work, "old"));
-      }
-    }
-    for (const edit of edits) {
-      fs.renameSync(path.join(edit.work, "next"), edit.at);
-      edit.done = true;
-    }
-  } catch (e) {
-    const errors: string[] = [];
-    for (const edit of [...edits].reverse()) {
-      if (!edit.done) continue;
-      try {
-        if (edit.old) fs.renameSync(path.join(edit.work, "old"), edit.at);
-        else fs.unlinkSync(edit.at);
-      } catch (undo) {
-        errors.push(String(undo));
-      }
-    }
-    if (errors.length !== 0) {
-      keep = true;
-      throw new Error(String(e) + "; rollback failed: " + errors.join("; ")
-        + "; backups retained in " + edits.map((x) => x.work).join(", "));
-    }
-    throw e;
-  } finally {
-    if (!keep) {
-      for (const edit of edits) {
-        fs.rmSync(edit.work, { recursive: true, force: true });
-      }
-      for (const dir of made.reverse()) {
-        try {
-          fs.rmdirSync(dir);
-        } catch (e) {
-          if (!["ENOTEMPTY", "ENOENT"].includes((e as NodeJS.ErrnoException).code ?? "")) {
-            throw e;
-          }
-        }
-      }
-    }
   }
 }
 
@@ -1201,17 +1037,9 @@ function book_err(e: unknown): string {
 // Load
 // ====
 
-async function load_js(path: string, inputs?: Set<string>): Promise<string> {
+async function load_js(path: string): Promise<string> {
   try {
-    const seen = new Map<string, string | null>();
-    const book = await book_read(path, undefined, seen);
-    if (inputs !== undefined) {
-      for (const file of seen.keys()) inputs.add(file);
-      for (const t of Object.values(book.tlds)) {
-        if (t.$ === "Def") for (const file of t.i ?? []) inputs.add(file);
-      }
-    }
-    return Comp.js_lib(book, true);
+    return Comp.js_lib(await book_read(path), true);
   } catch (e) {
     throw new Error(book_err(e));
   }
