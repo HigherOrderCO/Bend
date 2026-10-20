@@ -1,5 +1,5 @@
 # an @unsafe def calls a def declared after it; a safe def after it may
-# not: to live code, a def below is a bodiless claim, as an unfilled law
+# not, and the refusal names the file order, not a law (#1782)
 import Base
 
 @unsafe
@@ -17,7 +17,7 @@ def main() -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a filled definition (an unfilled law is a dead claim: live code cannot use it)
+#|- expected : a def written above its use (defs are checked in file order)
 #|- observed : g
 #|Context:
 #|- x : Nat

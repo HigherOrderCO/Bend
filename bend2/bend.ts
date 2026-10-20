@@ -3319,7 +3319,9 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
       if (qt.$ !== "None") {
         const gen = tld.$ === "Def" && tld.x > 0 && !(book.tlds[lhs.def] as Def).x ? tld : null;
         if (tld.$ === "Def" && tld.v === null && !tld.i && (tld.b !== true && lhs.u !== true || gen !== null) && k !== lhs.def) {
-          throw Err(book, ctx, "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
+          throw Err(book, ctx, tld.l
+            ? "a filled definition (an unfilled law is a dead claim: live code cannot use it)"
+            : "a def written above its use (defs are checked in file order)", tm, tm.s, lhs.def);
         }
         if (gen !== null) {
           k  = def_inst(book, lhs, tm, gen, sp, ctx, d);
