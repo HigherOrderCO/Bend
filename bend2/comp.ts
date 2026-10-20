@@ -3788,13 +3788,25 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A fault may land inside stdio, so the trap writes its line raw and
-// flushes stdout once, only if no thread holds it; a fault in that flush
-// re-enters (SA_NODEFER) and skips it.
+// The first fault flushes stdout, waiting at most 100ms for its lock, and
+// prints the line; a fault on another thread waits for it, and a fault in
+// that flush (its own thread, SA_NODEFER) skips the flush.
 static void err_trap(int sig) {
-  static volatile sig_atomic_t seen;
-  static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
-  if (!seen++ && ftrylockfile(stdout) == 0) fflush(stdout);
+  static atomic_flag seen = ATOMIC_FLAG_INIT;
+  static pthread_t   first;
+  static const char  line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
+  if (!atomic_flag_test_and_set(&seen)) {
+    first = pthread_self();
+    for (u32 i = 0; i < 100; i += 1) {
+      if (ftrylockfile(stdout) == 0) {
+        fflush(stdout);
+        break;
+      }
+      nanosleep(&(struct timespec){ 0, 1000000 }, NULL);
+    }
+  } else if (!pthread_equal(first, pthread_self())) {
+    for (;;) pause();
+  }
   if (write(2, line, sizeof line - 1)) {}
   _exit(1);
 }
@@ -4830,11 +4842,12 @@ static void* pool_mmap(u64 bytes) {
 
 static Term* pool_stack(void) {
   u64   len = 1ull << 31;
-  char* p   = pool_mmap(len + 16384 + SIGSTKSZ);
+  u64   alt = 4 * SIGSTKSZ;
+  char* p   = pool_mmap(len + 16384 + alt);
   if (mprotect(p + len, 16384, PROT_NONE)) {
     err_fail("stack guard failed");
   }
-  stack_t ss = { .ss_sp = p + len + 16384, .ss_size = SIGSTKSZ };
+  stack_t ss = { .ss_sp = p + len + 16384, .ss_size = alt };
   sigaltstack(&ss, NULL);
   struct sigaction sa = { .sa_handler = err_trap,
     .sa_flags = SA_ONSTACK | SA_NODEFER };
