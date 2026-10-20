@@ -3638,15 +3638,13 @@ static bool io_gpu;
 static DEV Term*  io_stk;
 
 static const char* CLI_HELP =
-  "usage: %s [arguments] [+RTS options -RTS] [arguments]\n"
-  "options, from $BENDRTS, then between +RTS and -RTS (or the end):\n"
+  "usage: %s [+RTS options -RTS] [arguments]\n"
   "  --threads N       worker threads, 1 to 128 (default: the CPU count)\n"
   "  --gpu on|off|4GB  run ! calls on the GPU, over this much of its memory\n"
   "                    (default: on if present, over 2GB on Metal)\n"
   "  --gpu-build       write the GPU program and exit\n"
   "  --bend-help       show this text\n"
-  "the rest are the program's arguments (IO.args); -- (kept) or --RTS\n"
-  "(dropped) makes every argument after it the program's\n";
+  "  --                the rest are the program's arguments (IO.args)\n";
 
 #endif
 
