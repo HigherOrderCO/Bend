@@ -1,6 +1,6 @@
 # bend3's C27 let a def between an assert and its fill call the
 # asserted name; bend refuses by design -- a def may not use a
-# demanded name (only asserts may), and the refusal names the law
+# demanded name (only asserts may); the refusal names the file order
 import Base
 
 law foo:
@@ -24,7 +24,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a filled definition (an unfilled law is a dead claim: live code cannot use it)
+#|- expected : a def written above its use (defs are checked in file order)
 #|- observed : foo
 #|Location: bar
 #|13 | def bar():

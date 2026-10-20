@@ -314,7 +314,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; w?: Bool; };
 export type TLD  = ADT | Def;
 export type Book = { tlds: Record<Name, TLD>; ctrs: Record<Name, Ctr>; order: Name[]; hols: number; tmps: Record<Name, Map<string, Name>>; };
 
@@ -3299,8 +3299,10 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
     //       is an error, so a self-reference never escapes as a value
     //       k has a body in a live region, unless base declared it, it
     //       is a template's ~ parameter, or the def is @unsafe (an
-    //       unfilled law is a dead claim; base's are native, a ~
-    //       parameter an opaque constant, and an unsafe body trusts it)
+    //       unfilled law is a dead claim, and a def or law filled below
+    //       its use has no body yet, as defs check in file order; base's
+    //       are native, a ~ parameter an opaque constant, and an unsafe
+    //       body trusts it)
     //       a template k in a live region outside a template's own text
     //       takes its x ~ arguments here: the call is k~n, the instance
     //       at them (def_inst), and the x applications above pass
@@ -3319,9 +3321,9 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
       if (qt.$ !== "None") {
         const gen = tld.$ === "Def" && tld.x > 0 && !(book.tlds[lhs.def] as Def).x ? tld : null;
         if (tld.$ === "Def" && tld.v === null && !tld.i && (tld.b !== true && lhs.u !== true || gen !== null) && k !== lhs.def) {
-          throw Err(book, ctx, tld.l
-            ? "a filled definition (an unfilled law is a dead claim: live code cannot use it)"
-            : "a def written above its use (defs are checked in file order)", tm, tm.s, lhs.def);
+          throw Err(book, ctx, tld.w
+            ? "a def written above its use (defs are checked in file order)"
+            : "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
         }
         if (gen !== null) {
           k  = def_inst(book, lhs, tm, gen, sp, ctx, d);
@@ -3789,8 +3791,10 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
 // each event against every declaration and the bodies so far: a
 // forward reference is a live reference to a bodiless def, which errs
 // (infer-ref) unless the def is @unsafe, so mutual recursion cannot
-// bypass the wall. an unchecked body never unfolds, a declared ref is
-// stuck. a def checks its type against Type, then its
+// bypass the wall; a declaration whose body comes later is marked w,
+// so that error names the file order, not an unfilled law. an unchecked
+// body never unfolds, a declared ref is stuck. a def checks its type
+// against Type, then its
 // tree against it (def_check); an ADT checks its signature against Type
 // and reads its declared kind Kind(G) off the tip, then checks every
 // constructor telescope domain (parameters, then fields) in the real
@@ -3812,7 +3816,7 @@ export function book_valid(book: Book, done: number = 0): void {
   book.tlds = Object.create(null);
   for (const k in tlds) {
     const t = tlds[k];
-    book.tlds[k] = last.has(k) && t.$ === "Def" ? { ...t, v: null } : t;
+    book.tlds[k] = last.has(k) && t.$ === "Def" ? { ...t, v: null, w: t.v !== null } : t;
   }
   for (let i = 0; i < book.order.length; i++) {
     const k   = book.order[i];
