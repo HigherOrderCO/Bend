@@ -3087,18 +3087,6 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     const x: HTerm = Var("_", dep);
     return compare_go(mode, book, term_apply(a, x), term_apply(b, x), dep + 1);
   }
-  // a def call short of its arguments is a function: two convert when
-  // they agree on fresh arguments (eta, as for a lambda)
-  const [f, xs] = term_unapply(a);
-  const [g, ys] = term_unapply(b);
-  const n = Math.max(f.$ === "Ref" ? (book.tlds[f.k]?.n ?? 0) - xs.length : 0,
-                     g.$ === "Ref" ? (book.tlds[g.k]?.n ?? 0) - ys.length : 0);
-  if (n > 0) {
-    for (let j = 0; j < n; j++) {
-      [a, b] = [App(a, Var("_", dep + j)), App(b, Var("_", dep + j))];
-    }
-    return compare_go(mode, book, a, b, dep + n);
-  }
   if (a.$ === "Lit" && b.$ === "Ctr") {
     a = lit_step(a);
   }
@@ -3107,10 +3095,16 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
   }
   switch (a.$) {
     case "Var": {
-      return b.$ === "Var" && a.i === b.i;
+      if (b.$ === "Var" && a.i === b.i) {
+        return true;
+      }
+      break;
     }
     case "Ref": {
-      return b.$ === "Ref" && a.k === b.k;
+      if (b.$ === "Ref" && a.k === b.k) {
+        return true;
+      }
+      break;
     }
     case "Typ": {
       if (b.$ !== "Typ") {
@@ -3157,12 +3151,26 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     }
     // a stuck call is canonical: its head def compares by name, not by eta
     case "App": {
-      if (b.$ !== "App") {
-        return false;
+      let f: HTerm = a;
+      let g: HTerm = b;
+      while (f.$ === "App" && g.$ === "App") {
+        f = f.f;
+        g = g.f;
       }
-      const head = f.$ === "Ref" || g.$ === "Ref" ? f.$ === "Ref" && g.$ === "Ref" && f.k === g.k
-        : compare_go("EQ", book, f, g, dep);
-      return head && xs.length === ys.length && xs.every((x, j) => compare_go("EQ", book, x, ys[j], dep));
+      if (f.$ !== "App" && g.$ !== "App"
+          && (f.$ === "Ref" || g.$ === "Ref" ? f.$ === "Ref" && g.$ === "Ref" && f.k === g.k
+            : compare_go("EQ", book, f, g, dep))) {
+        f = a;
+        g = b;
+        while (f.$ === "App" && g.$ === "App" && compare_go("EQ", book, f.x, g.x, dep)) {
+          f = f.f;
+          g = g.f;
+        }
+        if (f.$ !== "App") {
+          return true;
+        }
+      }
+      break;
     }
     case "ADT": {
       if (b.$ !== "ADT" || a.k !== b.k || a.x.length !== b.x.length) {
@@ -3182,9 +3190,12 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
       return b.$ === "Lit" && a.k === b.k && a.v === b.v;
     }
     case "Mat": {
-      return b.$ === "Mat" && a.k === b.k
+      if (b.$ === "Mat" && a.k === b.k
           && compare_go("EQ", book, a.h, b.h, dep)
-          && compare_go("EQ", book, a.m, b.m, dep);
+          && compare_go("EQ", book, a.m, b.m, dep)) {
+        return true;
+      }
+      break;
     }
     case "Eql": {
       return b.$ === "Eql"
@@ -3205,6 +3216,25 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
       return false;
     }
   }
+  // a def call short of its arguments is a function: when the forms above
+  // differ, two convert if they agree on fresh arguments (eta, as for a
+  // lambda). eta only adds equalities, so equal forms skip it
+  let f: HTerm = a;
+  let g: HTerm = b;
+  let i = 0;
+  let j = 0;
+  for (; f.$ === "App"; i++) {
+    f = f.f;
+  }
+  for (; g.$ === "App"; j++) {
+    g = g.f;
+  }
+  const n = Math.max(f.$ === "Ref" ? (book.tlds[f.k]?.n ?? 0) - i : 0,
+                     g.$ === "Ref" ? (book.tlds[g.k]?.n ?? 0) - j : 0);
+  for (let k = 0; k < n; k++) {
+    [a, b] = [App(a, Var("_", dep + k)), App(b, Var("_", dep + k))];
+  }
+  return n > 0 && compare_go(mode, book, a, b, dep + n);
 }
 
 // Check
