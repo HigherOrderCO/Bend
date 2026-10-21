@@ -424,7 +424,7 @@ function cc_find(gpu: boolean): string {
   const olds: string[] = [];
   const want = gpu ? "19 (Apple clang 17)" : "14";
   const env  = process.env.CC;
-  const ccs  = [...(env ? [env] : []), "clang", ...nums];
+  const ccs  = [...new Set([...(env ? [env] : []), "clang", ...nums])];
   for (const cc of ccs) {
     const [got, out] = Safe.run_read(cc, ["--version"]);
     const m   = /^(Apple )?(?:\w+ )?clang version (\d+)/m.exec(out);
@@ -432,14 +432,16 @@ function cc_find(gpu: boolean): string {
     if (m !== null && Number(m[2]) >= need) {
       if (env && cc !== env) {
         process.stderr.write("warning: $CC is not a clang " + want + " or newer (found "
-          + olds[0] + (/\s/.test(env) ? "; $CC names one program, without flags" : "")
-          + "), so bend builds with " + cc + "\n");
+          + olds[0] + "), so bend builds with " + cc + "\n");
       }
       return cc;
     }
+    const err = (got.error as NodeJS.ErrnoException | undefined)?.code;
     olds.push(m !== null ? "clang " + m[2] + " as " + cc
-      : got.error ? "no " + cc
-      : got.status === 0 && out ? cc + ", which is not clang" : cc + ", which fails --version");
+      : err === "ENOENT" ? "no " + cc + (/\s/.test(cc) ? " ($CC names one program, without flags)" : "")
+      : err ? cc + ", which does not run (" + err + ")"
+      : got.status !== 0 ? cc + ", which fails --version"
+      : out ? cc + ", which is not clang" : cc + ", which prints no version");
   }
   throw "Error: bend needs clang " + want
     + " or newer to build " + (gpu ? "a GPU program" : "binaries") + " (found "
