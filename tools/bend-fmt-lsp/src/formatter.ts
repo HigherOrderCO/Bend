@@ -167,7 +167,7 @@ type BodyScope = { open: number; angle: number; end: number };
 type InlineBody = { at: number; scope?: BodyScope };
 
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, `=>` lambda opener or `;` statement separator. As in
+// `def` header, `=>` lambda opener, `;` separator or `(` group opener. As in
 // `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
 function inlineBodies(lines: Line[]): InlineBody[][] {
   let open = 0;
@@ -183,6 +183,10 @@ function inlineBodies(lines: Line[]): InlineBody[][] {
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
       angles.push(0);
+      if (token.text === "(" && index + 1 < line.tokens.length) {
+        bodyScopes.push({ open, angle: angles[open], end: lines.length });
+        return [{ at: index + 1, scope: bodyScopes.at(-1) }];
+      }
     } else if ([")", "]", "}"].includes(token.text)) {
       if (open > 0) angles.pop();
       open = Math.max(0, open - 1);

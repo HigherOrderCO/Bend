@@ -327,6 +327,8 @@ test("preserves body layout across dedents, declarations, and delimiters", { ski
     ["import Base\ndef g(a:Bool,b:Bool)->Type:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n(\n@unsafe: U32 -> U32\n)\n          case False{}:\n  U32\n    case False{}:\n  U32\ndef main() -> g(True{}, False{}):\n  7\n", "7\n"],
     ["import Base\ndef old(a: Bool) -> U32:\n  match a:\n          case True{}: 1\n          case False{}: 2\n@\n  unsafe def newer(b: Bool) -> U32:\n  match b:\n    case True{}:\n10\n    case False{}:\n20\ndef main() -> U32:\n  newer(False{})\n", "20\n"],
     ["import Base\ndef old(a: Bool) -> U32:\n  match a:\n          case True{}: 1\n          case False{}: 2\n@ # decorator\nunsafe # qualifier\n  def newer(b: Bool) -> U32:\n  match b:\n    case True{}:\n10\n    case False{}:\n20\ndef main() -> U32:\n  newer(False{})\n", "20\n"],
+    ["import Base\ndef main() -> Array<U32>:\n  a = [0 : U32 * 2n]\n  (a[0]<-3\n   a[1]<-5)\n", "[3, 5]\n"],
+    ["import Base\ndef finish(a:Array<U32>,n:U32)->Array<U32>:\n  a[0] <- n\ndef main()->Array<U32>:\n  a = [0 : U32 * 2n]\n  finish((a[0]<-3\n          a[1]<-5\n    ),\n    11)\n", "[11, 5]\n"],
     ["import Base\ndef main() -> Array<U32>:\n  a = [0 : U32 * 2n]\n  (a[0]<-7;a[1]<-8\n           a[0]<-9)\n", "[9, 8]\n"],
     ["import Base\ndef main() -> Array<U32>:\n  a = [0 : U32 * 2n]\n  (a[0]<-7;x : Result<&2,&2,U32,U32> = Done{1};a[1]<-8\n                                               a[0]<-9)\n", "[9, 8]\n"],
     ["import Base\ndef keep(a: Array<U32>, n: U32) -> Array<U32>:\n  a\ndef main() -> Array<U32>:\n  a = [0 : U32 * 2n]\n  keep((a[0]<-7;a[1]<-8\n                a[0]<-9\n    ),\n    0)\n", "[9, 8]\n"],
