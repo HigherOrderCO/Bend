@@ -303,12 +303,16 @@ test("mixed line endings and the final-newline state survive formatting", () => 
   }
 });
 
-test("nested cases keep their owner and inline anchors after a dedented body", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
+test("match scopes survive body dedents and reset at declarations", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
   const cases = [
     ["import Base\ndef g(a:Bool,b:Bool)->Nat:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n  10n\n          case False{}:\n  20n\n    case False{}:\n  30n\ndef main()->Nat:\n  g(True{},False{})\n", "20n\n"],
     ["import Base\ndef g(a: Bool, b: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b:case True{}:\n  10n\n              case False{}:\n  20n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{})\n", "20n\n"],
     ["import Base\ndef  g(a: Bool, b: Bool) -> IO(Unit):\n  match a:\n    case True{}:\n      match b: case True{}:\n  IO.print(\"10\")\n               case False{}:\n                 do IO<Unit>:\n                   IO.print(\"20\")\n                   IO.print(\"21\")\n    case False{}:\n  IO.print(\"30\")\ndef main() -> IO(Unit):\n  g(True{}, False{})\n", "20\n21\n"],
     ["import Base\ndef  g(a: Bool, b: Bool, c: Bool) -> Nat:\n  match a:\n    case True{}:\n      match b: case True{}:\n  10n\n               case False{}:\n                 match c:\n                   case True{}:\n  20n\n                   case False{}:\n  21n\n    case False{}:\n  30n\ndef main() -> Nat:\n  g(True{}, False{}, True{})\n", "20n\n"],
+    ["import Base\ndef g(b:Bool)->Type:\n  match b:\n    case True{}:\n@x: U32 -> U32\n    case False{}:\nU32\ndef main() -> g(False{}):\n  7\n", "7\n"],
+    ["import Base\ndef g(a:Bool,b:Bool)->Type:\n  match a:\n    case True{}:\n      match b:\n        case True{}:\n(\n@unsafe: U32 -> U32\n)\n          case False{}:\n  U32\n    case False{}:\n  U32\ndef main() -> g(True{}, False{}):\n  7\n", "7\n"],
+    ["import Base\ndef old(a: Bool) -> U32:\n  match a:\n          case True{}: 1\n          case False{}: 2\n@\n  unsafe def newer(b: Bool) -> U32:\n  match b:\n    case True{}:\n10\n    case False{}:\n20\ndef main() -> U32:\n  newer(False{})\n", "20\n"],
+    ["import Base\ndef old(a: Bool) -> U32:\n  match a:\n          case True{}: 1\n          case False{}: 2\n@ # decorator\nunsafe # qualifier\n  def newer(b: Bool) -> U32:\n  match b:\n    case True{}:\n10\n    case False{}:\n20\ndef main() -> U32:\n  newer(False{})\n", "20\n"],
   ];
   const directory = mkdtempSync(join(tmpdir(), "bend-fmt-cases-"));
   const file = join(directory, "main.bend");
