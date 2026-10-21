@@ -7,7 +7,6 @@
 // CID #Move BEND_CID_Move
 // CID #Scroll BEND_CID_Scroll
 // CID #Close BEND_CID_Close
-// CID #Text BEND_CID_Text
 // CID :Window.frame BEND_CID_Window_frame
 // CID #Nil BEND_CID_Nil
 // CID #Con BEND_CID_Con
