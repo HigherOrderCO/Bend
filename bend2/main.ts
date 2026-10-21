@@ -408,7 +408,9 @@ function cli_emit(book: Bend.Book, out: string): void {
 // cc_find is the first of $CC, clang and every clang-NN on PATH (newest
 // first) that is new enough: clang 14 for a CPU build, and for a GPU build
 // clang 19 (Apple clang 17, which ships LLVM 19), whose #embed
-// carries the device program.
+// carries the device program. A $CC that does not run, is not clang or is
+// too old ends the build: the user asked for that compiler, so silently
+// building with plain clang would hide it from them.
 function cc_find(gpu: boolean): string {
   function dir_list(dir: string): string[] {
     try {
@@ -422,7 +424,7 @@ function cc_find(gpu: boolean): string {
     /^clang-\d+$/.test(f)))].sort((a, b) => Number(b.slice(6)) - Number(a.slice(6)));
   const olds: string[] = [];
   const ccs  = [...(process.env.CC ? [process.env.CC] : []), "clang", ...nums];
-  for (const cc of ccs) {
+  for (const [i, cc] of ccs.entries()) {
     const [got, out] = Safe.run_read(cc, ["--version"]);
     const m   = /^(Apple )?(?:\w+ )?clang version (\d+)/m.exec(out);
     const need = gpu ? (m?.[1] === undefined ? 19 : 17) : 14;
@@ -431,6 +433,13 @@ function cc_find(gpu: boolean): string {
     }
     olds.push(m !== null ? "clang " + m[2] + " as " + cc
       : got.status === 0 && out ? cc + ", which is not clang" : "no " + cc);
+    if (i === 0 && process.env.CC) {
+      const why = m !== null
+        ? "clang " + m[2] + ", and bend needs clang " + (gpu ? "19 (Apple clang 17)" : "14")
+        : got.status === 0 && out ? "not a clang" : "not runnable";
+      throw "Error: bend uses the compiler $CC names, and $CC (\"" + cc
+        + "\") is " + why + "; unset $CC to build with the best clang on the path";
+    }
   }
   throw "Error: bend needs clang " + (gpu ? "19 (Apple clang 17)" : "14")
     + " or newer to build " + (gpu ? "a GPU program" : "binaries") + " (found "
