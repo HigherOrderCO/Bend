@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Output.input_links BEND_CID_Output_input_links
+// bend-ids end
 function output_input_links() {
   const fs = require("node:fs");
   const os = require("node:os");
@@ -11,7 +14,7 @@ function output_input_links() {
       + '  import "./effect.js"\n  import "./effect.c"\n'
       + 'def main() -> U32:\n  Lib.value()\n'],
     ["lib.bend", "import Base\ndef value() -> U32:\n  42\n"],
-    ["effect.js", "io_eff(CID(Probe.value), () => 42);\n"],
+    ["effect.js", "// bend-ids 1\n// CID :Probe.value BEND_CID_Probe_value\n// bend-ids end\nio_eff(BEND_CID_Probe_value, () => 42);\n"],
     ["effect.c", "// Foreign input.\n"],
   ].map(([name, text]) => [path.join(dir, name), text]));
   const main = path.join(dir, "main.bend");
@@ -60,4 +63,4 @@ function output_input_links() {
   }
 }
 
-io_eff(CID(Output.input_links), output_input_links);
+io_eff(BEND_CID_Output_input_links, output_input_links);

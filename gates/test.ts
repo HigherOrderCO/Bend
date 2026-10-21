@@ -202,8 +202,35 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
 // State
 // =====
 
-// The comptime twins must produce the same C after private globals are
-// named by their numeric ids. Only tmpl checks a List.map specialization.
+// Preserve identifier equality, not allocation counters: each private name
+// gets one distinct replacement for all its occurrences. Numeric CID/FID
+// declarations keep their values. Only declared inline helpers and compiler
+// locals get declaration ordinals. Strings, chars and comments stay exact.
+function comptime_c(c: string): string {
+  const names = new Map<string, string>();
+  const ids = new Set<string>();
+  let local = 0, helper = 0;
+  return c.replace(/\/\/(?:\\\r?\n|[^\r\n])*|\/\*[\s\S]*?\*\/|"(?:\\[\s\S]|[^"\\])*"|'(?:\\[\s\S]|[^'\\])*'|[$\p{ID_Start}_][$\p{ID_Continue}_]*/gu, (k, at) => {
+    if (!names.has(k) && /^(?:CID_)?b0_/.test(k)) {
+      const before = c.slice(c.lastIndexOf("\n", at - 1) + 1, at);
+      const after = c.slice(at + k.length, c.indexOf("\n", at) < 0 ? c.length : c.indexOf("\n", at));
+      const id = /^(CID_)?b0_g\d+$/.test(k) && before === "#define " && /^ (\d+)$/.exec(after);
+      if (id) {
+        const value = (k.startsWith("CID_") ? "@CID_" : "@FID_") + id[1];
+        if (ids.has(value)) throw new Error("duplicate numeric private ids");
+        ids.add(value);
+        names.set(k, value);
+      } else if (/^b0_n(?:0|[1-9]\d*)v[A-Za-z0-9_]*$/.test(k)
+        && /^ +(?:Term|u32|u64) $/.test(before) && /^(?: =|\[)/.test(after)) {
+        names.set(k, "@LOCAL_" + local++);
+      } else if (/^b0_g\d+$/.test(k) && before === "INLINE Term " && after.startsWith("(")) {
+        names.set(k, "@INLINE_" + helper++);
+      }
+    }
+    return names.get(k) ?? k;
+  });
+}
+
 async function comptime_run(): Promise<Fail[]> {
   const fail = (probe: string, want: string, got: string): Fail[] =>
     [{ name: "comptime_tmpl", probe, want, got }];
@@ -228,11 +255,7 @@ async function comptime_run(): Promise<Fail[]> {
   if (maps[0] || !maps[1]) {
     return fail("only tmpl checks a List.map instance", "false true", maps.join(" "));
   }
-  const [hand, tmpl] = twins.map(({ c }) => {
-    const ids = new Map([...c.matchAll(/^#define ((CID_)?b0_g\d+) (\d+)$/gm)]
-      .map((m) => [m[1], (m[2] ? "CID_" : "FID_") + m[3]]));
-    return c.replace(/\b(?:CID_b0_g\d+|b0_g\d+)\b/g, (k) => ids.get(k) ?? k).split("\n");
-  });
+  const [hand, tmpl] = twins.map(({ c }) => comptime_c(c).split("\n"));
   for (let i = 0; i < hand.length || i < tmpl.length; ++i) {
     if (hand[i] !== tmpl[i]) {
       return fail("C matches hand at line " + String(i + 1),

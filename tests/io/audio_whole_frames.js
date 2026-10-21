@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :pause BEND_CID_pause
+// bend-ids end
 // Pause only this silent device, leaving the process clock untouched.
 function audio_pause(audio) {
   if (!Object.hasOwn(audio, "rate")) {
@@ -7,4 +10,4 @@ function audio_pause(audio) {
   return audio;
 }
 
-io_eff(CID(pause), audio_pause);
+io_eff(BEND_CID_pause, audio_pause);

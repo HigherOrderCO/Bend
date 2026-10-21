@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Stream.write_zero BEND_CID_Stream_write_zero
+// bend-ids end
 function stream_write_zero() {
   const child = require("node:child_process");
   for (const fd of [1, 2]) {
@@ -19,4 +22,4 @@ io_out(${fd}, Buffer.from("x"));
   return 0;
 }
 
-io_eff(CID(Stream.write_zero), stream_write_zero);
+io_eff(BEND_CID_Stream_write_zero, stream_write_zero);

@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :HTML.script_types BEND_CID_HTML_script_types
+// bend-ids end
 function html_script_types() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -44,4 +47,4 @@ function html_script_types() {
   }
 }
 
-io_eff(CID(HTML.script_types), html_script_types);
+io_eff(BEND_CID_HTML_script_types, html_script_types);

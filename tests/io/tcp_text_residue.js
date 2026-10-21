@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Host.small_send BEND_CID_Host_small_send
+// bend-ids end
 // Keep the real non-blocking send partial before the reader starts.
 function small_send(socket) {
   const sys = io_sys();
@@ -9,4 +12,4 @@ function small_send(socket) {
   return socket;
 }
 
-io_eff(CID(Host.small_send), small_send);
+io_eff(BEND_CID_Host_small_send, small_send);
