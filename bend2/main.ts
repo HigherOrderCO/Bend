@@ -320,6 +320,8 @@ async function cli_file(args: string[]): Promise<void> {
         || [...ins].some((input) => same_file(at, input))))) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
+    }
+    for (const out of outs) {
       cli_emit(book, out);
     }
   } catch (e) {
