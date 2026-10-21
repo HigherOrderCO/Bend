@@ -192,6 +192,15 @@ def IO.args() -> IO(List<String>):
   import "./effs/args.c"
   import "./effs/args.js"
 
+# IO.args as the OS hands it over: each entry's bytes (0..255), one List
+# cell each, with no UTF-8 decoding, so an argument that isn't UTF-8 (a
+# Latin-1 file name) keeps every byte, and File.open_bytes opens it. The
+# JS lanes get the arguments already decoded by the host: there, a byte
+# that isn't UTF-8 arrives as U+FFFD's UTF-8, EF BF BD.
+def IO.args_bytes() -> IO(List<List<&2, U32>>):
+  import "./effs/args.c"
+  import "./effs/args.js"
+
 def Process.run(program: String, args: List<String>, input: String,
   max_output: U32, timeout_ms: U32) ->
   IO(Result<&1, &1, U32 & String, U32 & (String & String)>):
@@ -291,6 +300,14 @@ def IO.within(-A: Type, ms: U32, act: IO(A)) -> IO(Maybe<&1, A>):
   IO.bind(Chan(Maybe<&1, A>), Maybe<&1, A>, both, c => IO.join(Maybe<&1, A>, c))
 
 def File.open(path: String, mode: String) ->
+  IO(Result<&1, &1, U32 & String, File>):
+  import "./effs/file_open.c"
+  import "./effs/file_open.js"
+
+# The path as its bytes (0..255), with no UTF-8 encoding, so a name that
+# isn't UTF-8, as IO.args_bytes gives it, opens. A value past 255 fails
+# with EINVAL, and a 0 with EILSEQ, as a NUL in File.open's path does.
+def File.open_bytes(path: List<&2, U32>, mode: String) ->
   IO(Result<&1, &1, U32 & String, File>):
   import "./effs/file_open.c"
   import "./effs/file_open.js"

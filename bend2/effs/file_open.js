@@ -1,8 +1,11 @@
 // File
 // ====
 
-function file_open(path, mode) {
-  const name = io_bytes(path);
+// name is the path's bytes, or null if a value is past 255.
+function file_open_with(name, mode) {
+  if (name === null) {
+    return io_fail(22);
+  }
   if (name.includes(0)) {
     return io_fail(process.platform === "darwin" ? 92 : 84);
   }
@@ -18,4 +21,13 @@ function file_open(path, mode) {
   }
 }
 
+function file_open(path, mode) {
+  return file_open_with(io_bytes(path), mode);
+}
+
+function file_open_bytes(path, mode) {
+  return file_open_with(io_unlist(path), mode);
+}
+
 io_eff(CID(File.open), file_open);
+io_eff(CID(File.open_bytes), file_open_bytes);
