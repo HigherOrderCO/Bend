@@ -307,15 +307,16 @@ cannot. _Take_ consumes a value at a match: read the fields, free the
 node. _Keep_ gives a value a second owner and is emitted exactly at a
 binder's second use: the first keep mints a _redirect_, one word
 holding the node's address and a count, and turns the local into a
-pointer at it; the count lives there, never on the node, so an
-unshared value carries no count anywhere. _Drop_ releases an owner: a
-packed term costs nothing, a counted pointer decrements and only the
-last one collects, a sole owner collects at once. Take respects
+pointer at it; the count lives there, never on the node. _Drop_
+releases an owner: a packed term costs nothing, a counted pointer
+decrements and only the last one collects, a sole owner collects at
+once. Take respects
 sharing: at count one it collapses the redirect and owns the node;
 above one it copies the fields out and releases its pointer. Every
 decrement is a release and whoever sees zero acquires first, so a
-field read never races a free. Only hot types pay any of this, and
-they seal every stored field with a count at build time.
+field read never races a free. Only hot types pay any of this, but
+they pay it on every node, shared or not: each stored field is sealed
+with a count at build time.
 
 Drop is the runtime's only collector: an iterative walk that threads
 its worklist through the nodes being freed, so it allocates nothing
@@ -604,9 +605,9 @@ collector-free functional memory; Rust @matsakis2014 made ownership
 with static borrows mainstream; Lean @ullrich2019 and Perceus
 @reinking2021 count precisely and reuse in place. Bend differs in
 where counts live and when they exist: contraction exists only at
-`Data`, so counts are minted only where a whole-program analysis finds
-sharing, in a redirect word beside the node, and the unshared majority
-of a program compiles to moves, borrows and frees with no count
+`Data`, so counts are minted only for the types a whole-program
+analysis finds shared, in a redirect word beside the node, and the
+rest of a program compiles to moves, borrows and frees with no count
 traffic.
 
 = Limitations <sec:limits>
