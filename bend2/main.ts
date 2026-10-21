@@ -316,9 +316,12 @@ async function cli_file(args: string[]): Promise<void> {
       t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
     for (const out of outs) {
       const at = path_real(out);
-      if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
+      if (ins.has(at) || (fs.existsSync(at) && (fs.statSync(at).isDirectory()
+        || [...ins].some((input) => same_file(at, input))))) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
+    }
+    for (const out of outs) {
       cli_emit(book, out);
     }
   } catch (e) {
