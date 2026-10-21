@@ -1012,21 +1012,28 @@ def Term.qge (ck : Book) (cl : Bool) : Nat → Term → Term → Bool × Nat
     | g, h =>
       if g == Lab "Q2" || h == Lab "Q0" || h == Lab "Q1" then (true, m) else Term.conv ck cl (min m n) g h
 
+@[inline] def Term.sameRef (a b : Term) : Bool :=
+  match a with | Ref _ => a == b | _ => false
+
 -- U fits T: they convert, or both are kinds and U's quantity is at least
 -- T's, or U is an enum with fewer labels, or both are ∀s at one quantity,
 -- T's domain fitting U's and U's codomain T's; and the fuel left
 def Term.fits (ck : Book) (cl : Bool) : Nat → Term → Term → Bool × Nat
   | 0, _, _ => (false, 0)
   | n + 1, U, T =>
-    let (U, m) := Term.wnf ck cl n U []
-    let (T, m) := Term.wnf ck cl (min m n) T []
-    match U, T with
-    | Typ g, Typ h => Term.qge ck cl (min m n) g h
-    | Enu ks, Enu js => (ks.all js.contains, m)
-    | All q A B, All p C D =>
-      let r := if q == p then Term.fits ck cl (min m n) C A else (false, m)
-      if r.1 then Term.fits ck false (min r.2 n) B D else r
-    | U, T => Term.conv ck cl (min m n) U T
+    -- A shared type name fits without unfolding its recursive function body.
+    if Term.sameRef U T then
+      (true, n)
+    else
+      let (U, m) := Term.wnf ck cl n U []
+      let (T, m) := Term.wnf ck cl (min m n) T []
+      match U, T with
+      | Typ g, Typ h => Term.qge ck cl (min m n) g h
+      | Enu ks, Enu js => (ks.all js.contains, m)
+      | All q A B, All p C D =>
+        let r := if q == p then Term.fits ck cl (min m n) C A else (false, m)
+        if r.1 then Term.fits ck false (min r.2 n) B D else r
+      | U, T => Term.conv ck cl (min m n) U T
 
 -- Checker
 -- =======
@@ -2259,16 +2266,21 @@ theorem qge_sound (hb : Sees ck bk) : (qge ck cl n g h).1 = true →
 theorem fits_sound (hb : Sees ck bk) (h : (fits ck cl n U T).1 = true) : Fits bk U T := by
   induction n using Nat.strongRecOn generalizing cl U T; rename_i n ih
   unfold fits at h; split at h; simp at h; rename_i n
-  have L {a} : min a n < n + 1 := by omega
-  split at h; rename_i e1; split at h; rename_i e2
-  refine .trans (.conv ⟨_, wnf_nil hb e1, .refl⟩) (.trans ?_ (.conv ⟨_, .refl, wnf_nil hb e2⟩))
   split at h
-  · exact .typ (qge_sound hb h)
-  · exact .enu fun _ m => by simpa using List.all_eq_true.1 h _ m
-  · dsimp only at h; split at h
-    · rename_i e; cases beq_iff_eq.1 e; split at h; exact .all (ih _ L ‹_›) (ih _ L h); simp_all
-    · simp at h
-  · exact .conv (conv_sound hb h)
+  · rename_i e
+    have same : U = T := by
+      cases U <;> simp_all only [Term.sameRef, beq_iff_eq, Bool.false_eq_true]
+    subst T; exact .conv crefl
+  · have L {a} : min a n < n + 1 := by omega
+    split at h; rename_i e1; split at h; rename_i e2
+    refine .trans (.conv ⟨_, wnf_nil hb e1, .refl⟩) (.trans ?_ (.conv ⟨_, .refl, wnf_nil hb e2⟩))
+    split at h
+    · exact .typ (qge_sound hb h)
+    · exact .enu fun _ m => by simpa using List.all_eq_true.1 h _ m
+    · dsimp only at h; split at h
+      · rename_i e; cases beq_iff_eq.1 e; split at h; exact .all (ih _ L ‹_›) (ih _ L h); simp_all
+      · simp at h
+    · exact .conv (conv_sound hb h)
 
 -- a substitution from Γ into Δ that keeps types
 def SubstOk (bk : Book) (Δ : List Term) (σ : Subst) (Γ : List Term) : Prop :=
