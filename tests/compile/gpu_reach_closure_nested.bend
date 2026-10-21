@@ -1,6 +1,6 @@
 # a bang over a nested datatype: each link doubles the type its next link
-# holds. A type argument walked once is not walked again, so the walk
-# ends at once, not after 2^1000 pairs
+# holds. The datatype has no value argument, so the walk opens it once
+# and ends at once, not after 2^1000 pairs
 import Base
 
 type P<A: Type, B: Type> is Type:
