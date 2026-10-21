@@ -2259,6 +2259,13 @@ export function parse_term_do_stmt(p: Parse, m: Name, ts: LTerm[], col: number):
   const A     = typed ? parse_term(p, 1) : step ? parse_var(p, "Unit", t.s) : t;
   parse_skip(p);
   const asg = typed && !parse_at(p, "==") && parse_take(p, "=");
+  // A lowercase name followed by `<-` or `=` is a bind or a let that lost its
+  // type: read as the exec form, the name would be the type, and the error
+  // would be about that instead.
+  if (!typed && t.$ === "Var" && /^[a-z]/.test(t.k) && (parse_at(p, "<-") || (parse_at(p, "=") && !parse_at(p, "==")))) {
+    const eol = p.str.indexOf("\n", p.pos);
+    parse_fail(p, "a typed bind (x : A <- m) or let (x : A = v)", beg, eol === -1 ? p.str.length : eol);
+  }
   if (typed && !asg) {
     parse_eat(p, "<-");
   } else if (!typed && !step && !parse_take(p, "<-")) {
