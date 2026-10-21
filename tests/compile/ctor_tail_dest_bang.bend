@@ -1,7 +1,7 @@
 # Constructor tails under !, on each lane: chain fills one destination all
-# the way down, and each of lfork's last kids pushes its Dst~put frame above
-# the nested left kids' frames. The fork's join still builds its node after
-# both kids.
+# the way down; lfork builds each node before its kids, its left kid fills
+# it from a nested frame and its right kid last. build's ! kids still meet
+# at a join, which builds their node after both.
 import Base
 
 type Tree is Data:

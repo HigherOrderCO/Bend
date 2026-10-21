@@ -1,8 +1,9 @@
-# A constructor tail that boxes its last call's result once is built before
-# that call, which fills the field. mid fills a box between word fields;
-# even and odd pass one destination around their cycle; map rebuilds each
-# cell in place; right fills the last field of a fork, three of them;
-# dup holds its result twice, so it builds after the call as before.
+# A constructor tail that boxes a call's result once is built before that
+# call, which fills the field. mid fills a box between word fields; even
+# and odd pass one destination around their cycle; map rebuilds each cell
+# in place; right builds a three-way fork's node before its calls, which
+# fill it in turn; dup holds its result twice, so it builds after the call
+# as before.
 import Base
 
 type Mid is Data:

@@ -34,6 +34,7 @@ type Seg = {
   refs: Set<string>;
   spin: boolean;
   fork: boolean;
+  dst?: boolean;
 };
 
 type Spine = {
@@ -1622,8 +1623,8 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
 function node_fill(sc: Scope, k: string, alloc: string,
   exprs: string[], shr = false): string {
   const nd = name_local(sc, k);
-  file_push(sc, `u64 ${nd} = ${alloc};`, ...exprs.map((w, j) =>
-    `e.mem[${nd} + ${j}] = ${shr ? `rfc_seal(e, ${w})` : w};`));
+  file_push(sc, `u64 ${nd} = ${alloc};`, ...exprs.flatMap((w, j) => w
+    ? [`e.mem[${nd} + ${j}] = ${shr ? `rfc_seal(e, ${w})` : w};`] : []));
   return nd;
 }
 
@@ -2568,12 +2569,20 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const calls = x.v.map(term_spine);
   const fork = calls.length > 1;
   const name = seg_name(sc, "j");
+  const holes = calls.map((c, i) => ctr_hole(sc, c, o.b, o.ps[i]));
+  const hole = fork ? -1 : holes[0];
+  const tree = fork && !holes.includes(-1)
+    && ![...sc.uses.keys()].some((p) => rest_use([o.b], p) > 0);
+  const spares = hole >= 0 ? sc.spares.splice(0) : [];
   let hold: Probe[] = [];
   if (fork) {
-    spare_flush(sc);
+    if (!tree) {
+      spare_flush(sc);
+    }
     sc.seg.fork = true;
-    const pl = { ...sc, uses: new Map(sc.uses) };
+    const pl = { ...sc, uses: new Map(sc.uses), spares: [...sc.spares] };
     block(pl, "if (!seq) {", () => {
+      spare_flush(pl);
       const margs = calls.map((c, j) => emit_args({ ...pl,
         rest: [...x.v.filter((_, i) => i !== j), o.b] }, c, false, true));
       const live = [...pl.uses].filter(([p, b]) =>
@@ -2598,24 +2607,31 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   }
   const pos = new Map<Probe, number>();
   let depth = 0;
+  let pnd = 0;
+  const nd = tree ? emit_dest(sc, x, holes.at(-1)!) : "";
   calls.forEach((c, i) => {
     const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
     const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
     const kn = seg_name(sc, "k");
     const last = i === calls.length - 1;
-    const hole = last ? ctr_hole(sc, c, o.b, o.ps[i]) : -1;
-    const spares = hole < 0 ? [] : sc.spares.splice(0);
     spare_flush(sc);
     const ws = vs.flatMap(([p, b]) =>
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
     const kf = seg_fid(kn);
+    const to = !tree || last ? [] : i > 0
+      ? [`STK(${pnd - depth}) + ${holes[i]}`] : [nd, `${nd} + ${holes[0]}`];
+    pnd = i > 0 ? pnd : depth;
+    depth += to.length;
     emit_chain(sc, [["seq", () => {
       if (hole >= 0) {
-        return emit_dest({ ...sc, uses: new Map(sc.uses), spares:
-          spares.slice() }, o.b, o.ps[i], ty_ann(x.v[i])!, hole,
-        depth - ws.length);
+        return void emit_dest({ ...sc, uses: new Map(sc.uses), spares:
+          spares.slice() }, x, hole);
       }
-      const fr = [...ws, seg_ref(sc, kf)];
+      if (tree && last) {
+        bind_dead({ ...sc, uses: new Map(sc.uses) }, []);
+        return file_push(sc, `WL_POPN(${depth});`);
+      }
+      const fr = [...ws, ...to, seg_ref(sc, kf)];
       file_push(sc, `WL_ROOM(${fr.length});`,
         ...fr.map((w, j) => `STK(${j}) = ${w};`), `WL_PUSHN(${fr.length});`);
     }], ...fork ? [] : [["", () => {
@@ -2632,21 +2648,32 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
     const rs = val_new(ret.ks.map(() => name_local(sc, o.ps[i].k)), ret);
     sc = seg_open(sc, kn, sc.seg.ret, { pop: last ? depth : 0, at }, held, rs,
       rest);
-    bind_uses(sc, o.ps[i], rs, rest, ty_ann(x.v[i])!);
+    if (to.length > 0) {
+      sc.seg.dst = true;
+      file_push(sc, `e.mem[STK(-1)] = ${rs.ws[0]};`);
+    } else if (!tree) {
+      bind_uses(sc, o.ps[i], rs, rest, ty_ann(x.v[i])!);
+    }
   });
   if (fork) {
-    const live = [...sc.uses];
-    emit_jump(sc, live.flatMap(([, b]) => b.val.ws), name);
-    sc = seg_open(sc, name, sc.seg.ret, null, live, val_new([], lay_pack([])),
-      [o.b]);
+    // a tree's last k is dead; its join takes every result, in order
+    if (tree) {
+      o.ps.forEach((p, i) => bind_uses(sc, p, val_new([p.k], BOX), [o.b],
+        ty_ann(x.v[i])!));
+    } else {
+      emit_jump(sc, [...sc.uses].flatMap(([, b]) => b.val.ws), name);
+    }
+    sc = seg_open(sc, name, sc.seg.ret, null, [...sc.uses],
+      val_new([], lay_pack([])), [o.b]);
   }
   emit_body(sc, o.b, null, ers, [], null);
 }
 
-// A constructor tail boxing its last call's result once is built first, and
-// the call fills that field (its word, or -1). The root goes to the stack's
-// destination, else under a Dst~put frame [root, field]; a fork pops its
-// frames first.
+// A constructor tail boxing a call's result once is built before the call,
+// which fills that field (its word, or -1). The root goes to the stack's
+// destination, else under a Dst~put frame [root, field]. A fork of only such
+// fields builds before its first call, and an earlier call's frame holds
+// [node, field]: a dst segment, so WL_DEST fills it like a Dst~put.
 function ctr_hole(sc: Scope, c: Spine, b: HTerm, p: Probe): number {
   const x = term_strip(b);
   if (x.$ !== "Ctr" || FL.hot.has(x.k) || rest_use([b], p) !== 1
@@ -2661,13 +2688,17 @@ function ctr_hole(sc: Scope, c: Spine, b: HTerm, p: Probe): number {
     : ls.slice(0, j).flatMap((l) => l.ks).length;
 }
 
-function emit_dest(sc: Scope, b: HTerm, p: Probe, A: HTerm, at: number,
-  pop: number): void {
-  bind_uses(sc, p, val_new(["0"], BOX), [b], A);
+function emit_dest(sc: Scope, x: Of<"Let">, at: number): string {
+  const { ps, b } = term_open(x);
+  ps.forEach((p, i) => bind_uses(sc, p, val_new([""], BOX), [b],
+    ty_ann(x.v[i])!));
   const [r] = val_own(sc, emit_expr(sc, b, null, BOX));
-  bind_dead(sc, []);
+  if (ps.length === 1) {
+    bind_dead(sc, []);
+  }
   spare_flush(sc);
-  file_push(sc, `WL_POPN(${pop}); WL_DEST(${r}, ${at});`);
+  file_push(sc, `WL_DEST(${r}, ${at});`);
+  return `term_loc(${r})`;
 }
 
 function emit_row(sc: Scope, t: HTerm, ty: Ty): string | null {
@@ -2890,9 +2921,9 @@ export function compile_book(book: Bend.Book): string {
       JSON.stringify(Bend.name_key(n))))};`,
     "#endif"];
   const arg = val_new([""], W64);
-  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
-    seg_new("Dst~put", BOX, [arg]),
-    seg_new(CLO_APPLY, BOX, [arg, arg])];
+  const entries = [...FL.segs.filter((s) => !s.dst), seg_new(IO_EMIT, BOX,
+    [arg]), seg_new(CLO_APPLY, BOX, [arg, arg]), seg_new("Dst~put", BOX, [arg]),
+  ...FL.segs.filter((s) => s.dst)];
   const cids = new Map<Name, number[]>();
   const cid = (k: Name, n: number, d = 0) =>
     cids.set(k, [n > WIDE ? 240 + Math.log2(n) : n, Number(FL.hot.has(k)), d]);
@@ -3416,7 +3447,7 @@ ${heads("cuda nvrtc sys/stat")}
     return 0; \
   }
 #define WL_DEST(R, J) \
-  if (STK(-1) == FID(Dst~put)) { \
+  if ((u32)STK(-1) - FID(Dst~put) < FID_EXIT - FID(Dst~put)) { \
     e.mem[STK(-2)] = (R); \
   } else { \
     WL_ROOM(3) \
