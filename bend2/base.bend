@@ -194,9 +194,9 @@ def IO.args() -> IO(List<String>):
 
 # IO.args as the OS hands it over: each entry's bytes (0..255), one List
 # cell each, with no UTF-8 decoding, so an argument that isn't UTF-8 (a
-# Latin-1 file name) keeps every byte, and File.open_bytes opens it. Only
-# node on macOS hides the bytes: there, a byte that isn't UTF-8 arrives as
-# U+FFFD's UTF-8, EF BF BD.
+# Latin-1 file name) keeps every byte, and File.open_bytes opens it. The
+# JS lanes get the arguments already decoded by the host: there, a byte
+# that isn't UTF-8 arrives as U+FFFD's UTF-8, EF BF BD.
 def IO.args_bytes() -> IO(List<List<&2, U32>>):
   import "./effs/args.c"
   import "./effs/args.js"

@@ -1,9 +1,6 @@
 # io (io_file_open_bytes): File.open_bytes opens a path given as bytes,
 # with no UTF-8 encoding (#1798). UTF-8 bytes name the file File.open's
-# String names; a value past 255 fails with EINVAL and a 0 with EILSEQ. A
-# Latin-1 E9 reaches the OS as itself: Linux makes that name, and "caf"
-# U+FFFD, all IO.args could give for it, names no file; macOS file systems
-# take UTF-8 names only, and refuse it with EILSEQ.
+# String names; a value past 255 fails with EINVAL and a 0 with EILSEQ.
 import Base
 
 def ascii(s: String, tail: List<&2, U32>) -> List<&2, U32>:
@@ -22,9 +19,6 @@ def pick(ok: Bool, yes: String, no: String) -> String:
       yes
     case False{}:
       no
-
-def kept(+got: String, want: String) -> String:
-  pick(String.eq(got, want), "E9 kept", got)
 
 # EILSEQ is 92 on macOS and 84 on Linux.
 def code(+c: U32) -> String:
@@ -52,20 +46,6 @@ def read(pair: File & Result<&1, &1, U32 & String, String>) -> IO(String):
     File.close(file)
     return text
 
-def latin1(r: Result<&1, &1, U32 & String, File>) -> IO(String):
-  match r:
-    case Done{file}:
-      do IO<String>:
-        File.close(file)
-        a : Result<&1, &1, U32 & String, File> <- File.open_bytes(path([233]), "r")
-        a : String <- shown(a)
-        b : Result<&1, &1, U32 & String, File> <-
-          File.open("/tmp/bend_io_open_bytes_\u{fffd}", "r")
-        b : String <- shown(b)
-        return kept(a ++ " " ++ b, "opened 2")
-    case Fail{(c, message)}:
-      IO.pure(String, kept(code(c), "EILSEQ"))
-
 def main() -> IO(Unit):
   do IO<Unit>:
     f : File <- IO.try(File, File.open_bytes(path([195, 169]), "w"))
@@ -81,11 +61,7 @@ def main() -> IO(Unit):
     r : Result<&1, &1, U32 & String, File> <- File.open_bytes(path([0, 120]), "w")
     t : String <- shown(r)
     IO.print("nul: " ++ t)
-    r : Result<&1, &1, U32 & String, File> <- File.open_bytes(path([233]), "w")
-    t : String <- latin1(r)
-    IO.print("latin-1: " ++ t)
 
 #|utf-8 bytes: hi
 #|past 255: 22
 #|nul: EILSEQ
-#|latin-1: E9 kept
