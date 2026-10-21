@@ -864,12 +864,17 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words.
-function ty_holds(A: HTerm | null,
-  p: Name | ((t: HTerm | null) => boolean), seen = new Set<Name>()): boolean {
+// but for the words; per instance, but with its value arguments unknown
+// once it re-enters its own family with one of them grown (a field stuck
+// on them holds). on keeps each family's shortest value keys on the path;
+// an answer is kept per file (p by its text: it captures nothing) if it
+// holds or met only instances opened under it: a new walk agrees.
+function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
+  w = { seen: new Map<string, number>(), on: new Map<Name, number[]>(),
+    low: Infinity }): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen);
+    return ty_holds(t.f(DUMMY), p, w);
   }
   if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
@@ -879,16 +884,36 @@ function ty_holds(A: HTerm | null,
   }
   const tld = FL.book.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
-    && ty_holds(x, p, seen))) {
+  const vs = t.x.map((x, i) => ty_value(ks[i]?.[2] ?? null));
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, w))) {
     return true;
   }
-  if (tld?.$ !== "ADT" || seen.has(t.k)) {
+  const xs = t.x.map((x, i) => vs[i] ? Bend.term_key(Bend.term_lower(x)) : "");
+  const ys = w.on.get(t.k);
+  const re = !!ys && xs.some((x, i) => x.length > ys[i]);
+  const key = t.k + (!re && xs);
+  const at = w.seen.get(key);
+  if (tld?.$ !== "ADT" || at !== undefined) {
+    w.low = Math.min(w.low, at ?? Infinity);
     return false;
   }
-  seen.add(t.k);
-  return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen)));
+  const id = JSON.stringify([String(p), key, ...w.on]);
+  if (FL.hold.has(id)) {
+    return FL.hold.get(id)!;
+  }
+  const [n, low] = [w.seen.size, w.low];
+  w.seen.set(key, n);
+  w.low = Infinity;
+  const us = t.x.map((x, i) => re && vs[i] ? DUMMY : x);
+  w.on.set(t.k, xs.map((x, i) => Math.min(x.length, ys?.[i] ?? Infinity)));
+  const r = tld.c.some((c) => ctr_doms(c, us).some((f) =>
+    ty_holds(f, p, w)));
+  ys ? w.on.set(t.k, ys) : w.on.delete(t.k);
+  if (r || w.low >= n) {
+    FL.hold.set(id, r);
+  }
+  w.low = Math.min(low, w.low);
+  return r;
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
@@ -1413,6 +1438,7 @@ function file_new(book: Bend.Book, js: boolean) {
     nodes: new Map<Name, Lay>(),
     lays: new Map<string, Lay>(),
     holds: new Map<string, Lay>(),
+    hold: new Map<string, boolean>(),
     lay_ids: new Map<Lay, number>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, Open>(),
