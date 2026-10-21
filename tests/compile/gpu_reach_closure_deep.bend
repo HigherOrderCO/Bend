@@ -1,5 +1,5 @@
 # a bang over a chain whose index grows with each link: the walk opens
-# each instance up to 8 calls deep, then the chain once by its name, and
+# the first instance, then the chain once with its index unknown, and
 # stops; the value is the plain call's
 import Base
 

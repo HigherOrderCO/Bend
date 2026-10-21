@@ -864,12 +864,14 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words; per instance till 8 calls deep or 64 seen.
+// but for the words; per instance, but with its value arguments unknown
+// once it re-enters its own family with one of them grown (a field stuck
+// on them holds).
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
-  seen = new Set(), d = 0): boolean {
+  seen = new Set(), on: [Name, string[]][] = []): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen, d);
+    return ty_holds(t.f(DUMMY), p, seen, on);
   }
   if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
     return true;
@@ -880,17 +882,20 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   const tld = FL.book.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
   const vs = t.x.map((x, i) => ty_value(ks[i]?.[2] ?? null));
-  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d + 1))) {
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, on))) {
     return true;
   }
-  const key = t.k + (d < 8 && seen.size < 64 && t.x.map((x, i) =>
-    vs[i] && Bend.term_key(Bend.term_lower(x))));
+  const xs = t.x.map((x, i) => vs[i] ? Bend.term_key(Bend.term_lower(x)) : "");
+  const re = on.some(([k, ys]) =>
+    k === t.k && ys.some((y, i) => xs[i].length > y.length));
+  const key = t.k + (!re && xs);
   if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
   seen.add(key);
-  return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen, d + 1)));
+  const us = t.x.map((x, i) => re && vs[i] ? DUMMY : x);
+  return tld.c.some((c) => ctr_doms(c, us).some((f) =>
+    ty_holds(f, p, seen, [...on, [t.k, xs]])));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
