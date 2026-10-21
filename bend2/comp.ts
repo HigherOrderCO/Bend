@@ -1407,8 +1407,11 @@ function file_new(book: Bend.Book, js: boolean) {
     names: new Map<number, string>(),
     facts: new Set<string>(),
     heat: new Set<string>(),
+    miss: new Map<string, Set<Unit>>(),
     when: new Map<string, (() => void)[]>(),
+    stale: new Set<Unit>(),
     units: new Map<string, Unit>(),
+    lazy: new Map<string, () => void>(),
     unit: null as Unit | null,
     tabs: new Map<string, number>(),
     lits: new Map<string, number>(),
@@ -1497,7 +1500,14 @@ function file_book(roots: Name[]): void {
 }
 
 function fact(kind: string, k = ""): boolean {
-  return FL.facts.has(kind + " " + k);
+  const key = kind + " " + k;
+  if (FL.facts.has(key)) {
+    return true;
+  }
+  if (FL.unit !== null) {
+    memo(FL.miss, key, () => new Set()).add(FL.unit);
+  }
+  return false;
 }
 
 function fact_add(kind: string, k = ""): boolean {
@@ -1506,6 +1516,8 @@ function fact_add(kind: string, k = ""): boolean {
     return false;
   }
   FL.facts.add(key);
+  FL.miss.get(key)?.forEach((u) => FL.stale.add(u));
+  FL.miss.delete(key);
   const then = FL.when.get(key) ?? [];
   FL.when.delete(key);
   then.forEach((f) => f());
@@ -1641,6 +1653,8 @@ function seg_text(lines: string[], tab: number): string[] {
 
 function seg_ref(sc: Scope, fid: string): string {
   sc.seg.refs.add(fid);
+  FL.lazy.get(fid)?.();
+  FL.lazy.delete(fid);
   return fid;
 }
 
@@ -1947,6 +1961,7 @@ function unit_new(name: string, emit: () => void): Unit {
   const u = { name, segs: [], n: 0, lent: new Set<string>(), lends: [],
     clos: new Set<string>(), emit };
   FL.units.set(name, u);
+  FL.stale.add(u);
   return u;
 }
 
@@ -1972,8 +1987,15 @@ function unit_order(): Unit[] {
   return out;
 }
 
+function unit_lazy(fid: string, name: string, emit: () => void): void {
+  if (!FL.units.has(name)) {
+    memo(FL.lazy, fid, () => () => unit_new(name, emit));
+  }
+}
+
 function unit_emit(u: Unit): void {
   const up = FL.unit;
+  FL.stale.delete(u);
   FL.folds.clear();
   Object.assign(u, { segs: [], n: 0, lent: new Set(), lends: [],
     clos: new Set() });
@@ -2365,7 +2387,7 @@ function emit_open(k: Name): [Scope, Val[]] {
 
 function emit_native(sc: Scope, k: Name): string {
   const name = name_id("spin_", k);
-  memo(FL.units, "spin " + k, (n) => unit_new(n, () => {
+  unit_lazy(name, "spin " + k, () => {
     const [sl, vals] = emit_open(k);
     const seg = Object.assign(sl.seg, { fid: name, native: true });
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
@@ -2380,7 +2402,7 @@ function emit_native(sc: Scope, k: Name): string {
       + (arr_q(kd) ? `, u64 q${i}` : "")).join("");
     FL.unit!.segs.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
       name}(Env e, THR Term* o${ps}) {`, ...body] });
-  }));
+  });
   return seg_ref(sc, name);
 }
 
@@ -2964,7 +2986,7 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
 function c_units(): Unit[] {
   for (const [k, tld] of [...done_defs().reverse(),
     ...done_defs(def_foreign)]) {
-    unit_new(k, () => {
+    const emit = () => {
       const [dl, vals] = emit_open(k);
       FL.unit!.segs.push(dl.seg);
       if (def_foreign(tld)) {
@@ -2972,12 +2994,22 @@ function c_units(): Unit[] {
       } else {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
-    });
+    };
+    if ((flat_of(k) || FL.sites.get(k) === 1) && k !== "main"
+      && !FL.bangs.has(k) && !FL.fids.has(k)) {
+      unit_lazy(seg_fid(k), k, emit);
+    } else {
+      unit_new(k, emit);
+    }
   }
-  let was;
-  do {
-    was = FL.facts.size;
-    FL.units.forEach(unit_emit);
+  while (FL.stale.size > 0) {
+    let made = -FL.units.size;
+    unit_order().forEach((u) => FL.stale.has(u) && unit_emit(u));
+    for (const u of FL.units.values()) {
+      if (made++ >= 0 && FL.stale.has(u)) {
+        unit_emit(u);
+      }
+    }
     const us = [...FL.units.values()];
     const lent = graph_close(new Set(us.flatMap((u) => [...u.lent])),
       us.flatMap((u) => u.lends.map(([at, r]) => [r, at])));
@@ -2985,7 +3017,7 @@ function c_units(): Unit[] {
       brw_of(k).forEach((b, i) => b && !lent.has(arg_key(k, i))
         && fact_add("own", arg_key(k, i)));
     }
-  } while (was !== FL.facts.size);
+  }
   return [...FL.units.values()];
 }
 
