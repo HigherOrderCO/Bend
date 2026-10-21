@@ -2,7 +2,7 @@
 // ==
 
 function io_write(text) {
-  io_out(1, io_bytes(text));
+  io_std(io_bytes(text));
   return { $: CID(Unit) };
 }
 
