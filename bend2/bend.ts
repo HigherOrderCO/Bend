@@ -3094,10 +3094,7 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     b = lit_step(b);
   }
   switch (a.$) {
-    // a neutral term is a head stuck on arguments: two are equal when their
-    // heads and arguments are, a head def by name. a def head short of its
-    // arguments makes a function, though: failing that, two convert when
-    // they agree on fresh arguments (eta, as for a lambda)
+    // a stuck term: same head and arguments, else eta if a def is short of them
     case "Var":
     case "Ref":
     case "App":
@@ -3106,37 +3103,44 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
       let g: HTerm = b;
       let i = 0;
       let j = 0;
-      while (f.$ === "App") {
-        f = f.f;
+      for (; f.$ === "App"; f = f.f) {
         i++;
       }
-      while (g.$ === "App") {
-        g = g.f;
+      for (; g.$ === "App"; g = g.f) {
         j++;
       }
-      let same = i === j && (f.$ === "Var" ? g.$ === "Var" && f.i === g.i
-        : f.$ === "Ref" ? g.$ === "Ref" && f.k === g.k
-        : f.$ === "Mat" ? g.$ === "Mat" && f.k === g.k
+      let same: boolean;
+      if (i !== j) {
+        same = false;
+      } else if (f.$ === "Var") {
+        same = g.$ === "Var" && f.i === g.i;
+      } else if (f.$ === "Ref") {
+        same = g.$ === "Ref" && f.k === g.k;
+      } else if (f.$ === "Mat") {
+        same = g.$ === "Mat" && f.k === g.k
           && compare_go("EQ", book, f.h, g.h, dep)
-          && compare_go("EQ", book, f.m, g.m, dep)
-        : compare_go("EQ", book, f, g, dep));
-      const n = Math.max(f.$ === "Ref" ? (book.tlds[f.k]?.n ?? 0) - i : 0,
-                         g.$ === "Ref" ? (book.tlds[g.k]?.n ?? 0) - j : 0);
-      f = a;
-      g = b;
-      while (same && f.$ === "App" && g.$ === "App") {
-        same = compare_go("EQ", book, f.x, g.x, dep);
-        f = f.f;
-        g = g.f;
+          && compare_go("EQ", book, f.m, g.m, dep);
+      } else {
+        same = compare_go("EQ", book, f, g, dep);
       }
-      if (same || n <= 0) {
-        return same;
+      for (let x: HTerm = a, y: HTerm = b; same && x.$ === "App" && y.$ === "App"; x = x.f, y = y.f) {
+        same = compare_go("EQ", book, x.x, y.x, dep);
+      }
+      if (same) {
+        return true;
+      }
+      let n = 0;
+      if (f.$ === "Ref") {
+        n = (book.tlds[f.k]?.n ?? 0) - i;
+      }
+      if (g.$ === "Ref") {
+        n = Math.max(n, (book.tlds[g.k]?.n ?? 0) - j);
       }
       for (let k = 0; k < n; k++) {
         a = App(a, Var("_", dep + k));
         b = App(b, Var("_", dep + k));
       }
-      return compare_go(mode, book, a, b, dep + n);
+      return n > 0 && compare_go(mode, book, a, b, dep + n);
     }
     case "Typ": {
       if (b.$ !== "Typ") {
