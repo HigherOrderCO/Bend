@@ -27,6 +27,18 @@ const pinned = [
     return [source, source];
   }),
   [
+    "import Base\n\ndef main() -> Array<U32>:\n  f : (Array<U32> -> Array<U32>) =\n    (a => a[0] <- 7\n          a[1] <- 8)\n  f([0 : U32 * 2n])\n",
+    "import Base\n\ndef main() -> Array<U32>:\n  f : (Array<U32> -> Array<U32>) =\n    (a => a[0] <- 7\n          a[1] <- 8)\n  f([0 : U32 * 2n])\n",
+  ],
+  [
+    "import Base\n\ndef apply(f: Array<U32> -> Array<U32>, a: Array<U32>) -> Array<U32>:\n  f(a)\n\ndef main() -> Array<U32>:\n  apply(a=>x : Result<&2,&2,U32,U32> = Done{1};a[0]<-7\n                                               a[1]<-8,\n                                        [0 : U32 * 2n])\n",
+    "import Base\n\ndef apply(f: Array<U32> -> Array<U32>, a: Array<U32>) -> Array<U32>:\n  f(a)\n\ndef main() -> Array<U32>:\n  apply(a => x : Result<&2, &2, U32, U32> = Done{1}; a[0] <- 7\n                                                     a[1] <- 8,\n    [0 : U32 * 2n])\n",
+  ],
+  [
+    "import Base\n\ndef main() -> Array<U32>:\n  f : (Array<U32> -> Array<U32>) = (a=>a[0]<-7;a[1]<-8\n                                               a[0]<-9)\n  f([0 : U32 * 2n])\n",
+    "import Base\n\ndef main() -> Array<U32>:\n  f : (Array<U32> -> Array<U32>) = (a => a[0] <- 7; a[1] <- 8\n                                                    a[0] <- 9)\n  f([0 : U32 * 2n])\n",
+  ],
+  [
     "import Base\ndef main() -> Array<U32>:\n    f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                        a[1] <- 8\n    f([0 : U32 * 2n])\n",
     "import Base\ndef main() -> Array<U32>:\n  f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                      a[1] <- 8\n  f([0 : U32 * 2n])\n",
   ],
@@ -280,6 +292,8 @@ test("leaves unterminated literals unchanged", () => {
 
 test("semicolon pins respect delimiters, literals, and comments", () => {
   for (const [source, expected] of [
+    ["def f() -> U32:\n    use(x=>x,\n                  3)\n", "def f() -> U32:\n  use(x => x,\n    3)\n"],
+    ["def f() -> U32:\n    (x=>x\n                  )\n", "def f() -> U32:\n  (x => x\n    )\n"],
     ["def f() -> U32:\n    (x:U32=1; x\n                  )\n", "def f() -> U32:\n  (x: U32 = 1; x\n    )\n"],
     ["def f() -> List<U32>:\n    [1, (x:U32=2; x),\n                  3]\n", "def f() -> List<U32>:\n  [1, (x: U32 = 2; x),\n    3]\n"],
     ['def f() -> String:\n    "a; b" # ; comment\n', 'def f() -> String:\n  "a; b"  # ; comment\n'],
