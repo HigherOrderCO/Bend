@@ -408,9 +408,8 @@ function cli_emit(book: Bend.Book, out: string): void {
 // cc_find is the first of $CC, clang and every clang-NN on PATH (newest
 // first) that is new enough: clang 14 for a CPU build, and for a GPU build
 // clang 19 (Apple clang 17, which ships LLVM 19), whose #embed
-// carries the device program. A $CC that does not run, is not clang or is
-// too old ends the build: the user asked for that compiler, so silently
-// building with plain clang would hide it from them.
+// carries the device program. A $CC that is not one of these is skipped with
+// a warning, which names the compiler bend builds with instead.
 function cc_find(gpu: boolean): string {
   function dir_list(dir: string): string[] {
     try {
@@ -423,25 +422,26 @@ function cc_find(gpu: boolean): string {
   const nums = [...new Set(dirs.flatMap(dir_list).filter((f) =>
     /^clang-\d+$/.test(f)))].sort((a, b) => Number(b.slice(6)) - Number(a.slice(6)));
   const olds: string[] = [];
-  const ccs  = [...(process.env.CC ? [process.env.CC] : []), "clang", ...nums];
-  for (const [i, cc] of ccs.entries()) {
+  const want = gpu ? "19 (Apple clang 17)" : "14";
+  const env  = process.env.CC;
+  const ccs  = [...(env ? [env] : []), "clang", ...nums];
+  for (const cc of ccs) {
     const [got, out] = Safe.run_read(cc, ["--version"]);
     const m   = /^(Apple )?(?:\w+ )?clang version (\d+)/m.exec(out);
     const need = gpu ? (m?.[1] === undefined ? 19 : 17) : 14;
     if (m !== null && Number(m[2]) >= need) {
+      if (env && cc !== env) {
+        process.stderr.write("warning: $CC is not a clang " + want + " or newer (found "
+          + olds[0] + (/\s/.test(env) ? "; $CC names one program, without flags" : "")
+          + "), so bend builds with " + cc + "\n");
+      }
       return cc;
     }
     olds.push(m !== null ? "clang " + m[2] + " as " + cc
-      : got.status === 0 && out ? cc + ", which is not clang" : "no " + cc);
-    if (i === 0 && process.env.CC) {
-      const why = m !== null
-        ? "clang " + m[2] + ", and bend needs clang " + (gpu ? "19 (Apple clang 17)" : "14")
-        : got.status === 0 && out ? "not a clang" : "not runnable";
-      throw "Error: bend uses the compiler $CC names, and $CC (\"" + cc
-        + "\") is " + why + "; unset $CC to build with the best clang on the path";
-    }
+      : got.error ? "no " + cc
+      : got.status === 0 && out ? cc + ", which is not clang" : cc + ", which fails --version");
   }
-  throw "Error: bend needs clang " + (gpu ? "19 (Apple clang 17)" : "14")
+  throw "Error: bend needs clang " + want
     + " or newer to build " + (gpu ? "a GPU program" : "binaries") + " (found "
     + olds.join(", ") + "); on Debian/Ubuntu: curl -fsSL"
     + " https://apt.llvm.org/llvm.sh | sudo bash -s 19; on macOS: xcode-select"
