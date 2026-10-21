@@ -1774,7 +1774,9 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
 
 function val_box(sc: Scope, v: Val): string {
   if (v.lay.arms === null) {
-    return val_own(sc, v)[0];
+    const w = val_own(sc, v)[0];
+    return v.lay.ks[0] === "box" || !sc.brwl.has(w) ? w
+      : emit_hold(sc, [w], "b")[0];
   }
   const arms = Object.keys(v.lay.arms);
   const build = (bl: Scope, k: Name) => ctr_build(bl, k, val_arm(v, k).flatMap(
