@@ -3059,6 +3059,27 @@ export function term_snf(book: Book, term: HTerm): HTerm {
 
 const RIGID: Book = book_nil();
 
+// how many arguments a call still lacks, 0 when its head is no def
+function call_gap(book: Book, t: HTerm): number {
+  let c = 0;
+  for (; t.$ === "App"; t = t.f) {
+    c++;
+  }
+  return t.$ === "Ref" ? Math.max((book.tlds[t.k]?.n ?? 0) - c, 0) : 0;
+}
+
+// a stuck call is canonical: its head def compares by name, then the
+// arguments; a head that is no def compares as usual
+function call_same(book: Book, a: HTerm, b: HTerm, dep: number): boolean {
+  if (a.$ === "App" && b.$ === "App") {
+    return call_same(book, a.f, b.f, dep) && compare_go("EQ", book, a.x, b.x, dep);
+  }
+  if (a.$ === "Ref" || b.$ === "Ref" || a.$ === "App" || b.$ === "App") {
+    return a.$ === "Ref" && b.$ === "Ref" && a.k === b.k;
+  }
+  return compare_go("EQ", book, a, b, dep);
+}
+
 // two copies of one term are equal: a conversion first compares both
 // sides with every def rigid (the empty book unfolds none), then as usual
 export function term_compare(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number = 0): boolean {
@@ -3087,6 +3108,16 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     const x: HTerm = Var("_", dep);
     return compare_go(mode, book, term_apply(a, x), term_apply(b, x), dep + 1);
   }
+  // a def short of its arity, bare or partly applied, is a function: two
+  // convert by name or when they agree on fresh arguments (eta)
+  const n = Math.max(call_gap(book, a), call_gap(book, b));
+  if (n > 0) {
+    let [f, g]: HTerm[] = [a, b];
+    for (let j = 0; j < n; j++) {
+      [f, g] = [App(f, Var("_", dep + j)), App(g, Var("_", dep + j))];
+    }
+    return call_same(book, a, b, dep) || compare_go(mode, book, f, g, dep + n);
+  }
   if (a.$ === "Lit" && b.$ === "Ctr") {
     a = lit_step(a);
   }
@@ -3097,18 +3128,8 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     case "Var": {
       return b.$ === "Var" && a.i === b.i;
     }
-    // a bare def is under-applied, so a function: two defs convert when
-    // they agree on fresh arguments (eta, as for a lambda)
     case "Ref": {
-      if (b.$ !== "Ref" || a.k === b.k) {
-        return b.$ === "Ref";
-      }
-      const n = Math.max(book.tlds[a.k]?.n ?? 0, book.tlds[b.k]?.n ?? 0);
-      let [f, g]: HTerm[] = [a, b];
-      for (let j = 0; j < n; j++) {
-        [f, g] = [App(f, Var("_", dep + j)), App(g, Var("_", dep + j))];
-      }
-      return n > 0 && compare_go(mode, book, f, g, dep + n);
+      return b.$ === "Ref" && a.k === b.k;
     }
     case "Typ": {
       if (b.$ !== "Typ") {
@@ -3153,14 +3174,8 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
           && compare_go(mode, book, b.A, a.A, dep)
           && compare_go(mode, book, a.B(x), b.B(x), dep + 1);
     }
-    // a stuck call is canonical: its head def compares by name, not by eta
     case "App": {
-      if (b.$ !== "App") {
-        return false;
-      }
-      const head = a.f.$ === "Ref" && b.f.$ === "Ref" ? a.f.k === b.f.k
-        : compare_go("EQ", book, a.f, b.f, dep);
-      return head && compare_go("EQ", book, a.x, b.x, dep);
+      return b.$ === "App" && call_same(book, a, b, dep);
     }
     case "ADT": {
       if (b.$ !== "ADT" || a.k !== b.k || a.x.length !== b.x.length) {
