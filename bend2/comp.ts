@@ -85,9 +85,11 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 
 // CLO_APPLY and IO_EMIT are the runtime's own segments (a ~ keeps any file
 // from declaring them). FOLD_FUEL caps the nodes unfolds add to a segment.
-// A spin of SPIN_FAR characters is a call on the device (DFAR). A node past
-// WIDE pads to its size class (240 + log2 in CID_T). An argument nested past
-// TPL_DEEP brackets goes to a local (clang allows 256).
+// A spin of SPIN_FAR characters is a call on the device (DFAR), and on the
+// host too if it loops over F32 (FAR): inlined, clang's SLP vectorizer packs
+// its state as the caller suits, not the loop. A node past WIDE pads to its
+// size class (240 + log2 in CID_T). An argument nested past TPL_DEEP
+// brackets goes to a local (clang allows 256).
 
 const CLO_APPLY = "Clo~apply";
 
@@ -2307,7 +2309,9 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[], f: Fun): string {
     ...seg_text(seg.lines, 2), "  break;", "  }",
     "  return 1;", "}"];
     const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
-    FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
+    const q = !far ? "INLINE" : seg.spin
+      && f.live.some(([, , A]) => ty_adt(A)?.k === "F32") ? "FAR" : "DFAR";
+    FL.spins.push({ ...seg, lines: [`${q} Term ${
       name}(Env e, THR Term* o${
       seg.ks.map((k, i) => `, ${lay_c(k)} r${i}${arr_q(k)
         ? `, u64 q${i}` : ""}`).join("")}) {`, ...body] });
