@@ -3094,17 +3094,49 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     b = lit_step(b);
   }
   switch (a.$) {
-    case "Var": {
-      if (b.$ === "Var" && a.i === b.i) {
-        return true;
+    // a neutral term is a head stuck on arguments: two are equal when their
+    // heads and arguments are, a head def by name. a def head short of its
+    // arguments makes a function, though: failing that, two convert when
+    // they agree on fresh arguments (eta, as for a lambda)
+    case "Var":
+    case "Ref":
+    case "App":
+    case "Mat": {
+      let f: HTerm = a;
+      let g: HTerm = b;
+      let i = 0;
+      let j = 0;
+      while (f.$ === "App") {
+        f = f.f;
+        i++;
       }
-      break;
-    }
-    case "Ref": {
-      if (b.$ === "Ref" && a.k === b.k) {
-        return true;
+      while (g.$ === "App") {
+        g = g.f;
+        j++;
       }
-      break;
+      let same = i === j && (f.$ === "Var" ? g.$ === "Var" && f.i === g.i
+        : f.$ === "Ref" ? g.$ === "Ref" && f.k === g.k
+        : f.$ === "Mat" ? g.$ === "Mat" && f.k === g.k
+          && compare_go("EQ", book, f.h, g.h, dep)
+          && compare_go("EQ", book, f.m, g.m, dep)
+        : compare_go("EQ", book, f, g, dep));
+      const n = Math.max(f.$ === "Ref" ? (book.tlds[f.k]?.n ?? 0) - i : 0,
+                         g.$ === "Ref" ? (book.tlds[g.k]?.n ?? 0) - j : 0);
+      f = a;
+      g = b;
+      while (same && f.$ === "App" && g.$ === "App") {
+        same = compare_go("EQ", book, f.x, g.x, dep);
+        f = f.f;
+        g = g.f;
+      }
+      if (same || n <= 0) {
+        return same;
+      }
+      for (let k = 0; k < n; k++) {
+        a = App(a, Var("_", dep + k));
+        b = App(b, Var("_", dep + k));
+      }
+      return compare_go(mode, book, a, b, dep + n);
     }
     case "Typ": {
       if (b.$ !== "Typ") {
@@ -3149,29 +3181,6 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
           && compare_go(mode, book, b.A, a.A, dep)
           && compare_go(mode, book, a.B(x), b.B(x), dep + 1);
     }
-    // a stuck call is canonical: its head def compares by name, not by eta
-    case "App": {
-      let f: HTerm = a;
-      let g: HTerm = b;
-      while (f.$ === "App" && g.$ === "App") {
-        f = f.f;
-        g = g.f;
-      }
-      if (f.$ !== "App" && g.$ !== "App"
-          && (f.$ === "Ref" || g.$ === "Ref" ? f.$ === "Ref" && g.$ === "Ref" && f.k === g.k
-            : compare_go("EQ", book, f, g, dep))) {
-        f = a;
-        g = b;
-        while (f.$ === "App" && g.$ === "App" && compare_go("EQ", book, f.x, g.x, dep)) {
-          f = f.f;
-          g = g.f;
-        }
-        if (f.$ !== "App") {
-          return true;
-        }
-      }
-      break;
-    }
     case "ADT": {
       if (b.$ !== "ADT" || a.k !== b.k || a.x.length !== b.x.length) {
         return false;
@@ -3188,14 +3197,6 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     }
     case "Lit": {
       return b.$ === "Lit" && a.k === b.k && a.v === b.v;
-    }
-    case "Mat": {
-      if (b.$ === "Mat" && a.k === b.k
-          && compare_go("EQ", book, a.h, b.h, dep)
-          && compare_go("EQ", book, a.m, b.m, dep)) {
-        return true;
-      }
-      break;
     }
     case "Eql": {
       return b.$ === "Eql"
@@ -3216,25 +3217,6 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
       return false;
     }
   }
-  // a def call short of its arguments is a function: when the forms above
-  // differ, two convert if they agree on fresh arguments (eta, as for a
-  // lambda). eta only adds equalities, so equal forms skip it
-  let f: HTerm = a;
-  let g: HTerm = b;
-  let i = 0;
-  let j = 0;
-  for (; f.$ === "App"; i++) {
-    f = f.f;
-  }
-  for (; g.$ === "App"; j++) {
-    g = g.f;
-  }
-  const n = Math.max(f.$ === "Ref" ? (book.tlds[f.k]?.n ?? 0) - i : 0,
-                     g.$ === "Ref" ? (book.tlds[g.k]?.n ?? 0) - j : 0);
-  for (let k = 0; k < n; k++) {
-    [a, b] = [App(a, Var("_", dep + k)), App(b, Var("_", dep + k))];
-  }
-  return n > 0 && compare_go(mode, book, a, b, dep + n);
 }
 
 // Check
