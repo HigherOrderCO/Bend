@@ -1686,10 +1686,12 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
 // Val
 // ===
 
-// A word rooted in a borrowed parameter (brwl) is not owned. val_own is
+// A box rooted in a borrowed parameter (brwl) is not owned; a word that is
+// not a box holds no reference, so it neither roots nor owns. val_own is
 // the one gate: at an owned position a rooted word owns its root; lent
 // at `at`, a rooted word passes its lend on, and an unheld owned box
-// owns `at`. A destination every arm fills from one root stays rooted.
+// owns `at`. A destination every arm boxing it fills from one root stays
+// rooted.
 
 function val_new(ws: string[], lay: Lay, stat = false): Val {
   return { ws, lay, stat };
@@ -1709,11 +1711,11 @@ function val_hold(sc: Scope, v: Val, k: string): Val {
 function val_own(sc: Scope, v: Val, at: string | null = null,
   held = false): string[] {
   v.ws.forEach((w, j) => {
-    const r = sc.brwl.get(w);
+    const box = v.lay.ks[j] === "box";
+    const r = box ? sc.brwl.get(w) : undefined;
     if (r !== undefined && at !== null) {
       FL.lend.add(at + "<" + r);
-    } else if (r !== undefined
-      || (at !== null && !held && v.lay.ks[j] === "box")) {
+    } else if (r !== undefined || (at !== null && !held && box)) {
       FL.own.add(r ?? at!);
     }
   });
@@ -1752,8 +1754,11 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
   emit_chain(sc, arms.map((k, i) => [box ? `term_aux(${t}) == ${cid_mac(k)}`
     : `${t} == ${i}`, () => {
     file_push(sc, `${out[0]} = ${i};`);
+    const ks = lay.arms![k].flatMap((l) => l.ks);
     ws({ ...sc, spares: [] }, k).forEach((w, n) => {
-      rs[1 + n].push(sc.brwl.get(w) ?? "");
+      if (ks[n] === "box") {
+        rs[1 + n].push(sc.brwl.get(w) ?? "");
+      }
       file_push(sc, `${out[1 + n]} = ${w};`);
     });
   }]));
