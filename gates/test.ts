@@ -231,6 +231,8 @@ function comptime_c(c: string): string {
   });
 }
 
+// Only tmpl may check a List.map instance: without it, the twins match
+// without the template.
 async function comptime_run(): Promise<Fail[]> {
   const fail = (probe: string, want: string, got: string): Fail[] =>
     [{ name: "comptime_tmpl", probe, want, got }];
@@ -245,6 +247,8 @@ async function comptime_run(): Promise<Fail[]> {
     });
     return { map, c: Comp.compile_book(book) };
   };
+  // main awaits this only after the shards, so a twin that fails to check
+  // must fail here, not reject (its shard fails it too)
   let twins: { map: boolean; c: string }[];
   try {
     twins = [await emit("hand"), await emit("tmpl")];
@@ -265,12 +269,14 @@ async function comptime_run(): Promise<Fail[]> {
   return [];
 }
 
-// A process may compile many books (the bun loader, io_run). Compile two
-// separately checked copies to catch stale state crossing compilations,
-// normalization and other books. The first copies establish the baselines;
-// each later emission is compared by hash. Byte equality is a cheap check
-// for these fixtures, not a compatibility promise for private symbols.
-// It builds and runs nothing: the shards run these programs.
+// After comparing the comptime twins, check the four state fixtures.
+// A process may compile many books (the bun loader, io_run), and none may
+// leave state for the next. Each fixture loads and checks twice.
+// Its first copy's C and JS
+// are the baseline (compiled after the earlier fixtures' baselines, not in
+// a fresh process); its second copy must match their hashes
+// at every step: C, C, JS, C, normalization, JS, C, the next fixture (+),
+// C, JS. It builds and runs nothing: the shards run these programs.
 async function state_run(): Promise<Fail[]> {
   const fails = await comptime_run();
   const files = ["reg/borrow_loop", "run/harness_cache_compile",

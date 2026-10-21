@@ -802,7 +802,8 @@ async function cli_login(): Promise<string> {
 // A leading byte order mark is dropped: the hub stores the text as sent,
 // and an importer's fetch drops the mark, so a file sent with one would
 // never match its hash.
-function pkg_files(file: string, book: Bend.Book, seen: Map<string, Bend.FileId | null>): Record<string, string> {
+function pkg_files(file: string, book: Bend.Book,
+  seen: Map<string, Bend.FileId | null>): Record<string, string> {
   const entry = fs.realpathSync(file);
   const dir = path.dirname(entry);
   const names = new Map<string, string>();
@@ -976,9 +977,9 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // its type, never its code. If the book holds a promise, a walk from the
 // defs outside Base collects who names whom, then each promise floods
 // back along those edges.
-function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
+function book_promises(book: Bend.Book): Array<[string, Bend.Name[]]> {
   const keys = Object.keys(book.tlds);
-  const roots: Array<[string, Bend.QName[]]> = [
+  const roots: Array<[string, Bend.Name[]]> = [
     ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
     ["foreign effects", keys.filter((k) => {
       const t = book.tlds[k] as Bend.Def;
@@ -989,18 +990,18 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
     return [];
   }
 
-  const own = [...new Set(book.order)].filter(k => book.tlds[k].b !== true);
-  const uses: Record<Bend.QName, Bend.QName[]> = Object.create(null);
+  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
+  const uses: Record<Bend.Name, Bend.Name[]> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
     const t = book.tlds[k];
     if (t !== undefined) {
-      const rs = new Set<Bend.QName>();
+      const rs = new Set<Bend.Name>();
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
         term_refs(Bend.term_lower(c.T), rs);
       }
       if (t.$ === "Def" && t.e !== undefined) {
-        term_refs(Bend.term_lower(Bend.term_higher(t.e, null, true)), rs);
+        term_refs(Bend.term_lower(Bend.term_higher(t.e)), rs);
       }
       for (const r of rs) {
         (uses[r] ??= []).push(k);
@@ -1020,11 +1021,13 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
-function term_refs(t: Bend.LTerm, out: Set<Bend.QName>): void {
+function term_refs(t: Bend.LTerm, out: Set<Bend.Name>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
     const x = todo.pop()!;
-    if (x.$ === "Ref" || x.$ === "ADT") out.add(x.k);
+    if (x.$ === "Ref" || x.$ === "ADT") {
+      out.add(x.k);
+    }
     for (const key of Bend.term_children[x.$]) {
       const v = (x as unknown as Record<string, Bend.LTerm | Bend.LTerm[]>)[key];
       if (Array.isArray(v)) {
@@ -1097,7 +1100,9 @@ class Check_Fail {
 
 function book_seed(base: Bend.Book): Bend.Book {
   const book = Bend.book_nil();
-  for (const [k, t] of Object.entries(base.tlds)) book.tlds[k] = { ...t };
+  for (const k of Object.keys(base.tlds)) {
+    book.tlds[k] = { ...base.tlds[k] };
+  }
   Object.assign(book.ctrs, base.ctrs);
   book.base  = base.base;
   book.files = new Map(base.files);

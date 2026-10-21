@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as nodePath from "node:path";
 import * as url from "node:url";
 
-import type { Book, Ctx, Err, HTerm, LTerm, QName, FileId, Quant, Uses } from "bend2/bend.ts";
+import type { Book, Ctx, Err, HTerm, LTerm, Name, FileId, Quant, Uses } from "bend2/bend.ts";
 import type { Span as BendSpan } from "bend2/bend.ts";
 import type * as BendModule from "bend2/bend.ts";
 import type * as CompModule from "bend2/comp.ts";
@@ -48,7 +48,7 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_global(k: QName): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_global(k: Name): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
@@ -72,7 +72,7 @@ type Mapper = (s: BendSpan | undefined) => BendSpan | undefined;
 // marks an instance's fact.
 export type Raw = {
   tm: LTerm; ty: HTerm; bok: Book;
-  ctx: Ctx; dep: number; def: QName;
+  ctx: Ctx; dep: number; def: Name;
   qt: Quant; us: Uses; inst: boolean; spn?: BendSpan;
 };
 
@@ -92,7 +92,7 @@ export type Checked = {
   book: Book;
   sources: Source[];
   map: Mapper;
-  declarations: QName[];
+  declarations: Name[];
   facts?: Fact[];
   failure?: Diag;
 };
@@ -161,7 +161,7 @@ export const PATCHED = Object.keys(PATCHES);
 // Where the wrappers report, set for one check at a time.
 export const hook: {
   see?: (report: Report) => void;
-  parsed?: (file: BendModule.File, names: QName[]) => void;
+  parsed?: (file: BendModule.File, names: Name[]) => void;
 } = {};
 
 // Text an editor holds unsaved, by real path, set for one check at a time.
@@ -643,7 +643,7 @@ const isErr = (e: unknown): e is Err =>
 
 // Display is a public lookup name only when it resolves back to this identity.
 // Generated and otherwise unaddressable globals retain their opaque keys.
-const sourceName = (m: Loaded, book: Book, k: QName): string => {
+const sourceName = (m: Loaded, book: Book, k: Name): string => {
   if (m.Bend.name_parent(k) !== null) return k;
   const scope = book.files.get(book.entry);
   const text  = m.Bend.name_display(book, k, scope);
@@ -658,7 +658,7 @@ const kindOf = (m: Loaded, book: Book, t: LTerm): { kind: string; name: string }
 });
 
 // Whether a fact passes a filter, its scope aside.
-const matches = (m: Loaded, book: Book, f: FactFilter, t: LTerm, def: QName): boolean => {
+const matches = (m: Loaded, book: Book, f: FactFilter, t: LTerm, def: Name): boolean => {
   if (f.kinds?.length && !f.kinds.includes(t.$)) return false;
   if (f.names?.length && !f.names.includes(kindOf(m, book, t).name)) return false;
   if (!f.defs?.length) return true;
@@ -698,7 +698,7 @@ const checked = async (
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
-  let declarations: QName[] = [];
+  let declarations: Name[] = [];
   reads = texts;
 
   const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
