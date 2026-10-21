@@ -864,15 +864,16 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words, its fields once per value arguments, past 64 once
-// with DUMMY for them; a walk 5000 entries long holds it.
+// but for the words, its fields once per value arguments (past 64, once
+// with DUMMY: a stuck type then holds names); 4000 calls deep holds.
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
-  seen = new Map<HTerm | string, number>()): boolean {
+  seen = new Map(), d = 0): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen);
+    return ty_holds(t.f(DUMMY), p, seen, d);
   }
-  if (typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t)) {
+  if (typeof p !== "string" ? p(t) : t?.$ === "ADT" ? t.k === p
+    : seen.has("~") && t?.$ === "App") {
     return true;
   }
   if (t?.$ !== "ADT" || WORDS[t.k] || seen.has(t)) {
@@ -880,21 +881,22 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   }
   seen.set(t, 0);
   const tld = FL.book.tlds[t.k];
-  const ts = tld?.$ !== "ADT" ? t.x : memo(FL.tys, t.k, (k) => (FL.tys
-    .set(k, []), tele_unbind(tld.T).doms.map((D) => !ty_value(D[2]))));
-  if (t.x.some((x, i) => ts[i] && ty_holds(x, p, seen))) {
+  const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
+  const ts = t.x.map((x, i) => !ty_value(ks[i]?.[2] ?? null));
+  if (t.x.some((x, i) => ts[i] && ty_holds(x, p, seen, d + 1))) {
     return true;
   }
   const n = seen.get(t.k) ?? 0;
-  const xs = n < 64 ? t.x : t.x.map((x, i) => ts[i] ? x : DUMMY);
+  const xs = n < 64 ? t.x
+    : (seen.set("~", 0), t.x.map((x, i) => ts[i] ? x : DUMMY));
   const key = `${t.k}<${xs.map((x, i) =>
     ts[i] ? "" : Bend.term_key(Bend.term_lower(x)))}`;
   if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
   seen.set(key, 0).set(t.k, n + 1);
-  return seen.size > 4999 || tld.c.some((c) =>
-    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen)));
+  return d > 3999 || tld.c.some((c) =>
+    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen, d + 1)));
 }
 
 function ty_tag(t: HTerm | null, tags: string): boolean {
@@ -1418,7 +1420,6 @@ function file_new(book: Bend.Book, js: boolean) {
     brws: new Map<Name, boolean[]>(),
     nodes: new Map<Name, Lay>(),
     lays: new Map<string, Lay>(),
-    tys: new Map<Name, unknown[]>(),
     holds: new Map<string, Lay>(),
     lay_ids: new Map<Lay, number>(),
     memo: {

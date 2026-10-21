@@ -1,6 +1,6 @@
 # a bang over a chain whose growing index sits under twelve type
 # arguments: the walk opens 64 links, about 900 calls deep, then the
-# chain once with its index unknown, before its size cap
+# chain once with its index unknown, before its depth cap
 import Base
 
 type Bx<A: Type> is Type:
