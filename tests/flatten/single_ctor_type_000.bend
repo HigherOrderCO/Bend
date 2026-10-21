@@ -18,4 +18,4 @@ def main(a):
     case a:
       B{a}
 
-#|\{K: (a => b => c => A{a, b, c}); (a => B{a})}
+#|\{K: (a => b => c => A{a, b, c})}

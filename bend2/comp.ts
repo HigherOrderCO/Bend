@@ -484,6 +484,7 @@ const BINDING = Symbol();
 
 type Probe = Of<"Var"> & { [BINDING]: Probe; expr?: string; depth?: number };
 
+// Next probe index, above ordinary telescope and erased-parameter levels too.
 let PROBES = 0;
 const DUMMY = probe("dummy");
 
@@ -500,9 +501,13 @@ function probe_of(t: HTerm, required = true): Of<"Var"> {
 
 // Cache-local free bindings carry an ordinal; reified bound Vars have no binding field.
 function scoped_key(...terms: HTerm[]): string {
+  const t = terms.length === 1 ? Bend.term_force(terms[0]) : terms[0];
+  if (terms.length === 1 && t.$ === "ADT" && t.x.length === 0 && t.r.length === 0) {
+    return JSON.stringify([Bend.ADT(t.k, [])]);
+  }
   return Bend.term_key(terms.map(t => {
-    const copy = Bend.scope_mapper(v => memo(FL.bindings, probe_of(v, false),
-      () => ({ $: "Var", k: "", i: 0, binding: FL.bindings.size })));
+    const copy = Bend.term_copy(v => memo(FL.bindings, probe_of(v, false),
+      () => ({ $: "Var", k: "", i: 0, binding: FL.bindings.size })), PROBES);
     return Bend.term_lower(copy(t));
   }));
 }
@@ -599,10 +604,11 @@ function lit_call(s: Of<"Lit">): HTerm | null {
     ? Bend.App(Bend.Ref(base("U32.to_nat")), Bend.Lit(s.file, "U32", s.v)) : null;
 }
 
-function term_force(t: HTerm): HTerm {
+function term_force(t: HTerm, native = false): HTerm {
   const s = Bend.term_force(t);
-  return s.$ !== "Lit" ? s
-    : memo(FL.steps, Bend.term_key(s), () => lit_call(s) ?? Bend.lit_step(s));
+  return s.$ !== "Lit" || native && s.file === Bend.BASE_ID
+    && (s.kind === "U32" || s.kind === "F32") ? s
+    : memo(FL.steps, s.file + ":" + s.kind + ":" + s.v, () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -610,18 +616,18 @@ function term_strip(t: HTerm): HTerm {
 }
 
 function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
-  const got = FL.memo.opens.get(t);
+  const got = FL.opened.get(t);
   if (got !== undefined) return got;
   const ps = (t.$ === "Lam" ? [t.k] : t.k).map((k) => probe(k));
   const opened = { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
-  FL.memo.opens.set(t, opened);
+  FL.opened.set(t, opened);
   return opened;
 }
 
 function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
   const l = Bend.Let(ps.map((p) => p.k), ps.map(() => 0), vs,
     () => die("a pre-opened let")) as Of<"Let">;
-  FL.memo.opens.set(l, { ps, b });
+  FL.opened.set(l, { ps, b });
   return l;
 }
 
@@ -793,7 +799,11 @@ function intr_of(k: QName, js = false): Intr | undefined {
 // ====
 
 function tele_unbind(T: HTerm): { doms: Dom[]; ret: HTerm } {
-  return memo(FL.teles, T, () => Bend.tele_unbind(FL.book, T));
+  return memo(FL.teles, T, () => {
+    const tel = Bend.tele_unbind(FL.book, T);
+    PROBES = Math.max(PROBES, tel.doms.length);
+    return tel;
+  });
 }
 
 function tele_fill(T: HTerm, xs: HTerm[]): HTerm {
@@ -818,10 +828,10 @@ function ty_all(ty: HTerm | null): Of<"All"> {
 }
 
 function ty_peel(tm: HTerm, ty: HTerm | null): [HTerm, HTerm | null] {
-  let x = term_force(tm);
+  let x = term_force(tm, true);
   while (x.$ === "Ann" || x.$ === "Rwt") {
     ty = x.$ === "Ann" ? x.T : ty;
-    x = term_force(x.$ === "Ann" ? x.x : x.f);
+    x = term_force(x.$ === "Ann" ? x.x : x.f, true);
   }
   return [x, ty];
 }
@@ -1014,6 +1024,7 @@ function ctr_adt(x: Of<"Ctr">, ty: HTerm | null): [Of<"ADT">, number | null] {
 function ctr_tail(ctr: Bend.Ctr, xs?: HTerm[]): Dom[] {
   const doms = (xs ? Bend.tele_unbind(FL.book, tele_fill(ctr.T, xs))
     : tele_unbind(ctr.T)).doms;
+  PROBES = Math.max(PROBES, doms.length);
   return doms.slice(doms.length - ctr.n);
 }
 
@@ -1386,8 +1397,9 @@ function file_new(book: Bend.Book, js: boolean) {
     bindings: new Map<Of<"Var">, HTerm>(), symbols: new Map<QName, string>(),
 
     nodes: new Map<QName, Lay>(), lays: new Map<string, Lay>(),
+    opened: new WeakMap<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
+
     memo: {
-      opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
       uses: new Map<HTerm, Bend.PMap<number>>(), folds: new Map<HTerm, HTerm | null>(),
       spines: new Map<HTerm, Spine>(),
     },
@@ -1477,7 +1489,7 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
     if (w?.$ === "Mat") {
       return term_kids(w).forEach((h) => facts_hot(sc, h, true, local));
     }
-    const dom = w?.$ === "Var" && !local
+    const dom = w?.$ === "Var" && !(BINDING in w) && !local
       && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
       FL.hot.add(arg_name(sc.def, w.i));
@@ -1970,7 +1982,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
     return Bend.Ann(p, T!);
   };
   const go = (u: HTerm, top: boolean, T: HTerm | null): HTerm => {
-    const s = term_force(u);
+    const s = term_force(u, true);
     if (term_const(s)) {
       return s;
     }
@@ -2032,7 +2044,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
   };
   const wrap = (b: HTerm) =>
     binds.reduceRight((b2, [p, v]) => let_open([p], [v], b2), b);
-  const x = term_force(t);
+  const x = term_force(t, true);
   if (x.$ !== "Let") {
     const b = go(x, true, ty);
     return wrap(binds.length === 0 || ty === null ? b : Bend.Ann(b, ty));
@@ -2206,7 +2218,7 @@ function emit_open(k: QName, f = fun_of(k)): [Scope, Val[]] {
 function emit_native(sc: Scope, k: QName, ers: HTerm[], f: Fun): string {
   // k fixes erased positions and memoized borrowing for this pass.
   // Array sharing can grow mid-pass; any fact growth discards the whole output.
-  const key = JSON.stringify([f.lays, f.ret, arr_q("box")]) + scoped_key(Bend.Ref(k), ...ers);
+  const key = JSON.stringify([k, f.lays, f.ret, arr_q("box")]) + scoped_key(...ers);
   return seg_ref(sc, memo(FL.spun, key, () => {
     const code = name_gen(k, "native", FL.next++);
     FL.spun.set(key, code);
@@ -2225,8 +2237,7 @@ function emit_native(sc: Scope, k: QName, ers: HTerm[], f: Fun): string {
     ...seg_take(seg), "WL_SPIN"], 1),
     ...seg_text(seg.lines, 2), "  break;", "  }",
     "  return 1;", "}"];
-    const far = body.reduce((n, l) =>
-      n + l.replace(/\b(?:CID_)?b0\w+/g, "b0_name").length + 1, 0) >= SPIN_FAR;
+    const far = body.join("\n").replace(/\b(?:CID_)?b0\w+/g, "b0_name").length + 1 >= SPIN_FAR;
     FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
       name_global(code)}(Env e, THR Term* o${
       seg.ks.map((k, i) => `, ${lay_c(k)} r${i}${arr_q(k)
@@ -2408,6 +2419,7 @@ function emit_unfold(m: Spine): HTerm | null {
 function emit_expr(sc: Scope, tm: HTerm, ty0: HTerm | null, at: Lay | null): Val {
   const [x, ty] = ty_peel(tm, ty0);
   switch (x.$) {
+    case "Lit": return val_new([`${x.v}ull`], W32, true);
     case "Var": {
       return bind_pop(sc, x);
     }
@@ -2490,6 +2502,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
       const all = ty_all(ty);
       if (all.q.$ === "None") {
         const t = ers[0] ?? Bend.Var(x.k, x.i);
+        PROBES = Math.max(PROBES, x.i + 1);
         return emit_body(sc, x.f(t), all.B(t), ers.slice(1), args, dst);
       }
       const o = term_open(x);
@@ -2987,6 +3000,10 @@ function js_open(sc: Scope, x: Of<"Let">): HTerm {
 function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
   const [x, ty] = ty_peel(tm, ty0);
   switch (x.$) {
+    case "Lit": {
+      const v = x.kind === "F32" ? Bend.f32_from_bits(x.v) : x.v;
+      return Object.is(v, -0) ? "-0" : String(v);
+    }
     case "Var": {
       const c = sc.caps;
       const p = probe_of(x) as Probe;

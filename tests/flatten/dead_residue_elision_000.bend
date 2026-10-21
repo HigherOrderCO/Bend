@@ -24,4 +24,4 @@ def main(a):
     case a:
       XD{a}
 
-#|\{A: XA{}; C: XC{}; B: XB{}; (a => XD{a})}
+#|\{A: XA{}; C: XC{}; B: XB{}}

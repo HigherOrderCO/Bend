@@ -23,4 +23,4 @@ def main(a, b, c, d):
     case p, q, r, s:
       C{p, q, r, s}
 
-#|\{Z: \{Z: \{Z: \{Z: A{}; (d => C{Z{}, Z{}, Z{}, d})}; (c => d => C{Z{}, Z{}, c, d})}; (b => c => d => C{Z{}, b, c, d})}; S: (w => b => c => d => B{w, b, c, d}); (a => b => c => d => C{a, b, c, d})}
+#|\{Z: \{Z: \{Z: \{Z: A{}; (d => C{Z{}, Z{}, Z{}, d})}; (c => d => C{Z{}, Z{}, c, d})}; (b => c => d => C{Z{}, b, c, d})}; S: (w => b => c => d => B{w, b, c, d})}

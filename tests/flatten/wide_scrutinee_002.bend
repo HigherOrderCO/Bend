@@ -24,4 +24,4 @@ def main(a, b, c, d, e):
     case x, b, y, d, z:
       C{x,y,z}
 
-#|\{Z: (b => \{Z: (d => \{Z: A{}; (e => C{Z{}, Z{}, e})}); (c => d => e => C{Z{}, c, e})}); S: (x => b => c => d => \{S: (z => B{x, c, z}); (e => C{S{x}, c, e})}); (a => b => c => d => e => C{a, c, e})}
+#|\{Z: (b => \{Z: (d => \{Z: A{}; (e => C{Z{}, Z{}, e})}); (c => d => e => C{Z{}, c, e})}); S: (x => b => c => d => \{S: (z => B{x, c, z}); (e => C{S{x}, c, e})})}

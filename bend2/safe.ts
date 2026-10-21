@@ -214,7 +214,7 @@ function safe_pass(book: Book, groups: Map<QName, Group>): { text: string; oos: 
   const g0 = groups.size;
   // The model evaluates bodies and constructor telescopes, not declaration
   // signatures. Copy those computation roots together to preserve their sharing.
-  const copy = B.scope_mapper(v => v);
+  const copy = B.term_copy(v => v);
   const mb: Book = { ...book, tlds: Object.create(null), ctrs: Object.create(null) };
   for (const [k, t] of Object.entries(book.tlds)) {
     mb.tlds[k] = t.$ === "Def" ? { ...t, v: t.v === null ? null : copy(t.v) }
@@ -499,7 +499,7 @@ function arm(e: Safe, s: Scope, k: QName, cols: Cols, vs: Array<[Q, O]>): O {
   const tld = e.book.tlds[k] as Def;
   const ps = tld.x === 0 ? null : new Map(cols.slice(0, tld.x).map((v, j) => [B.name_gen(k, "param", j), v]));
   const t0 = B.term_higher(tld.e as B.LTerm, null, true);
-  let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
+  let t = ps === null ? t0 : B.term_copy(x => x, 0, ps)(t0);
   let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
   let j = 0;
   for (let [x, T] = open(t); x.$ === "Lam" && T !== null; [x, T] = open(t)) {
@@ -573,7 +573,7 @@ function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
 // x's normal form, when it is closed; null when it depends on a run-time value
 function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
   // bend2's annotations name a variable by its level
-  const v = B.term_snf(e.book, B.scope_mapper(v => v.i < s.d ? s.c[v.i]?.v ?? v : v)(x));
+  const v = B.term_snf(e.book, B.term_copy(v => v.i < s.d ? s.c[v.i]?.v ?? v : v, s.d)(x));
   return mentions(B.term_lower(v, s.d), (i) => i >= 0 && i < s.d) ? null : v;
 }
 
@@ -591,7 +591,7 @@ function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
 function model(e: Safe, T: HTerm): HTerm | null {
   // The model book assigns bodies to otherwise opaque refs; its evaluation
   // cells must not remember those bodies in the original interpretation.
-  T = B.scope_mapper(v => v)(T);
+  T = B.term_copy(v => v)(T);
   return model_by(e, T, false) ?? model_by(e, T, true);
 }
 
@@ -609,7 +609,7 @@ function inst_pick(e: Safe, k: QName): HTerm[] | null {
   for (const n of e.book.tmps.values()) {
     if (B.name_parent(n) !== k) continue;
     const xs = (e.book.tlds[n] as Def).args!.map(x => B.term_higher(x, null, true));
-    if (fits(B.scope_mapper(v => v)(e.book.tlds[k].T), xs)) return xs;
+    if (fits(B.term_copy(v => v)(e.book.tlds[k].T), xs)) return xs;
   }
   return null;
 }
@@ -617,7 +617,7 @@ function inst_pick(e: Safe, k: QName): HTerm[] | null {
 // x checked at T in the model book, as k's code; null if it does not fit
 function fit(e: Safe, k: QName, x: HTerm, T: HTerm): HTerm | null {
   try {
-    const copy = B.scope_mapper(v => v);
+    const copy = B.term_copy(v => v);
     return B.term_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, copy(x), B.Lone(), copy(T), B.ctx_nil(), 0).tm, null, true);
   } catch (err) {
     if ((err as B.Err).$ !== "Err") {
@@ -670,7 +670,7 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
       const x: HTerm = B.Var(F.k, d);
       const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], proj, probe);
       return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
-        B.scope_mapper(x => x.i === d ? v : x)(t)), F);
+        B.term_copy(x => x.i === d ? v : x, d + 1)(t)), F);
     }
     case "ADT": {
       const { key, size } = model_key(F, d);

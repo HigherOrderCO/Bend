@@ -25,4 +25,4 @@ def main(a, b, c):
     case a, b, c:
       D{a,b,c}
 
-#|\{S: (a => \{Z: \{S: (b => A{a, b}); Z: B{a, Z{}}; (c => D{S{a}, Z{}, c})}; (b => \{Z: B{a, b}; (c => D{S{a}, b, c})})}); Z: \{S: (a => c => C{a, c}); (b => c => D{Z{}, b, c})}; (a => b => c => D{a, b, c})}
+#|\{S: (a => \{Z: \{S: (b => A{a, b}); Z: B{a, Z{}}}; (b => \{Z: B{a, b}; (c => D{S{a}, b, c})})}); Z: \{S: (a => c => C{a, c}); (b => c => D{Z{}, b, c})}}

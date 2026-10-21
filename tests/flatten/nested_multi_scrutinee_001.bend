@@ -24,4 +24,4 @@ def main(a, b):
     case a, b:
       D{a,b}
 
-#|\{S: \{S: (a => \{S: (b => A{a, b}); Z: B{a}; (b => C{S{a}, b})}); (_9 => b => C{_9, b})}; (a => b => D{a, b})}
+#|\{S: \{S: (a => \{S: (b => A{a, b}); Z: B{a}}); (_9 => b => C{_9, b})}; (a => b => D{a, b})}

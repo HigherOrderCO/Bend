@@ -27,4 +27,4 @@ def main(a, b, c):
     case a, b, c:
       D{a,b,c}
 
-#|\{S: (a => \{S: (b => \{S: (c => A{a, b, c}); Z: B{a, b, Z{}}; (c => B{a, b, c})}); (b => \{Z: C{a, b}; (c => D{S{a}, b, c})})}); (a => b => c => D{a, b, c})}
+#|\{S: (a => \{S: (b => \{S: (c => A{a, b, c}); Z: B{a, b, Z{}}}); (b => \{Z: C{a, b}; (c => D{S{a}, b, c})})}); (a => b => c => D{a, b, c})}
