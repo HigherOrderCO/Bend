@@ -5,8 +5,8 @@
 // Comp
 // ====
 
-// Compiles a checked Book to C, one source for the host and
-// the device, or to JS. The C and JS runtimes close the file.
+// Compiles a checked Book to C, one source for host and device, or to JS.
+// The C and JS runtimes close the file.
 
 import * as fs from "node:fs";
 
@@ -141,8 +141,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
-  // as intr_of skips an op with no JS
+  // C only: intr_of skips an op with no JS, so JS runs Base's def
   u32_pow: { C: "u32_pow($0, $1)" },
   u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
   map_msb_u: { C: "map_msb_u($0, $1)" },
@@ -832,6 +831,10 @@ function ty_ann(t: HTerm): HTerm | null {
   return v.$ === "Ann" ? v.T : null;
 }
 
+function ty_key(t: HTerm): string {
+  return Bend.term_key(Bend.term_lower(t));
+}
+
 function ty_wnf(ty: HTerm | null): HTerm | null {
   const t = ty && Bend.term_wnf(FL.book, ty);
   return t?.$ === "Rwt" ? ty_wnf(t.f) : t;
@@ -888,7 +891,7 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, w))) {
     return true;
   }
-  const xs = t.x.map((x, i) => vs[i] ? Bend.term_key(Bend.term_lower(x)) : "");
+  const xs = t.x.map((x, i) => vs[i] ? ty_key(x) : "");
   const ys = w.on.get(t.k);
   const re = !!ys && xs.some((x, i) => x.length > ys[i]);
   const key = t.k + (!re && xs);
@@ -945,16 +948,14 @@ function ty_srcs(T: HTerm): void {
 // ===
 
 // An Array, an IO.OP and a datatype that re-enters itself (maybe through a
-// family) are one box. A lay without arms is W32, W64 or BOX. An Array cell
+// family) are one box; a lay without arms is W32, W64 or BOX. An Array cell
 // takes its element type's open layout, so all callers agree. lay_el refuses
-// an open element type (a variable, a hole, a bodiless law or family); a
-// type former, such as a function, is a box. adt_of and js_expr call it
-// only for that check.
+// an open element type (a variable, a hole, a bodiless law or family) and
+// boxes a type former (a function): adt_of and js_expr call it to check.
 
 function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
-  return t === null ? BOX : WORDS[t.k] ?? memo(FL.lays,
-    Bend.term_key(Bend.term_lower(t)), (key) => {
+  return t === null ? BOX : WORDS[t.k] ?? memo(FL.lays, ty_key(t), (key) => {
     const tld = FL.book.tlds[t.k];
     if (t.k === "Array" || t.k === "IO.OP" || tld?.$ !== "ADT"
       || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F, t.k)))) {
@@ -1006,7 +1007,7 @@ function lay_node(k: Name): Lay {
 
 // An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
-  return A && memo(FL.opens, Bend.term_key(Bend.term_lower(A)), () =>
+  return A && memo(FL.opens, ty_key(A), () =>
     ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
@@ -1058,9 +1059,8 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
 function lay_holds(A: HTerm | null, lay: Lay, fam: Name): Lay {
   if (lay.arms) {
     return lay_pack(Object.entries(lay.arms).map(([k, lays]) =>
-      [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) =>
-        memo(FL.holds, fam + " " + Bend.term_key(Bend.term_lower(F)),
-          () => lay_holds(F, lays[i], fam)))]));
+      [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) => memo(FL.holds,
+        fam + " " + ty_key(F), () => lay_holds(F, lays[i], fam)))]));
   }
   return lay === BOX && !ty_holds(A, fam) ? W32 : lay;
 }
@@ -1449,8 +1449,7 @@ function file_new(book: Bend.Book, js: boolean) {
   };
 }
 
-// A scope is where the emitter writes; a nested arm, closure or fork copies
-// it.
+// A scope is where the emitter writes; an arm, closure or fork copies it.
 function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
@@ -1713,11 +1712,10 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
 // ===
 
 // A box rooted in a borrowed parameter (brwl) is not owned; a word that is
-// not a box holds no reference, so it neither roots nor owns. val_own is
-// the one gate: at an owned position a rooted word owns its root; lent
-// at `at`, a rooted word passes its lend on, and an unheld owned box
-// owns `at`. A destination every arm boxing it fills from one root stays
-// rooted.
+// no box holds no reference, so it neither roots nor owns. val_own is the
+// one gate: at an owned position a rooted word owns its root; lent at `at`,
+// a rooted word passes its lend on, and an unheld owned box owns `at`. A
+// destination every arm boxing it fills from one root stays rooted.
 
 function val_new(ws: string[], lay: Lay, stat = false): Val {
   return { ws, lay, stat };
@@ -1991,7 +1989,7 @@ function show_main(): (number | Name)[] | null {
     + " erased or dependent field)");
   const node = (T: HTerm, lay: Lay) => {
     const t = ty_wnf(T) as HTerm;
-    const key = Bend.term_key(Bend.term_lower(t));
+    const key = ty_key(t);
     const ids = memo(lays, lay, () => new Map());
     if (ids.has(key)) {
       return ids.get(key)!;
@@ -3972,10 +3970,7 @@ OUTLINE Term rfc_wrap(Env e, Term t, u32 cnt) {
 }
 
 INLINE Term rfc_seal(Env e, Term t) {
-  if (term_tag(t) != TAG_CTR || term_rfc(t)) {
-    return t;
-  }
-  return rfc_wrap(e, t, 1);
+  return term_tag(t) != TAG_CTR || term_rfc(t) ? t : rfc_wrap(e, t, 1);
 }
 
 INLINE void rfc_bump(Env e, u64 r, u32 k) {
@@ -3990,10 +3985,7 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
     rfc_bump(e, term_loc(t), k);
     return t;
   }
-  if (term_triv(t)) {
-    return t;
-  }
-  return rfc_wrap(e, t, 1 + k);
+  return term_triv(t) ? t : rfc_wrap(e, t, 1 + k);
 }
 
 // A redirect cell holds its target's loc over a 24-bit count, which only
@@ -4002,10 +3994,7 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
 // two halves, both holding the same loc. A shared node's fields never change
 // either, so ctr_take copies them before it acquires.
 INLINE u64 term_peek(DEV u64* H, Term t) {
-  if (term_rfc(t)) {
-    return w64_load(&H[term_loc(t)]) >> 24;
-  }
-  return term_loc(t);
+  return term_rfc(t) ? w64_load(&H[term_loc(t)]) >> 24 : term_loc(t);
 }
 
 // Base's Map.bit, reading the key in place: 33 bits a char, a presence bit
@@ -4190,10 +4179,7 @@ INLINE DEV u32a* blk_ptr(DEV u64* H, u64 loc, u32 i) {
 }
 
 INLINE Term blk_read(DEV u64* H, bool arr, u64 loc, u32 i) {
-  if (arr) {
-    return H[loc + i];
-  }
-  return (u64)*blk_ptr(H, loc, i);
+  return arr ? H[loc + i] : (u64)*blk_ptr(H, loc, i);
 }
 
 INLINE void blk_write(DEV u64* H, bool arr, u64 loc, u32 i, Term v) {
@@ -6158,7 +6144,7 @@ int main(int argc, char** argv) {
 // RuntimeJs
 // =========
 
-const RUNTIME: string = String.raw`
+const RUNTIME = String.raw`
 ${NATIVE.JS}
 // Array
 // =====
@@ -6226,7 +6212,7 @@ function io_eff(k, run) {
 }
 `.slice(1);
 
-const RUNTIME_MAIN: string = String.raw`
+const RUNTIME_MAIN = String.raw`
 // Cli
 // ===
 
