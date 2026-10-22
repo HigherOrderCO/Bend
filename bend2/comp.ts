@@ -948,10 +948,10 @@ function ty_srcs(T: HTerm): void {
 // ===
 
 // An Array, an IO.OP and a datatype that re-enters itself (maybe through a
-// family) are one box; a lay without arms is W32, W64 or BOX. An Array cell
-// takes its element type's open layout, so all callers agree. lay_el refuses
-// an open element type (a variable, a hole, a bodiless law or family) and
-// boxes a type former (a function): adt_of and js_expr call it to check.
+// family) are one box. An Array cell takes its element type's open layout,
+// so all callers agree. lay_el refuses an open element type (a variable, a
+// hole, a bodiless law or family) and boxes a type former (a function):
+// adt_of and js_expr call it to check.
 
 function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
@@ -2139,8 +2139,8 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
 // ====
 
 // A call emits its nested arguments, pops the owned ones, then reads the
-// borrowed ones (a read asks a lend). A closure moves its captures into a
-// node. A jump's returns must agree or both be one word, else it is a cut.
+// borrowed ones (a read asks a lend). A jump's returns must agree or both
+// be one word, else it is a cut.
 // A fork runs a join task and a task per call; in sequence one frame serves
 // every step. A self-jump reads its parameters back, so the device's loop
 // keeps them typed. A foreign def short of its continuation is an IO action.
@@ -2877,7 +2877,6 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
-  // the datatypes of the constructors a pure main prints are roots too
   const show = show_main();
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
