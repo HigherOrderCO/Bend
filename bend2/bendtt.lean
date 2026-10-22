@@ -1737,8 +1737,9 @@ def Claim.halts : Prop :=
 def Claim.empty : Prop :=
   ∀ bk t, Book.WellTyped bk → Value bk t → ¬ Typed bk [] t (Enu [])
 
--- a corollary: a closed live term typed at {a == b} has convertible sides,
--- so a checked law holds at each closed instance (its def on closed values)
+-- a closed live term typed at {a == b} has convertible sides: a checked
+-- law's proof on closed values makes its sides convert, in Part 2's
+-- theory, where opaque defs unfold to their models
 def Claim.adequate : Prop :=
   ∀ bk t T a b A, Book.check bk = .ok () → Term.Closed t → Term.Live bk t →
     Typed bk [] t T → Conv bk T (Eql a b A) → Conv bk a b
