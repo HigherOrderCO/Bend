@@ -2,6 +2,7 @@
 # list heats Tuple, so the Tuple inside build seals its P field; P must
 # be hot too, or total takes the sealed node raw and reads its cell.
 # the family hides P from the bound types; the bind keeps the index open
+# build only reads words, so it borrows; give owns, so main shares s
 import Base
 
 type P is Data:
@@ -20,6 +21,9 @@ def build(xs: List<&2,Q()>) -> Pw(xs):
     case Nil{}: Unit{}
     case Con{Tuple{n,m},t}: Tuple{P{n,1},Unit{}}
 
+def give(xs: List<&2,Q()>) -> List<&2,Q()>:
+  xs
+
 def total(xs: List<&2,Q()>, ps: Pw(xs)) -> U32:
   match xs:
     case Nil{}: 0
@@ -30,6 +34,6 @@ def total(xs: List<&2,Q()>, ps: Pw(xs)) -> U32:
 def main() -> IO(Unit):
   do IO<Unit>:
     +s : List<&2,Q()> <- IO.pure(List<&2,Q()>, [Tuple{5,3}])
-    IO.print(U32.show(total(s,build(s))))
+    IO.print(U32.show(total(s,build(give(s)))))
 
 #|5

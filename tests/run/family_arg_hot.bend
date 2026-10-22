@@ -4,6 +4,7 @@
 # sealed node as a raw RT. The arm's type comes from the argument, not
 # from the family's body, so the facts walk the arguments at every
 # instantiation. The index comes from a fold the checker cannot see.
+# first only reads words, so it borrows; give owns, so heat shares c.
 import Base
 
 type RT is Data:
@@ -45,8 +46,11 @@ def first(c: Carrier<0n>) -> U32:
   Carrier{x, tail} = c
   x
 
+def give(c: Carrier<0n>) -> Carrier<0n>:
+  c
+
 def heat(+c: Carrier<0n>) -> U32:
-  U32.add(first(c), first(c))
+  U32.add(first(give(c)), first(c))
 
 def use(+n: Nat, c: Carrier<n>) -> U32:
   match n:
