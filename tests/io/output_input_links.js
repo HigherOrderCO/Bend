@@ -54,6 +54,26 @@ function output_input_links() {
     if (build(ok).status !== 0 || !intact()) return code;
     const run = child.spawnSync(process.execPath, [ok], options);
     if (run.status !== 0 || run.stdout.trim() !== "42") return code;
+    code++;
+    // A GPU archive is an output too, even though it has no -o.
+    const gpu = process.platform === "darwin" || [process.env.CUDA_HOME,
+      process.env.CUDA_PATH, "/usr/local/cuda", "/opt/cuda"]
+      .some((d) => d && fs.existsSync(d + "/include/nvrtc.h"));
+    if (gpu) {
+      const bin = path.join(dir, "program");
+      const cache = bin + ".gpu";
+      const entry = path.join(dir, "gpu.bend");
+      const text = "import Base\n"
+        + "def work(n: Nat) -> U32:\n  match n:\n"
+        + "    case 0n: 0\n    case 1n+p: (work(p) + 1 : U32)\n"
+        + "def main() -> U32:\n  work!(12n)\n";
+      fs.writeFileSync(cache, text);
+      inputs.set(cache, text);
+      fs.symlinkSync(cache, entry);
+      const got = child.spawnSync(process.execPath,
+        [path.resolve("bend2/main.ts"), entry, "-o", bin], options);
+      if (!rejects(got, "GPU output") || fs.existsSync(bin)) return code;
+    }
     return 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
