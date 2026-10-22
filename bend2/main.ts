@@ -474,7 +474,8 @@ function cli_build(bin: string, file: string, ins: Set<string>): void {
   const bangs = !/^#define BANGS\s+0$/m.test(c) && (mac || cuda !== "");
   // The GPU build writes <binary>.gpu as well as the requested binary.
   if (bangs && output_conflicts(bin + ".gpu", ins)) {
-    cli_fail("GPU output " + bin + ".gpu is a file the program reads, or a directory");
+    throw "bend: GPU output " + bin
+      + ".gpu is a file the program reads, or a directory (see bend --help)";
   }
   const cc    = cc_find(bangs);
   const objc  = mac && (bangs || /^#import /m.test(c))
