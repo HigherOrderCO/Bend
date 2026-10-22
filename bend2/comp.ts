@@ -3775,9 +3775,10 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A trap bypasses stdio and keeps the original fatal signal.
+// Flush if free, report the fault, then re-raise its signal.
 static void err_trap(int sig) {
   static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
+  if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
   if (write(2, line, sizeof line - 1)) {}
   signal(sig, SIG_DFL);
   raise(sig);
