@@ -939,15 +939,14 @@ function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
 }
 
 // whether a lowered term mentions a variable at a level p holds for
-function mentions(t: B.LTerm, p: (i: number) => boolean): boolean {
-  if (t.$ === "Var" && p(t.i)) {
+function mentions(t: object, p: (i: number) => boolean): boolean {
+  const o = t as Record<string, unknown>;
+  if (o.$ === "Var" && p(o.i as number)) {
     return true;
   }
-  for (const k of B.term_children[t.$]) {
-    const v = (t as unknown as Record<string, unknown>)[k];
-    if (Array.isArray(v)) {
-      for (const x of v) if (mentions(x, p)) return true;
-    } else if (v !== undefined && mentions(v as B.LTerm, p)) return true;
+  for (const k in o) {
+    const v = o[k];
+    if (k !== "s" && typeof v === "object" && v !== null && mentions(v, p)) return true;
   }
   return false;
 }
@@ -1185,8 +1184,8 @@ function group_new(e: Safe, k: Name, hs: Name[]): Group | null {
 }
 
 // the arguments of each call to k in the lowered term t
-function back(t: B.LTerm, k: Name, out: B.LTerm[][] = []): B.LTerm[][] {
-  let f = t;
+function back(t: object, k: Name, out: B.LTerm[][] = []): B.LTerm[][] {
+  let f = t as B.LTerm;
   const xs: B.LTerm[] = [];
   while (f.$ === "App" || f.$ === "Ann") {
     if (f.$ === "App") xs.push(f.x);
@@ -1196,11 +1195,10 @@ function back(t: B.LTerm, k: Name, out: B.LTerm[][] = []): B.LTerm[][] {
     out.push(xs.reverse());
     return out;
   }
-  for (const key of B.term_children[t.$]) {
-    const v = (t as unknown as Record<string, unknown>)[key];
-    if (Array.isArray(v)) {
-      for (const x of v) back(x, k, out);
-    } else if (v !== undefined) back(v as B.LTerm, k, out);
+  const o = t as Record<string, unknown>;
+  for (const j in o) {
+    const v = o[j];
+    if (j !== "s" && typeof v === "object" && v !== null) back(v, k, out);
   }
   return out;
 }

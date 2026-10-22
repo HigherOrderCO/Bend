@@ -563,8 +563,8 @@ export function Check(tm: LTerm, ty: HTerm, us: Uses, changed = false): Check {
   return { tm: Ann(tm, Var("_", -1, undefined, ty)), us, changed };
 }
 
-// Checking may prune a default or replace a template call. Reuse other
-// source values; project changed ones without the checker's type wrappers.
+// Reuse source values unless checking pruned a default. Projection retains
+// source template calls, not the generated refs used by compilation.
 export function checked_value(result: Check, source: HTerm): HTerm {
   return result.changed ? term_higher(result.tm, null, true) : source;
 }
@@ -776,15 +776,6 @@ export function term_strip<X>(tm: TermOf<X>): TermOf<X> {
   return t;
 }
 
-export const term_children: Record<string, string[]> = {
-  Var: ["v"], Ref: [], Sub: ["v", "f"], Let: ["v", "f"],
-  Typ: ["g"], Qnt: [], Qua: [], Min: ["a", "b"],
-  All: ["A", "B"], Lam: ["f"], App: ["f", "x"],
-  ADT: ["x"], Ctr: ["x"], Lit: [], Mat: ["h", "m"], Efq: [],
-  Eql: ["a", "b", "T"], Rfl: [], Rwt: ["e", "p", "f"], Hol: [], Ann: ["x", "T"],
-  PVar: [], PCtr: ["x"],
-};
-
 // Preserve value spans and mutable-cell identity.
 function term_at(value: HTerm, span?: Span): HTerm {
   return value.s !== undefined || span === undefined || (value.$ === "Var" && value.i < 0)
@@ -881,7 +872,11 @@ export function term_higher(tm: LTerm, env: Env = null, value = false): HTerm {
     }
     case "Ann": {
       if (tm.T.$ === "Var" && tm.T.i < 0 && tm.T.v !== undefined) {
-        if (value) return env !== null ? term_higher(tm.x, env, value) : tm.value ??= term_higher(tm.x, env, value);
+        if (value) {
+          // Ref projections include only closed template arguments.
+          if (env === null || tm.x.$ === "Ref") return tm.value ??= term_higher(tm.x, env, value);
+          return term_higher(tm.x, env, value);
+        }
         const x = term_higher(tm.x, env, value);
         if (env === null || tm.x.$ === "Ref") return Ann(x, tm.T, tm.s);
         const copy = env.copy ??= term_copy(v => {
@@ -3443,9 +3438,9 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
 // returns first-order: an LTerm built bottom-up, every node Ann-wrapped
 // with its type in a share cell (Infer, Check), so no type is lowered.
 // term_higher converts checked syntax to HOAS and substitutes through its
-// inferred types. Dependent goals use values with checked defaults and
-// template calls; changed records pruning/specialization so other source
-// values are reused. lhs is the def's
+// inferred types. Dependent goals keep source template calls with pruned
+// defaults; changed records pruning so other source values are reused.
+// lhs is the def's
 // own equation, rebuilt as the tree walks; lhs.qs holds the def's
 // parameter quantities, read off its type once, so descent can skip
 // erased columns. quantities: a binder q x: A checks A against Kind(q),
@@ -3540,6 +3535,8 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
         throw Err(book, ctx, "a defined name", tm, tm.s, lhs.def);
       }
       let k = tm.k;
+      let value: HTerm | undefined;
+      let changed = false;
       let x = 0;
       if (qt.$ !== "None") {
         const gen = tld.$ === "Def" && tld.x > 0 && !(book.tlds[lhs.def] as Def).x ? tld : null;
@@ -3547,7 +3544,7 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
           throw Err(book, ctx, "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
         }
         if (gen !== null) {
-          k  = def_inst(book, lhs, tm, gen, sp, ctx, d);
+          ({ k, value, changed } = def_inst(book, lhs, tm, gen, sp, ctx, d));
           x  = gen.x;
           sp = sp.slice(x);
         }
@@ -3565,7 +3562,9 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
       if (tld.$ === "ADT" && tld.n > 0) {
         throw Err(book, ctx, "a family instance (write " + name_display(book, tm.k) + "<..>)", tm, tm.s, lhs.def);
       }
-      return Infer(k === tm.k ? tm : Ref(k, tm.s, tm.b), book.tlds[k].T, uses_nil(), k !== tm.k, x);
+      const result = Infer(k === tm.k ? tm : Ref(k, tm.s, tm.b), book.tlds[k].T, uses_nil(), changed, x);
+      if (value !== undefined) (result.tm as Extract<LTerm, { $: "Ann" }>).value = value;
+      return result;
     }
     // Γ ⊢ q : Quant
     // where q is dead
@@ -3987,7 +3986,7 @@ export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
   return checked.tm;
 }
 
-export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>, def: Def, sp: HTerm[], ctx: Ctx, d: number): Name {
+export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>, def: Def, sp: HTerm[], ctx: Ctx, d: number): { k: Name; value: HTerm; changed: boolean } {
   const xs = sp.slice(0, def.x);
   if (xs.length < def.x) {
     throw Err(book, ctx, "a template applied to closed ~ arguments (a def parameter is not comptime)", tm, tm.s, lhs.def);
@@ -4032,7 +4031,7 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
   } else if ((book.tlds[o] as Def).v === null && o !== lhs.def) {
     throw Err(book, ctx, "a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)", tm, tm.s, lhs.def);
   }
-  return o;
+  return { k: o, value: values.reduce<HTerm>((f, a) => App(f, a), tm), changed: checked.changed };
 }
 
 // Valid
