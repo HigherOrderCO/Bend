@@ -1416,6 +1416,7 @@ function file_new(book: Bend.Book, js: boolean) {
     lend: new Set<string>(),
     segs: [] as Seg[],
     spins: [] as Seg[],
+    room: 0,
     spun: new Map<string, string>(),
     clos: new Set<string>(),
     tabs: new Map<string, number>(),
@@ -2168,7 +2169,8 @@ function emit_task(sc: Scope, fid: string, rem: number, words: string[],
     `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words);
 }
 
-function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
+function emit_jump(sc: Scope, args: string[], k: Name, bang = false,
+  push = false): void {
   const fid = seg_fid(k);
   sc.seg.fork ||= bang;
   if (bang || sc.seg.def !== k) {
@@ -2178,6 +2180,9 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
         emit_task(sc, fid, 0, args)});`));
   }
   args.forEach((a, i) => file_push(sc, `r${i} = ${a};`));
+  if (push) {
+    file_push(sc, `WL_ROOM(${seg_ref(sc, fid)});`);
+  }
   if (sc.seg.def !== k) {
     return file_push(sc, `WL_JMP(${seg_ref(sc, fid)});`);
   }
@@ -2676,7 +2681,6 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
     emit_chain(sc, [["seq", () => {
       const fr = [...ws, seg_ref(sc, seg_fid(kn))];
-      file_push(sc, `WL_ROOM(${fr.length});`);
       fr.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
       file_push(sc, `WL_PUSHN(${fr.length});`);
     }], ...fork ? [] : [["", () => {
@@ -2684,7 +2688,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
         emit_task(sc, seg_fid(kn), 1, ws)});`);
       file_push(sc, `WL_IDX = ${ws.length};`);
     }] as [string, () => void]]]);
-    emit_jump(sc, cargs, c.k!, !fork && c.b);
+    emit_jump(sc, cargs, c.k!, !fork && c.b, true);
     const last = i === calls.length - 1;
     const held = [...sc.uses].filter(([p]) => pos.has(p));
     const at = held.flatMap(([p, b]) => b.val.ws.map((_, j) =>
@@ -2696,6 +2700,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       rest);
     bind_uses(sc, o.ps[i], rs, rest, ty_ann(x.v[i])!);
   });
+  FL.room = Math.max(FL.room, depth + calls.length);
   if (fork) {
     const live = [...sc.uses];
     emit_jump(sc, live.flatMap(([, b]) => b.val.ws), name);
@@ -3469,11 +3474,6 @@ using namespace metal;
     STK(wi) = e.mem[(A) + wi]; \
   } \
   WL_PUSHN(N);
-#define WL_ROOM(N) \
-  if (DEVICE && sp + (N) * CUBE >= e.mem + STAT_OFF + CUBE) { \
-    err_post(e.mem, ERR_DEEP); \
-    return 0; \
-  }
 
 // Types
 // =====
@@ -4430,7 +4430,30 @@ ${spins}
 // ====
 
 // A host self-jump is a tail call: as a loop, clang hoists constants badly.
-#if !DEVICE
+// A device call that leaves less room than the longest chain of frames one
+// def pushes (#1393) jumps to F with bit 16 set, which moves the lane's stack
+// to the heap, under an exit frame, before F runs. Metal has no goto.
+#if DEVICE
+#define WL_ROOM(F) \
+  if (sp >= e.mem + STAT_OFF - ${FL.room} * CUBE) WL_JMP((F) | 1u << 16)
+#define WL_SPILT(F) ((F) == FID_EXIT)
+
+// A lane's stack starts as far past STAK_OFF as its allocator past ALC_OFF.
+FAR DEV Term* lane_spill(Env e, DEV Term* sp) {
+  DEV Term* sb = e.alc + (STAK_OFF - ALC_OFF);
+  u32 sn = (sp - sb) / CUBE;
+  u64 wa = heap_alloc(e, cls_fit(STAK_LEN));
+  for (u32 i = 0; i < sn; i += 1) {
+    e.mem[wa + i] = sb[i * CUBE];
+  }
+  sb[0]        = term_tsk(FID_EXIT, wa);
+  sb[CUBE]     = sn;
+  sb[2 * CUBE] = FID_EXIT;
+  return sb + 3 * CUBE;
+}
+#else
+#define WL_ROOM(F)
+#define WL_SPILT(F) 0
 #undef  WL_SPIN
 #undef  WL_SPUN
 #undef  WL_AGAIN
@@ -4523,14 +4546,19 @@ ${segs}
     Term cont = STK(0);
     u32  idx  = (u32)STK(1);
     u32  wf   = (u32)term_aux(cont);
-    if (cont != TERM_HOLE && fid_resw(wf)) {
+    if (cont != TERM_HOLE && (WL_SPILT(wf) || fid_resw(wf))) {
       u64 wa = term_loc(cont);
       u32 wn = fid_arity(wf);
-      WL_FRAME(cont)
-      seq = (seq & 1) | fid_nofk(wf) << 1;
-      WL_ARGS(wa, wn - n)
-      heap_free(e, cls_fit(wn + 2), wa);
+      if (!WL_SPILT(wf)) {
+        WL_FRAME(cont)
+        seq = (seq & 1) | fid_nofk(wf) << 1;
+      }
+      WL_ARGS(wa, WL_SPILT(wf) ? idx : wn - n)
+      heap_free(e, cls_fit(WL_SPILT(wf) ? STAK_LEN : wn + 2), wa);
       WL_TAKE(rv)
+      if (WL_SPILT(wf)) {
+        WL_RETN(n);
+      }
       WL_DYN(wf);
     }
     return task_deliver(e.mem, cont, idx, rv, n);
@@ -4538,6 +4566,11 @@ ${segs}
 
 #if DEVICE
   default: {
+    if (fid >> 16) {
+      fid &= 0xFFFF;
+      sp = lane_spill(e, sp);
+      break;
+    }
     err_post(e.mem, ERR_FIDS);
     return 0;
   }
