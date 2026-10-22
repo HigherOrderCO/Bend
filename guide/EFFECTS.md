@@ -100,17 +100,12 @@ allocate it in the run function and free it in `pack`. In `bend2/effs/`,
 The `.js` file is a plain script, run once in a closure of its own, that
 registers the effect: `io_eff(CID(Clock.now), clock_now)`. The effect
 takes the def's arguments as JS values: a `U32` is a number, a `Nat` a
-number, a constructor `{$: CID(Name), field: value}`, a handle its host
-value (a descriptor). A `String` or `Char` is Bend's own text, a JS string
-in which a Char that is no Unicode scalar takes four units, so it is
-converted before it leaves, wherever it sits in the arguments:
-`io_bytes(s)` gives its UTF-8 bytes and `str_out(s)` a host string, each
-with U+FFFD for such a Char, as `io_cstr` does on the C side.
-`CID(Name)` is the constructor's tag, read as on the C side. It returns
-the answer the same way: `io_done(v)`, `io_fail(code)`,
-`io_tup(handle, result)`, `{$: CID(Unit)}`. Text answers as Bend's own
-too: a host string goes in through `str_in(s)`, which turns a lone
-surrogate into U+FFFD, and bytes through `io_text(b, n)`, as `io_str` does. A `Nat` answer that is not a
+number, a `String` Bend's text, taken with `io_bytes(s)` (its UTF-8) or
+`str_out(s)` (a host string), a constructor `{$: CID(Name), field: value}`,
+a handle its host value (a descriptor). `CID(Name)` is the constructor's
+tag, read as on the C side. It returns the answer the same way:
+`io_done(v)`, `io_fail(code)`, `io_tup(handle, result)`, `{$: CID(Unit)}`,
+a `String` as `str_in(s)` or `io_text(b, n)`. A `Nat` answer that is not a
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.
 
