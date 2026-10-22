@@ -22,7 +22,7 @@
 // events), its input method and context (NULL if none opened), the
 // time and code of the last key the method took, the frame's image,
 // the events pumped since the last frame, five words each (cid, a, b,
-// c, d) as on the Mac, whether it holds the pointer, and the display's
+// c, d) as on the Mac, its pointer grab and warp baseline, and the display's
 // refresh period in ns.
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -31,7 +31,36 @@
 #include <dlfcn.h>
 #include <limits.h>
 #ifdef CID(Window.fullscreen)
-#include <X11/extensions/Xrender.h>
+// XRender is loaded at run time, like RandR below: only Xlib headers are needed.
+typedef struct {
+  XID id;
+  int type, depth;
+  struct {
+    short red, redMask, green, greenMask, blue, blueMask, alpha, alphaMask;
+  } direct;
+  Colormap colormap;
+} BendRenderFormat;
+
+typedef struct {
+  int repeat;
+  XID alpha_map;
+  int alpha_x_origin, alpha_y_origin, clip_x_origin, clip_y_origin;
+  Pixmap clip_mask;
+  Bool graphics_exposures;
+  int subwindow_mode, poly_edge, poly_mode;
+  Atom dither;
+  Bool component_alpha;
+} BendRenderAttrs;
+
+typedef struct {
+  int matrix[3][3];
+} BendRenderTransform;
+
+enum {
+  BEND_RENDER_SRC = 1,
+  BEND_RENDER_REPEAT = 1,
+  BEND_RENDER_PAD = 2
+};
 #endif
 #include <langinfo.h>
 #include <locale.h>
@@ -47,14 +76,13 @@ typedef struct {
 #ifdef CID(Window.fullscreen)
   Atom     state;
   Atom     full;
-  Atom     clients;
   bool     full_supported;
-  bool     managed;
+  bool     mapped;
   bool     full_sent;
   u64      full_due;
   Pixmap   pix;
-  Picture  source;
-  Picture  target;
+  XID      source;
+  XID      target;
   u32      vx, vy, vw, vh;
   bool     full_now;
   bool     full_want;
@@ -67,12 +95,22 @@ typedef struct {
   u32      cap;
   u32*     evs;
   u32      grab;
-  unsigned long warp_serial;
+  unsigned long warp_serial, warp_floor;
+  int      mouse_x, mouse_y;
   u64      period;
 } BendWin;
 
-static void window_warp(BendWin* win, int x, int y) {
+// A grab or resize changes the basis; an ordinary recenter preserves queued input.
+static void window_warp(BendWin* win, int x, int y, bool reset) {
+  if (!reset && win->warp_serial) {
+    return;
+  }
   win->warp_serial = NextRequest(win->dpy);
+  if (reset) {
+    win->warp_floor = win->warp_serial;
+    win->mouse_x = x;
+    win->mouse_y = y;
+  }
   XWarpPointer(win->dpy, None, win->win, 0, 0, 0, 0, x, y);
 }
 
@@ -90,13 +128,13 @@ static void window_limits(BendWin* win, bool on) {
 #ifdef CID(Window.fullscreen)
 static struct {
   bool tried;
-  XRenderPictFormat* (*format)(Display*, Visual*);
-  Picture (*create)(Display*, Drawable, XRenderPictFormat*, unsigned long,
-    const XRenderPictureAttributes*);
-  void (*destroy)(Display*, Picture);
-  void (*transform)(Display*, Picture, XTransform*);
-  void (*filter)(Display*, Picture, const char*, XFixed*, int);
-  void (*composite)(Display*, int, Picture, Picture, Picture,
+  BendRenderFormat* (*format)(Display*, Visual*);
+  XID (*create)(Display*, Drawable, BendRenderFormat*, unsigned long,
+    const BendRenderAttrs*);
+  void (*destroy)(Display*, XID);
+  void (*transform)(Display*, XID, BendRenderTransform*);
+  void (*filter)(Display*, XID, const char*, int*, int);
+  void (*composite)(Display*, int, XID, XID, XID,
     int, int, int, int, int, int, unsigned int, unsigned int);
 } window_render;
 
@@ -155,9 +193,9 @@ static void window_viewport(BendWin* win) {
   win->vy = full ? (win->height - vh) / 2 : 0;
   win->vw = vw;
   win->vh = vh;
-  if (win->source) {
-    XTransform transform = {{{ XDoubleToFixed((double)w / vw), 0, 0 },
-      { 0, XDoubleToFixed((double)h / vh), 0 }, { 0, 0, XDoubleToFixed(1) }}};
+  if (full) {
+    BendRenderTransform transform = {{{ (int)((double)w / vw * 65536), 0, 0 },
+      { 0, (int)((double)h / vh * 65536), 0 }, { 0, 0, 65536 }}};
     window_render.transform(win->dpy, win->source, &transform);
     XClearWindow(win->dpy, win->win);
   }
@@ -172,22 +210,22 @@ static bool window_surface(BendWin* win) {
   }
   Display* dpy = win->dpy;
   int scr = DefaultScreen(dpy);
-  XRenderPictFormat* format = window_render.format(dpy, DefaultVisual(dpy, scr));
+  BendRenderFormat* format = window_render.format(dpy, DefaultVisual(dpy, scr));
   if (format == NULL) {
     win->full_supported = false;
     return false;
   }
   win->pix = XCreatePixmap(dpy, win->win, win->img->width, win->img->height,
     DefaultDepth(dpy, scr));
-  XRenderPictureAttributes attrs = { .repeat = RepeatPad };
-  win->source = window_render.create(dpy, win->pix, format, CPRepeat, &attrs);
+  BendRenderAttrs attrs = { .repeat = BEND_RENDER_PAD };
+  win->source = window_render.create(dpy, win->pix, format, BEND_RENDER_REPEAT, &attrs);
   win->target = window_render.create(dpy, win->win, format, 0, NULL);
-  window_render.filter(dpy, win->source, FilterNearest, NULL, 0);
+  window_render.filter(dpy, win->source, "nearest", NULL, 0);
   return true;
 }
 
 static void window_full_request(BendWin* win) {
-  if (!win->full_wait || !win->managed) {
+  if (!win->full_wait || !win->mapped) {
     return;
   }
   XEvent ev = { 0 };
@@ -258,8 +296,10 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   CGSize         draw_size;
 #ifdef CID(Window.fullscreen)
   NSUInteger     full_style;
+  NSUInteger     full_behavior;
   BOOL           full_want;
   BOOL           full_busy;
+  BOOL           full_started;
   BOOL           full_dirty;
   u64            full_due;
 #endif
@@ -499,10 +539,12 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
     if (on) {
       self.layer.contentsGravity = kCAGravityResizeAspect;
       full_style = win.styleMask;
+      full_behavior = win.collectionBehavior;
       win.styleMask |= NSWindowStyleMaskResizable;
       win.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
     }
     full_busy = YES;
+    full_started = NO;
     full_due = io_tick() + 5000000000ull;
     [win toggleFullScreen:nil];
   }
@@ -510,8 +552,10 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 
 - (void)fullDone {
   full_busy = NO;
+  full_started = NO;
   if (!(self.window.styleMask & NSWindowStyleMaskFullScreen)) {
     self.window.styleMask = full_style;
+    self.window.collectionBehavior = full_behavior;
     self.layer.contentsGravity = kCAGravityResize;
   }
   if (full_dirty) {
@@ -522,20 +566,20 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 // An ignored toggle sends no delegate notification. Frames and later requests
 // retire it rather than leaving every future target queued forever.
 - (void)fullTick {
-  if (full_busy && io_tick() >= full_due) {
+  if (full_busy && !full_started && io_tick() >= full_due) {
     [self fullDone];
   }
 }
 
 - (void)windowWillEnterFullScreen:(NSNotification*)note {
   full_busy = YES;
+  full_started = YES;
   self.layer.contentsGravity = kCAGravityResizeAspect;
-  full_due = io_tick() + 5000000000ull;
 }
 
 - (void)windowWillExitFullScreen:(NSNotification*)note {
   full_busy = YES;
-  full_due = io_tick() + 5000000000ull;
+  full_started = YES;
 }
 
 - (void)windowDidEnterFullScreen:(NSNotification*)note {
@@ -642,6 +686,7 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
     view->draw_size = CGSizeMake(w, h);
 #ifdef CID(Window.fullscreen)
     view->full_style = win.styleMask;
+    view->full_behavior = win.collectionBehavior;
 #endif
     view.wantsLayer = YES;
     CAMetalLayer* layer = (CAMetalLayer*)view.layer;
@@ -756,11 +801,9 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
 #ifdef CID(Window.fullscreen)
   win->state = XInternAtom(dpy, "_NET_WM_STATE", False);
   win->full = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
-  win->clients = XInternAtom(dpy, "_NET_CLIENT_LIST", False);
   Atom have = XInternAtom(dpy, "_NET_SUPPORTED", False);
   win->full_supported = window_has_value(dpy, DefaultRootWindow(dpy), have,
     XA_ATOM, win->full) && window_renderer(dpy);
-  XSelectInput(dpy, DefaultRootWindow(dpy), PropertyChangeMask);
 #endif
   win->img = XCreateImage(dpy, DefaultVisual(dpy, scr), DefaultDepth(dpy, scr),
     ZPixmap, 0, io_mem(calloc(w * h, 4)), w, h, 32, w * 4);
@@ -1121,8 +1164,7 @@ static void window_pump(BendWin* win) {
   u32 ph = win->height;
   int cx = pw / 2;
   int cy = ph / 2;
-  int x  = cx;
-  int y  = cy;
+  f32 dx = 0, dy = 0;
   while (XPending(win->dpy) > 0) {
     XEvent ev;
     XNextEvent(win->dpy, &ev);
@@ -1132,10 +1174,11 @@ static void window_pump(BendWin* win) {
       if (pw != ev.xconfigure.width || ph != ev.xconfigure.height) {
         win->width = pw = ev.xconfigure.width;
         win->height = ph = ev.xconfigure.height;
-        x = cx = pw / 2;
-        y = cy = ph / 2;
+        cx = pw / 2;
+        cy = ph / 2;
+        dx = dy = 0;
         if (win->grab) {
-          window_warp(win, cx, cy);
+          window_warp(win, cx, cy, true);
         }
 #ifdef CID(Window.fullscreen)
         window_viewport(win);
@@ -1150,18 +1193,17 @@ static void window_pump(BendWin* win) {
       }
       if (!win->full_wait) {
         win->full_want = full;
-        window_limits(win, full);
       }
       if (win->full_now != full) {
         win->full_now = full;
         if (full) {
           window_surface(win);
         }
+        window_limits(win, full || win->full_want);
         window_viewport(win);
       }
-    } else if (ev.type == PropertyNotify && ev.xproperty.atom == win->clients) {
-      win->managed = window_has_value(win->dpy, DefaultRootWindow(win->dpy),
-        win->clients, XA_WINDOW, win->win);
+    } else if (ev.type == MapNotify) {
+      win->mapped = true;
       if (!win->full_sent) {
         window_full_request(win);
       }
@@ -1196,12 +1238,21 @@ static void window_pump(BendWin* win) {
           f32_rewrap(b > 5 ? 0 : s));
       }
     } else if (ev.type == MotionNotify) {
-      if (win->grab && ev.xmotion.serial < win->warp_serial) {
-        continue;
-      }
-      x = ev.xmotion.x;
-      y = ev.xmotion.y;
-      if (!win->grab) {
+      int x = ev.xmotion.x, y = ev.xmotion.y;
+      if (win->grab) {
+        if (ev.xmotion.serial < win->warp_floor) {
+          continue;
+        }
+        if (win->warp_serial && ev.xmotion.serial >= win->warp_serial) {
+          win->warp_serial = 0;
+          win->mouse_x = cx;
+          win->mouse_y = cy;
+        }
+        dx += x - win->mouse_x;
+        dy += y - win->mouse_y;
+        win->mouse_x = x;
+        win->mouse_y = y;
+      } else {
         window_push(win, CID(Move), window_coord(win, x, false),
           window_coord(win, y, true), 0, 0);
       }
@@ -1228,9 +1279,8 @@ static void window_pump(BendWin* win) {
     window_viewport(win);
   }
 #endif
-  // grabbed, the frame's motion is one look from the centre
-  if (win->grab && (x != cx || y != cy)) {
-    f32 dx = x - cx, dy = y - cy;
+  // Sum real motion across the pending warp without counting the warp itself.
+  if (win->grab && (dx != 0 || dy != 0)) {
 #ifdef CID(Window.fullscreen)
     if (win->full_now && win->source) {
       dx *= (f32)w / win->vw;
@@ -1238,7 +1288,9 @@ static void window_pump(BendWin* win) {
     }
 #endif
     window_push(win, CID(Look), f32_rewrap(dx), f32_rewrap(dy), 0, 0);
-    window_warp(win, cx, cy);
+  }
+  if (win->grab && (win->mouse_x != cx || win->mouse_y != cy)) {
+    window_warp(win, cx, cy, false);
   }
 }
 
@@ -1324,7 +1376,7 @@ static void window_show(Env e, BendWin* win, Term image) {
   if (win->full_now && win->source) {
     XPutImage(win->dpy, win->pix, DefaultGC(win->dpy, DefaultScreen(win->dpy)),
       win->img, 0, 0, 0, 0, w, h);
-    window_render.composite(win->dpy, PictOpSrc, win->source, None, win->target,
+    window_render.composite(win->dpy, BEND_RENDER_SRC, win->source, None, win->target,
       0, 0, 0, 0, win->vx, win->vy, win->vw, win->vh);
   } else
 #endif
@@ -1421,7 +1473,6 @@ static u32 window_fullscreen(intptr_t at, bool on, const char** why) {
 
 static u32 window_fullscreen(intptr_t at, bool on, const char** why) {
   BendWin* win = (BendWin*)at;
-  Display* dpy = win->dpy;
   if (!win->full_supported) {
     *why = "Window.fullscreen: desktop has no EWMH/XRender fullscreen support";
     return ENOTSUP;
@@ -1442,10 +1493,6 @@ static u32 window_fullscreen(intptr_t at, bool on, const char** why) {
   win->full_wait = true;
   win->full_due = io_tick() + 5000000000ull;
   window_limits(win, true);
-  if (!win->managed) {
-    win->managed = window_has_value(dpy, DefaultRootWindow(dpy),
-      win->clients, XA_WINDOW, win->win);
-  }
   window_full_request(win);
   return 0;
 }
@@ -1504,7 +1551,7 @@ static void window_grab(intptr_t at, bool on) {
     XFreeCursor(win->dpy, cur);
     XFreePixmap(win->dpy, pix);
     if (win->grab) {
-      window_warp(win, win->width / 2, win->height / 2);
+      window_warp(win, win->width / 2, win->height / 2, true);
     }
   } else if (!on && win->grab) {
     XUngrabPointer(win->dpy, CurrentTime);
@@ -1538,6 +1585,23 @@ static void __attribute__((constructor)) window_grab_use(void) {
 static void window_close(intptr_t at) {
   NSWindow* win = CFBridgingRelease((void*)at);
   [win.contentView setValue:@NO forKey:@"grab"];
+#ifdef CID(Window.fullscreen)
+  BendView* view = (BendView*)win.contentView;
+  [view setFullscreen:NO];
+  while (view->full_busy) {
+    @autoreleasepool {
+      NSEvent* ev = [NSApp nextEventMatchingMask:NSEventMaskAny
+        untilDate:NSDate.distantPast inMode:NSDefaultRunLoopMode dequeue:YES];
+      if (ev != nil) {
+        [NSApp sendEvent:ev];
+      } else {
+        CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.01, true);
+      }
+      [view fullTick];
+    }
+  }
+#endif
+  win.delegate = nil;
   [win close];
 }
 
