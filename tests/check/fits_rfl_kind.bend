@@ -9,11 +9,12 @@ def data_type(): {==}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : Data
-#|- observed : Type
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: data_type
 #|7 | law data_type: {Data == Type : Type}
 #|8>| def data_type(): {==}
 #|  |                  ^^^^
 #|9 |
+#|- left     : Data  =>  Data
+#|- right    : Type  =>  Type
 #|exit 1

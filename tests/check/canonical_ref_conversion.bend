@@ -44,8 +44,7 @@ def main(): 0
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : f(t)
-#|- observed : g(t)
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- t : Nc
 #|Location: eq
@@ -53,4 +52,6 @@ def main(): 0
 #|38>|   {==}
 #|   |   ^^^^
 #|39 |
+#|- left     : f(t)  =>  f(t)
+#|- right    : g(t)  =>  g(t)
 #|exit 1

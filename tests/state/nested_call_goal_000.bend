@@ -45,8 +45,7 @@ def turn_turn(d):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : turn(turn(d))
-#|- observed : back(d)
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- d : Dir
 #|Location: turn_turn
@@ -54,4 +53,6 @@ def turn_turn(d):
 #|44>|   {==}
 #|   |   ^^^^
 #|45 |
+#|- left     : turn(turn(d))  =>  turn(turn(d))
+#|- right    : back(d)  =>  back(d)
 #|exit 1

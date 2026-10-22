@@ -16,11 +16,12 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : 1.5
-#|- observed : 2.5
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: prf
 #| 8 | def prf():
 #| 9>|   {==}
 #|   |   ^^^^
 #|10 |
+#|- left     : 1.5  =>  1.5
+#|- right    : 2.5  =>  2.5
 #|exit 1

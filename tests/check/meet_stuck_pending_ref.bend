@@ -20,11 +20,12 @@ def q():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : q <&> &1
-#|- observed : &1
+#|- message  : {==} needs both sides to compute to the same value
 #|Location: thm
 #|15 | def thm():
 #|16>|   {==}
 #|   |   ^^^^
 #|17 |
+#|- left     : q <&> &1  =>  q <&> &1
+#|- right    : &1  =>  &1
 #|exit 1

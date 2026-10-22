@@ -31,8 +31,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : f(U32.add(1, x))
-#|- observed : 0
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- x : U32
 #|Location: bad
@@ -40,4 +39,6 @@ def main():
 #|24>|   {==}
 #|   |   ^^^^
 #|25 |
+#|- left     : f(U32.add(1, x))  =>  f(U32.add(1, x))
+#|- right    : 0  =>  0
 #|exit 1

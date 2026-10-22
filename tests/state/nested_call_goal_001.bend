@@ -43,8 +43,7 @@ def rot_x(p):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : getx(rot(p))
-#|- observed : gety(p)
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- p : P3
 #|Location: rot_x
@@ -52,4 +51,6 @@ def rot_x(p):
 #|42>|   {==}
 #|   |   ^^^^
 #|43 |
+#|- left     : getx(rot(p))  =>  getx(rot(p))
+#|- right    : gety(p)  =>  gety(p)
 #|exit 1

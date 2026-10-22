@@ -42,8 +42,7 @@ def ones_twos(n):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : S{ones(n)}
-#|- observed : S{twos(n)}
+#|- message  : {==} needs both sides to compute to the same value
 #|Context:
 #|- n : Nat
 #|Location: ones_twos
@@ -51,4 +50,6 @@ def ones_twos(n):
 #|41>|       {==}
 #|   |       ^^^^
 #|42 |
+#|- left     : ones(1n+n)  =>  S{ones(n)}
+#|- right    : twos(1n+n)  =>  S{twos(n)}
 #|exit 1

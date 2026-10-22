@@ -3668,7 +3668,28 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
         throw Err(book, ctx, ty, "non-inferrable term", tm.s, lhs.def);
       }
       if (!term_compare("EQ", book, t_wnf.a, t_wnf.b, d)) {
-        throw Err(book, ctx, t_wnf.a, t_wnf.b, tm.s, lhs.def);
+        const file = tm.s?.file;
+        const bnd  = ctx_scope(ctx);
+        // as the rest of the error prints: the same rebasing, no strip
+        const cut = (s: string): string => s.length <= 100 ? s : s.slice(0, 97) + "...";
+        const raw = (x: HTerm): string => term_show(term_lower(x, bnd.length), -1, bnd, file);
+        // the weak head normal form first: it is one step and short, so
+        // the strong one (the whole value) is only computed when the
+        // short one says nothing
+        const show = (x: HTerm): string => {
+          const w = term_show(term_lower(term_wnf(book, x), bnd.length), -1, bnd, file);
+          if (w.length <= 100) {
+            return w;
+          }
+          const s = expr_show(book, x, bnd, file);
+          return s.length <= 100 ? s : cut(w);
+        };
+        const lft  = raw(t_wnf.a);
+        const rgt  = raw(t_wnf.b);
+        const lval = show(t_wnf.a);
+        const rval = show(t_wnf.b);
+        const nte  = "- left     : " + cut(lft) + "  =>  " + lval + "\n- right    : " + cut(rgt) + "  =>  " + rval;
+        throw Err(book, ctx, "{==} needs both sides to compute to the same value", undefined, tm.s, lhs.def, nte);
       }
       return Check(tm, ty, uses_nil());
     }
