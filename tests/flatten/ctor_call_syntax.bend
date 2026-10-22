@@ -30,4 +30,5 @@ def main(): f(Zw4{})
 #|15>|   Aw4(x)
 #|   |   ^^^
 #|16 |
+#|Note: did you mean Nw4, or Rw4?
 #|exit 1

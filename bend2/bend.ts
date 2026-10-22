@@ -1217,6 +1217,62 @@ export function name_show(file: File | undefined, k: Name): string {
   return ns === file.ns ? nm : a === undefined ? name_key(k) : a + "." + nm;
 }
 
+// a misspelt name: declared names within edit distance 2, same namespace
+// first, then nearest and alphabetical. on the error path only.
+function name_suggest(book: Book, k: Name, file?: File): Name[] {
+  // a name the file can see: the root, its own, or an imported one
+  const vis = file === undefined ? null : new Set(["", file.ns, ...Object.values(file.al)]);
+  const mod = (o: Name): string => {
+    const c = o.indexOf(":");
+    return c < 0 ? "" : o.slice(0, c);
+  };
+  const part = (o: Name): [string, string] => {
+    const c = o.indexOf(":");
+    if (c >= 0) {
+      return [o.slice(0, c), o.slice(c + 1)];
+    }
+    const d = o.lastIndexOf(".");
+    return d > 0 ? [o.slice(0, d), o.slice(d + 1)] : ["", o];
+  };
+  const [ns, nm] = part(k);
+  const dist = (a: string, b: string): number => {
+    let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      }
+      prev = cur;
+    }
+    return prev[b.length];
+  };
+  const out: Array<[Name, number, number]> = [];
+  for (const o in book.tlds) {
+    if (o === k || o.includes("~") || o.lastIndexOf(".") === 0) {
+      continue;
+    }
+    if (vis !== null && !vis.has(mod(o))) {
+      continue;
+    }
+    const [ons, onm] = part(o);
+    if (onm.startsWith("_") || nm.startsWith("_")) {
+      continue;
+    }
+    if (Math.abs(o.length - k.length) > 2) {
+      continue;
+    }
+    const full = dist(name_key(k), name_key(o));
+    const d = dist(nm, onm);
+    if (full <= 2 && (d <= 1 || nm[0] === onm[0])) {
+      out.push([o, ons === ns ? 0 : 1, full]);
+    }
+  }
+  const same = out.filter(([, s]) => s === 0);
+  const pool = same.length === 0 ? out : same;
+  pool.sort((a, b) => a[2] - b[2] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  return pool.slice(0, 3).map(([o]) => o);
+}
+
 export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?: File): string {
   function term_show_sugar_exi(tm: LTerm, prc: number): string | null {
     const [h, xs] = term_unapply(tm);
@@ -3312,7 +3368,10 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
     case "Ref": {
       const tld = book.tlds[tm.k];
       if (tld === undefined) {
-        throw Err(book, ctx, "a defined name", tm, tm.s, lhs.def);
+        const sug = name_suggest(book, tm.k, tm.s?.file).map((o) => name_show(tm.s?.file, o));
+        const nte = sug.length === 0 ? undefined
+          : "Note: did you mean " + (sug.length === 1 ? sug[0] : sug.slice(0, -1).join(", ") + ", or " + sug[sug.length - 1]) + "?";
+        throw Err(book, ctx, "a defined name", tm, tm.s, lhs.def, nte);
       }
       let k = tm.k;
       let x = 0;
