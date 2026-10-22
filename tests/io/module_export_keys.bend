@@ -1,5 +1,5 @@
-# A pure __proto__ def is an own, enumerable JS module export, without
-# changing the export object's prototype.
+# JS exports keep own __proto__ keys and distinguish imported dep:value
+# from a root dep.value, including when the export object is spread.
 import Base
 
 def Module.export_keys() -> IO(U32):

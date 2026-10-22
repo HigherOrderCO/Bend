@@ -191,6 +191,54 @@ function separator(a: Node, b: Node): string {
   return " ";
 }
 
+type Level = { col: number; depth: number; parent?: Level };
+
+// A case belongs to its match, not to the indentation of the preceding body.
+// Retain the match's path even when an arm body is written farther left.
+class Layout {
+  level: Level = { col: 0, depth: 0 };
+  scopes: { parent: number; first?: number; current: number; level?: Level }[] = [];
+
+  line(nodes: Node[]): number {
+    const head = first(nodes[0]), col = head.col;
+    let level = this.level;
+    while (level.parent && col < level.col) level = level.parent;
+    if (col > level.col) level = { col, depth: level.depth + 1, parent: level };
+    if (col === 0 && (head.text === "def" || head.text === "type"
+      || head.text === "law" || head.text === "@")) this.scopes.length = 0;
+    if (head.text !== "import") for (const node of nodes) {
+      if ("open" in node || node.kind !== "code") continue;
+      if (node.text === "match") {
+        this.scopes.push({ parent: this.scopes.at(-1)?.current ?? -1, current: -1 });
+      } else if (node.text === "case") {
+        while (this.scopes.length) {
+          const scope = this.scopes.at(-1)!;
+          if (scope.first === undefined ? node.col > scope.parent : node.col >= scope.first) break;
+          this.scopes.pop();
+        }
+        const scope = this.scopes.at(-1);
+        if (!scope) continue;
+        if (scope.first === undefined) {
+          scope.first = node.col;
+          if (node === nodes[0]) {
+            const parent = this.scopes.at(-2)?.level;
+            if (parent && level.depth <= parent.depth) {
+              level = { col: node.col, depth: parent.depth + 1, parent };
+            }
+            scope.level = level;
+          }
+        } else if (node === nodes[0] && scope.level) {
+          level = scope.level.col === node.col ? scope.level : { ...scope.level, col: node.col };
+          scope.level = level;
+        }
+        scope.current = node.col;
+      }
+    }
+    this.level = level;
+    return level.depth;
+  }
+}
+
 function sequence(
   nodes: Node[],
   source: string,
@@ -372,7 +420,7 @@ export function format(source: string, opts: FormatOptions): string {
     } else records[records.length - 1].push(n);
   }
   const rows: string[] = [],
-    levels = [0];
+    layout = new Layout();
   let blank = false,
     previous = "",
     previousComment = false;
@@ -383,9 +431,7 @@ export function format(source: string, opts: FormatOptions): string {
     }
     const head = first(record[0]),
       col = head.col;
-    while (levels.length > 1 && col < levels[levels.length - 1]) levels.pop();
-    if (col > levels[levels.length - 1]) levels.push(col);
-    const indent = (levels.length - 1) * opts.tabWidth;
+    const indent = layout.line(record) * opts.tabWidth;
     const declaration = /^(def|type|law)$/.test(head.text) || head.text === "@";
     const comment = head.kind === "comment";
     if (

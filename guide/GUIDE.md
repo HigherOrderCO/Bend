@@ -371,8 +371,8 @@ def main() -> IO(Unit):
 Every bind is annotated, and `x : T = v` binds a pure value in the middle of a
 block. A fallible effect answers `Result<&1, &1, U32 & String, A>`: `IO.try`
 unwraps it or exits with the error, and `IO.die` exits with your own. `IO.args`
-answers the command line, less the runtime's own options (a `--` ends them):
-its head is the program as invoked, like C's `argv[0]`. A handle (`File`,
+answers the command line, less the runtime's options (`+RTS` to `-RTS`): its
+head is the program as invoked, like C's `argv[0]`. A handle (`File`,
 `Socket`, `Window`) is an affine, opaque value, so every effect on one hands it
 back beside its result, and no program can forge or reuse one.
 
@@ -553,9 +553,8 @@ bend file.bend -o file.js # emit the JS source instead
 bend file.bend -o f.mjs   # emit an ES module of its non-IO defs, for JS to import
 bend file.bend --verdict  # check; then recheck with the proven BendTT kernel
 bend page.html -o dist    # bundle a web page that imports .bend files
-./file --threads 8        # run a native binary on 8 CPU threads
-./file --gpu off          # run ! calls on the CPU (the GPU is on by default)
-./file --gpu 4GB          # cap the GPU's heap at 4GB
+./file +RTS --threads 8   # run a native binary on 8 CPU threads
+./file +RTS --gpu 4GB     # cap the GPU heap at 4GB; off runs ! calls on the CPU
 ```
 
 A `main` that returns `IO` runs compiled; one that returns a value is normalized
@@ -646,11 +645,11 @@ whichever chip it lands on.
 A term is one 64-bit word: small values are stored inline, everything else is a
 pointer into a single heap shared by every core and by the GPU. There is no
 garbage collector. Since values are affine, a `match` frees the node it opens
-on the spot, and only `+` values carry a reference count. There is no C stack
-either: each def compiles to a segment of a flat state machine, a call is a
-jump, and a parallel call creates a join task plus one task per call, which the
-scheduler deals across CPU or GPU lanes. `paper/BendRT.pdf` has the design and
-the benchmarks.
+on the spot, but copying any value of a datatype makes all its nodes count their
+fields. There is no C stack either: each def compiles to a segment of a flat
+state machine, a call is a jump, and a parallel call creates a join task plus
+one task per call, which the scheduler deals across CPU or GPU lanes.
+`paper/BendRT.pdf` has the design and the benchmarks.
 
 Bend's theory has one universe and no positivity check: `Type : Type` holds,
 and a datatype may recurse on the left of an arrow. What keeps this consistent

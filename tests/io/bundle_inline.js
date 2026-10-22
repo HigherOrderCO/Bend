@@ -42,8 +42,34 @@ function bundle_inline() {
       return 4;
     }
     const multi = build("multi.html");
-    return multi.status === 1 && multi.stderr.includes("multi.html:12:11")
-      ? 0 : 5;
+    if (multi.status !== 1 || !multi.stderr.includes("multi.html:12:11")) {
+      return 5;
+    }
+    put(".collision.html.bend-inline-0.js", 'console.log("asset");\n');
+    put("collision.html", '<script type="module" src="./.collision.html.bend-inline-0.js"></script>\n'
+      + '<script type="module">import M from "./m.bend"; console.log(M.main());</script>\n');
+    if (build("collision.html").status !== 0) {
+      return 6;
+    }
+    const html = fs.readFileSync(path.join(out, "collision.html"), "utf8");
+    const sources = [];
+    new HTMLRewriter().on("script", {
+      element(el) {
+        const src = el.getAttribute("src");
+        if (src) sources.push(src);
+      },
+    }).transform(html);
+    put("run-page.mjs", sources.map(src => "await import("
+      + JSON.stringify(require("node:url").pathToFileURL(path.resolve(out, src)).href) + ");").join("\n"));
+    const collision = run(path.join(dir, "run-page.mjs"));
+    if (collision.status !== 0 || collision.stdout.trim() !== "asset\n42") {
+      return 7;
+    }
+    put(".external.html.bend-inline-99.js", "const broken = ;\n");
+    put("external.html", '<script type="module" src="./.external.html.bend-inline-99.js"></script>\n');
+    const external = build("external.html");
+    return external.status === 1 && external.stderr.includes(".external.html.bend-inline-99.js:1:16")
+      ? 0 : 8;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
