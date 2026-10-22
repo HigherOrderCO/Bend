@@ -19,7 +19,7 @@ The checker skips dead code (#820, #878, #973, #1091)
 `~` template arguments are compile-time (#784)
   In live code a `~` argument must be closed. A def parameter is a runtime
   value, so pass it as a plain argument instead. In a type, `--verdict`
-  lifts captured runtime Data into explicit kernel parameters (#1483);
+  lifts typed runtime captures into explicit kernel parameters (#1483);
   this does not admit runtime captures in live template applications.
 
 Allocation failure fail-stops the runtime (#792)

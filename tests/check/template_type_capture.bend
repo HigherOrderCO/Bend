@@ -1,4 +1,4 @@
-# A type-only template can close over run-time Data. Its kernel instance
+# A type-only template can close over a typed run-time value. Its kernel instance
 # must take the actual captures, not freeze them as global constants.
 import Base
 
@@ -48,4 +48,22 @@ def record_bound(b: Bounds, xs: List<&2, Nat>) -> Data:
 def record_two() -> record_bound(Bounds{2n, 3n}, [2n, 3n]):
   {==}
 
+# A lifted predicate's outer lo and T's local hi have different bindings,
+# even though both have frontend level zero in their own definitions.
+def T(~f: Nat -> Bool, hi: Nat, xs: List<&2, Nat>) -> Data:
+  {List.all(~&2, ~Nat, ~(y => Bool.and(f(y), Nat.is_le(y, hi))), xs) == True{} : Bool}
+
+def bounded_zero(lo: Nat, p: {True{} == Nat.is_le(lo, 0n) : Bool}) -> T(~(y => Nat.is_le(lo, y)), 0n, [0n]):
+  %e@p : {List.all(~&2, ~Nat, ~(y => Bool.and(_, Nat.is_le(y, 0n))), [0n]) == True{} : Bool}
+  {==}
+
+law refl_all:
+  for ~b: Bool
+  for xs: List<&2, Bool>
+  {List.all(~&2, ~Bool, ~(y => Bool.and(y, b)), xs) == List.all(~&2, ~Bool, ~(y => Bool.and(y, b)), xs) : Bool}
+
+def refl_all(b, xs):
+  {==}
+
 #|ALL PROOFS CHECK
+#|Use --verdict for mathematical validity.
