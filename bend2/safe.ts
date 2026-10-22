@@ -36,8 +36,8 @@
 // Quant is a kernel value like any other, and a kind converts in the
 // kernel where it does in bend2: Kind(&0) is *(.Q0), and fits *(.Q1)
 // (Type) only as bend2's LE does. An item (a book name) goes out
-// once per tuple of closed arguments at its template (~) parameters, with
-// those parameters gone. A def with a finite one also goes out as a
+// once per tuple of template (~) arguments, closed up to explicitly lifted
+// typed captures. The ~ parameters go; the captures are kernel parameters. A def with a finite one also goes out as a
 // λ-match on its values that names an instance in each arm, so the
 // kernel checks that every value has one. Every def goes out after the
 // defs its live code names; a name in a type may come later. A def with
@@ -88,9 +88,9 @@ type O =
 // each use's depth and mode, so its o is unused)
 type Bind = { o: O; T: HTerm | null; v?: HTerm };
 
-// the argument of each parameter of an item, or of each column of a
-// tree, that is specialized; null at the rest
-type Cols = Array<HTerm | null>;
+// specialized parameter or tree columns; instance captures stay with
+// these arguments, in dependency order, rather than in pass-global maps
+type Cols = Array<HTerm | null> & { caps?: Map<number | O, Bind & { T: HTerm; k: Name }> };
 
 // an argument: its binder's quantity, the argument, the binder's type,
 // and its value when the binder is specialized
@@ -109,9 +109,10 @@ type Chain = { n: number; cv: number[] };
 // (a word literal there stays a constructor, which the kernel compares to
 // a pattern), each kernel binder's tentative quantity, the default tags
 // (a tag's fields follow it), whether the tree is built only to count
-// its uses, and whether it is built again for a convoy
+// its uses, whether it is built again for a convoy, its capture bindings,
+// and whether open template arguments may be lifted
 type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
-  self: string; empty: O[]; sub: boolean; kq: Q[]; tags: number[]; dry: boolean; again: boolean };
+  self: string; empty: O[]; sub: boolean; kq: Q[]; tags: number[]; dry: boolean; again: boolean; caps?: Map<Name, Bind>; lift?: boolean };
 
 // the elaboration: the book, the book models read (a root's constant at
 // its model), the defs out (an opaque one flagged), each item's kernel
@@ -173,8 +174,8 @@ const UV: O = { $: "Lab", k: "()" };
 // a book the kernel cannot express
 class Scope_Error extends Error {}
 
-// a template argument that depends on a run-time value, which a closed
-// argument there would not
+// an open template argument where lifting is forbidden, including a root's
+// tentative finite-parameter type, whose fallback names closed instances
 class Open_Error extends Scope_Error {}
 
 // a live cycle found below the item at key, now a group: the emission
@@ -309,7 +310,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
         const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
-          const b = term(e, t.s, t.T, false);
+          const b = term(e, { ...t.s, lift: false }, t.T, false);
           G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
           ps = t.ps;
         } catch (x) {
@@ -378,7 +379,12 @@ function item_try(e: Safe, k: Name, cols: Cols): string {
 // book name k at the arguments cols of its specialized parameters (a
 // tab and a def's name is the def's group)
 function item_key(k: Name, cols: Cols): string {
-  return [k, ...cols.flatMap((v) => v === null ? [] : [B.term_key(B.term_lower(v))])].join("\n");
+  const cs = cols.caps;
+  const ns = cs?.size ? new Map(Array.from(cs.values(), (b, i): [Name, HTerm] => [b.k, B.Ref("\0capture" + i)])) : null;
+  const key = (v: HTerm) => B.term_key(B.term_lower(ns === null ? v
+    : subst(v, 0, (o) => o.$ === "Ref" ? ns.get(o.k as Name) : undefined)));
+  return [k, ...(cs === undefined ? [] : Array.from(cs.values(), (b) => "~" + key(b.T))),
+    ...cols.flatMap((v) => v === null ? [] : [key(v)])].join("\n");
 }
 
 // the kernel name of book name k at cols: a Quant literal names itself;
@@ -446,9 +452,9 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
 function def_emit(e: Safe, k: Name, cols: Cols, n: string, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
   const t = tld.e !== undefined ? null : (Object.hasOwn(e.mb.tlds, k) ? (e.mb.tlds[k] as Def).v : model(e, T)) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
-  const s = { ...scope_nil(), self: n };
+  const { s, ps: cps } = spec_scope(e, cols, n);
   const To = term(e, s, T, false);
-  e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
+  e.out.push([n, alls(cps, To), lams(e, cps, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, [])), t !== null]);
 }
 
 // D.arms and D, at D's specialized arguments
@@ -498,9 +504,59 @@ function tele_open(e: Safe, s: Scope, T: HTerm, cols: Cols, n: number): { s: Sco
 // Specialize
 // ----------
 
-// a specialized argument: closed, in normal form
-function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
-  return closed_val(e, s, x) ?? oos("a template argument that depends on a run-time value", Open_Error);
+// Close a specialized argument over explicit kernel parameters, rather
+// than treating a run-time capture as a global constant.
+function spec_val(e: Safe, s: Scope, x: HTerm, cols: Cols): HTerm {
+  const cap = (b: Bind): HTerm => {
+    if (b.T === null) {
+      return oos("a captured variable without its checked type", Open_Error);
+    }
+    const key = b.o.$ === "Var" ? b.o.l : b.o;
+    let c = cols.caps!.get(key);
+    if (c === undefined) {
+      const T = close(b.T);
+      let k = "\0capture" + cols.caps!.size;
+      while (s.caps!.has(k)) k += "_";
+      c = { ...b, T, k };
+      cols.caps!.set(key, c);
+      s.caps!.set(k, c);
+    }
+    return B.Ref(c.k);
+  };
+  const close = (t: HTerm): HTerm => {
+    const v = B.term_snf(e.book, subst(t, s.d, (o) => {
+      const b = o.$ === "Ref" ? s.caps?.get(o.k as Name)
+        : o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < s.d ? s.c[o.i as number] : undefined;
+      return b === undefined ? undefined : b.v === undefined ? cap(b) : close(b.v);
+    }));
+    if (mentions(B.term_lower(v, s.d), (i) => i >= 0 && i < s.d)) {
+      oos("an open value in a template argument", Open_Error);
+    }
+    return v;
+  };
+  return close(x);
+}
+
+
+// A lifted instance's explicit capture prefix, shared by ordinary defs
+// and the selector encoding of a mutually recursive group.
+function spec_scope(e: Safe, cols: Cols, self: string): { s: Scope; ps: Binder[] } {
+  let s = { ...scope_nil(), self };
+  const ps: Binder[] = [];
+  if (cols.caps?.size) s.caps = new Map();
+  for (const { k, T } of cols.caps?.values() ?? []) {
+    ps.push([2, s.D, term(e, s, T, false)]);
+    s.caps!.set(k, { o: { $: "Var", l: s.D }, T });
+    s = scope_kq(scope_hide(s), s.D, 2);
+  }
+  return { s, ps };
+}
+
+function spec_apply(cols: Cols, head: O): O {
+  for (const c of cols.caps?.values() ?? []) {
+    head = { $: "App", q: 2, f: head, x: c.o };
+  }
+  return head;
 }
 
 // x's normal form, when it is closed; null when it depends on a run-time value
@@ -698,6 +754,7 @@ function scope_move(s: Scope, a: number, b: number): Scope {
   const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? { $: "Var", l: b } : o)
     : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, is_o(v) ? mv(v) : v])) as O;
   return { ...s, c: s.c.map((x) => x === undefined ? x : { ...x, o: mv(x.o) }), empty: s.empty.map(mv),
+    caps: s.caps === undefined ? undefined : new Map([...s.caps].map(([k, b]) => [k, { ...b, o: mv(b.o) }])),
     tags: s.tags.flatMap((t) => t === a ? [t, b] : [t]) };
 }
 
@@ -1081,6 +1138,10 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
 function spine(e: Safe, s: Scope, t: HTerm, live: boolean): O {
   const [h, xs] = unapply(t);
   const [f, T] = open(h);
+  if (f.$ === "Ref" && s.caps?.has(f.k)) {
+    const b = s.caps.get(f.k)!;
+    return args(e, s, { $: "Ann", x: b.o, T: term(e, s, b.T!, false) }, b.T, xs, live);
+  }
   if (f.$ !== "Ref") {
     const U = f.$ === "Var" ? s.c[f.i]?.T ?? null : T;
     const o = term(e, s, h, live);
@@ -1103,14 +1164,26 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
   // a def's first x parameters, its ~ ones, are specialized
   const nx = tld?.$ === "Def" ? tld.x : 0;
   const ps: Arg[] = [];
+  const cols: Cols = [];
   let U = T;
   xs.forEach((x, j) => {
     const F = U === null ? U : B.term_wnf(e.book, U);
     if (F?.$ !== "All") {
       return oos("an application past its head's known type");
     }
-    const v = j < nx ? spec_val(e, s, x) : null;
+    let v = j < nx ? closed_val(e, s, x) : null;
+    if (j < nx && (v === null || s.caps?.size)) {
+      if (v === null && (live || s.lift === false)) {
+        oos("a template argument that depends on a runtime value", Open_Error);
+      }
+      if (cols.caps === undefined) {
+        cols.caps = new Map();
+        s = { ...s, caps: new Map(s.caps) };
+      }
+      v = spec_val(e, s, v ?? x, cols);
+    }
     ps.push([quant(F.q), x, F.A, v]);
+    cols.push(v);
     U = F.B(v ?? x);
   });
   // a call that closed a live cycle goes again, through its group
@@ -1118,9 +1191,9 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
   try {
     const g = typeof k === "string" ? group_of(e, k) : null;
     if (g !== null) {
-      return group_call(e, s, g, k as Name, ps, U as HTerm, live);
+      return group_call(e, s, g, k as Name, ps, cols, U as HTerm, live);
     }
-    n = typeof k === "string" ? item_ref(e, k, ps.map((p) => p[3]), live) : null;
+    n = typeof k === "string" ? item_ref(e, k, cols, live) : null;
   } catch (x) {
     if (x instanceof Reroute) {
       return args(e, s, k, T, xs, live);
@@ -1128,8 +1201,9 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
     throw x;
   }
   const a = { ...s, sub: live && n === s.self };
-  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => ({ $: "App", q, f, x: arg_term(e, a, x, A, live && q > 0) }),
-    n === null ? k as O : { $: "Ref", k: n });
+  const head: O = n === null ? k as O
+    : spec_apply(cols, { $: "Ref", k: n });
+  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => ({ $: "App", q, f, x: arg_term(e, a, x, A, live && q > 0) }), head);
 }
 
 // Group
@@ -1245,18 +1319,21 @@ function put(e: Safe, x: Map<string, string> | Set<string>, k: string, v = ""): 
 
 // a call to member m at the arguments ps (R its type): the group's at
 // m's selector, annotated (the kernel infers an unreduced mode)
-function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, live: boolean): O {
+function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], cols: Cols, R: HTerm, live: boolean): O {
   const n = g.qs.length;
   if (ps.length < Math.max(e.book.tlds[m].n, n) || ps.slice(n).some((p) => p[3] !== null)) {
     oos("a partial or specialized call to " + m + ", mutually recursive");
   }
-  const k = item_ref(e, "\t" + g.k, ps.slice(0, n).map((p) => p[3]), live);
+  const cs: Cols = cols.slice(0, n);
+  cs.caps = cols.caps;
+  const k = item_ref(e, "\t" + g.k, cs, live);
   const a = { ...s, sub: live && k === s.self };
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
   const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: UV };
   const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
-    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
+    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }),
+      spec_apply(cs, { $: "Ref", k }));
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
 
@@ -1264,7 +1341,8 @@ function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, l
 // (MODE s), MODE the selected member's other parameters and type; its
 // tree convoys the lead's q=1 variables through the selector's match
 function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
-  const { s, ps: ls, xs: lead } = tele_open(e, { ...scope_nil(), self: n }, e.book.tlds[g.k].T, cols, g.qs.length);
+  const cap = spec_scope(e, cols, n);
+  const { s, ps: ls, xs: lead } = tele_open(e, cap.s, e.book.tlds[g.k].T, cols, g.qs.length);
   // member m past the lead, from scope s1 on: its binders, its terms (but
   // at its specialized parameters), its cols and type
   const rest = (s1: Scope, m: Name) => {
@@ -1294,7 +1372,7 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     return lams(e, r.ps, arm(e, r.s, m, r.cs, r.vs));
   }, []));
   const v = ks.reduce<O>((f, l) => ({ $: "App", q: 1, f, x: { $: "Var", l } }), { $: "App", q: 1, f: body, x: { $: "Var", l: l0 } });
-  e.out.push([n, To, lams(e, [...ls, [1, l0]], v), false]);
+  e.out.push([n, alls(cap.ps, To), lams(e, [...cap.ps, ...ls, [1, l0]], v), false]);
 }
 
 // def k's checked tree at the terms vs (its parameters left to right,
