@@ -1011,8 +1011,16 @@ function lay_at(A: HTerm | null, v: Val): Lay {
     ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
-function lay_eq(a: Lay, b: Lay): boolean {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
+function lay_eq(a: Lay, b: Lay, seen = new Map<Lay, Lay>()): boolean {
+  if (a === b || seen.get(a) === b) {
+    return true;
+  }
+  seen.set(a, b);
+  const x = a.arms ?? {}, y = b.arms ?? {};
+  return a.ks.join() === b.ks.join() && !a.arms === !b.arms
+    && Object.keys(x).join() === Object.keys(y).join()
+    && Object.entries(x).every(([k, ls]) => ls.length === y[k].length
+      && ls.every((l, i) => lay_eq(l, y[k][i], seen)));
 }
 
 function lay_c(k: Kind): string {
@@ -1965,75 +1973,150 @@ function memo_gc(): void {
 // Show
 // ====
 
-// A pure main prints through a descriptor of its type, a node per (type,
-// layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
-// (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
-// then an (offset, node) per field).
+// A pure main prints through Bend code: main_pure writes a printer of
+// main's type as Bend source and checks it in a copy of the book, whose
+// main prints main's value (on C as it walks it, on JS as one text).
 
-function show_main(): (number | Name)[] | null {
-  const main = FL.book.tlds.main;
-  if (!FL.book.tlds.IO) {
+function main_pure(book: Bend.Book, whole = false): Bend.Book {
+  const main = book.tlds.main;
+  if (!book.tlds.IO) {
     die("a build needs import Base");
   }
   if (!fun_runs(main)) {
     die("no main to run");
   }
-  if (io_type(FL.book) !== null) {
-    return null;
+  if (io_type(book) !== null) {
+    return book;
   }
-  const show: (number | Name)[] = [];
-  let names = 0;
-  const lays = new Map<Lay, Map<string, number>>();
+  const ks = Object.keys({ ...book.tlds, ...book.ctrs });
+  const fresh = (p: string): string =>
+    ks.some((k) => k.includes(p)) ? fresh(p + "_") : p;
+  const pre = fresh("main.show"), al = fresh("_ns");
+  const MARK = 1 << 30;
+  // the source names an imported type or constructor through an alias
+  const file = { str: "", ns: "", al: Object.fromEntries([
+    ...new Set(ks.map((k) => k.split(":").slice(0, -1)[0]))].map((ns, i) =>
+      [al + i, ns])) };
+  const fields = new Map<number, Dom>();
+  const defs = new Map<string, [Name, HTerm]>();
+  const src: string[] = [];
+  const free = (t: HTerm, ms = new Set<number>()) => {
+    JSON.stringify(Bend.term_lower(t), (k, v) => k === "s" ? undefined
+      : v?.$ === "Var" && v.i >= MARK && !ms.has(v.i) ? (ms.add(v.i),
+        free(fields.get(v.i)![2], ms), v) : v);
+    return [...ms].sort((a, b) => a - b);
+  };
+  const v = (m: number) => "v" + (m - MARK);
+  const sub = (t: HTerm, env: Bend.List<HTerm>) =>
+    Bend.term_higher(Bend.term_lower(t), env);
+  const words: Record<Name, string> = Object.setPrototypeOf({
+    U32: "U32.show($)", F32: "F32.show.dot(F32.show($))",
+    Nat: 'Nat.show($) ++ "n"', Char: `"'" ++ Char.quote(39, $) ++ "'"`,
+    String: "String.quote($)" }, null);
+  // C prints the value as it walks it; JS builds the text, then prints it
+  const io = ty_all(book.tlds["IO.print"].T);
+  const ret = whole ? io.A : io.B(DUMMY);
+  const seq = (ps: (string | [string, boolean] | null)[]): string => {
+    const xs: [string, boolean][] = [];
+    for (const p of ps.filter((p) => p !== null)) {
+      const [s, io] = typeof p === "string" ? [JSON.stringify(p), false] : p;
+      const l = xs.at(-1);
+      if (l && !l[1] && !io) {
+        l[0] += " ++ " + s;
+      } else {
+        xs.push([s, io]);
+      }
+    }
+    const ys = xs.map(([s, io]) => io || whole ? s : `IO.write(${s})`);
+    return ys.length < 2 ? ys[0] ?? seq([""]) : "do IO<Unit>:" + ys.map(
+      (x, i) => "\n        " + (ys[i + 1] ? "Unit <- " : "") + x).join("");
+  };
+  const piece = (cs: number[], t: HTerm, o: string, xs: string[]):
+    [string, boolean] => {
+    const u = ty_wnf(t)!;
+    const w = u.$ === "Eql" ? '"{==}"' : words[ty_adt(u)?.k!];
+    return w ? [w.replaceAll("$", xs.at(-1)!), false]
+      : [`${show(cs, t, o)}(${xs.join(", ")})`, !whole];
+  };
+  const show = (ms: number[], t: HTerm, o: string) => {
+    const T = ms.reduceRight((B: (env: Bend.List<HTerm>) => HTerm, m) =>
+      (env) => Bend.All(Bend.None(), fields.get(m)![1], 0,
+        sub(fields.get(m)![2], env), (y) => B(Bend.list_set(env, m, y))),
+    (env) => Bend.All(Bend.Lone(), "x", 0, sub(t, env), () => ret))(null);
+    const key = ty_key(T) + o;
+    if (defs.has(key)) {
+      return defs.get(key)![0];
+    }
+    const name = pre + defs.size;
+    defs.set(key, [name, T]);
+    const adt = ty_adt(t);
+    const tld = adt && book.tlds[adt.k];
+    const E = adt?.k === "Array" ? adt.x[0] : null;
+    const arms = tld?.$ === "ADT" && adt?.k !== "IO.OP" && !E
+      ? tld.c.map((c) => {
+        const fs: number[] = [];
+        let tel = tele_fill(c.T, adt!.x);
+        for (let a = Bend.tele_open(book, tel); a;
+          a = Bend.tele_open(book, tel)) {
+          const m = MARK + fields.size;
+          fs.push(m);
+          fields.set(m, [a.q, a.k, a.A]);
+          tel = a.B(Bend.Var(a.k, m));
+        }
+        const b = c.k === "Tuple" ? "(" : c.k === "Con" || c.k === "Nil"
+          ? "[" : "{";
+        const end = b === "{" || o !== b ? "}])"["{[(".indexOf(b)] : null;
+        return `    case ${Bend.name_show(file, c.k)}{${fs.slice(-c.n).map(
+          v).join(", ")}}:\n      ` + seq([b === "{" ? Bend.name_key(c.k) + "{"
+          : o === b ? null : b, ...fs.slice(-c.n).flatMap((m, j) => {
+          const d = fields.get(m)!;
+          const cs = free(d[2]);
+          return [(b === "[" ? j === 0 && o === b : j > 0) ? ", " : null,
+            dom_live(d) ? piece(cs, d[2], j === 1 && b !== "{" ? b : "",
+              [...cs, m].map(v)) : refuse()];
+        }), end]);
+      }) : null;
+    // an Array of Data is read in place by index; another becomes a List
+    const e = E && Bend.term_show(Bend.term_lower(E), -1, [], file);
+    let data = E !== null;
+    try {
+      data &&= !!Bend.term_check_kind(book, { t: E!, n: 0, def: name,
+        qs: [] }, E!, Bend.Many(), "", Bend.ctx_nil(), 0);
+    } catch (x) {
+      if ((x as Bend.Err)?.$ !== "Err") throw x;
+      data = false;
+    }
+    if (data) {
+      src.push(`def ${name}e(s: String, y: ${e}) -> ${whole ? "String"
+        : "IO(Unit)"}:\n  ` + seq([["s", false], piece([], E!, "", ["y"])]));
+    }
+    src.push(`def ${name}(${ms.map((m) => `-${v(m)}: Unit, `).join("")
+      }x: Unit) -> IO(Unit):\n  ` + (data ? `Array.${whole ? "show" : "write"
+      }(~${e}, ~${name}e, x)` : E ? `${show([],
+      ty_all(ty_all(book.tlds["Array.to_list"].T).B(E)).B(DUMMY), "")
+      }(Array.to_list(~${e}, x))` : arms ? "match x:\n" + arms.join("\n")
+      : refuse()));
+    return name;
+  };
   const refuse = () => die("main's type " + Bend.term_show(
     Bend.term_lower(main.T)) + " cannot be printed (a function, a Type, an"
     + " erased or dependent field)");
-  const node = (T: HTerm, lay: Lay) => {
-    const t = ty_wnf(T) as HTerm;
-    const key = ty_key(t);
-    const ids = memo(lays, lay, () => new Map());
-    if (ids.has(key)) {
-      return ids.get(key)!;
-    }
-    const box = lay === BOX;
-    const adt = ty_adt(t);
-    const tld = adt && FL.book.tlds[adt.k];
-    const kind = t.$ === "Eql" ? 5 : "U32 F32 Nat Char String . Array"
-      .split(" ").indexOf(adt?.k ?? "") & 7;
-    if (kind !== 5 && (tld?.$ !== "ADT" || adt?.k === "IO.OP")) {
-      return refuse();
-    }
-    const id = show.push(kind) - 1;
-    ids.set(key, id);
-    const refs: [number, HTerm, Lay][] = [];
-    if (kind === 3) {
-      show.push(Number(box));
-    } else if (kind === 6) {
-      const el = lay_el(adt!.x[0]);
-      refs.push([show.push(0, lay_arr(el).lgs) - 2, adt!.x[0], el]);
-    } else if (kind === 7 && tld?.$ === "ADT") {
-      show.push(Number(box), tld.c.length);
-      for (const c of tld.c) {
-        const fs = (box ? lay_node(c.k) : lay).arms![c.k];
-        const doms = ctr_tail(c, adt!.x);
-        let at = Number(!box && tld.c.length > 1);
-        show.push(names++, c.k, doms.length,
-          c.k === "Tuple" ? 2 : Number(c.k === "Con" || c.k === "Nil"));
-        for (const [f, d] of doms.entries()) {
-          if (!dom_live(d)) {
-            refuse();
-          }
-          refs.push([show.push(at, 0) - 1, d[2], fs[f]]);
-          at += fs[f].ks.length;
-        }
-      }
-    }
-    for (const [at, T2, l] of refs) {
-      show[at] = node(T2, l);
-    }
-    return id;
-  };
-  node(main.T, fun_of("main").ret);
-  return show;
+  const top = seq([piece([], main.T, "", [pre + "main()"]), "\n"]);
+  const b: Bend.Book = { ...book, order: book.order.map((k) =>
+    k === "main" ? pre + "main" : k),
+  tlds: Object.assign(Object.create(null), book.tlds, { [pre + "main"]: main }),
+  ctrs: Object.assign(Object.create(null), book.ctrs),
+  tmps: Object.assign(Object.create(null), ...Object.entries(book.tmps).map(
+    ([k, m]) => ({ [k]: new Map(m) }))) };
+  delete b.tlds.main;
+  const done = b.order.length;
+  Bend.parse_book(b, "", [...src, "def main() -> IO(Unit):\n  "
+    + (whole ? `IO.write(${top})` : top)].join("\n\n"), "", file.al);
+  for (const [name, T] of defs.values()) {
+    (b.tlds[name] as Bend.Def).T = T;
+  }
+  Bend.book_valid(b, done);
+  return b;
 }
 
 // ANF
@@ -2877,10 +2960,8 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
-  const show = show_main();
-  const names = (show ?? []).filter((c) => typeof c === "string");
-  file_book(["main", ...RUNTIME_ADTS,
-    ...names.map((c) => Bend.book_fam(FL.book, c))]);
+  FL = file_new(main_pure(book), false);
+  file_book(["main", ...RUNTIME_ADTS]);
   const facts = () => FL.own.size + FL.hot.size + FL.stat.size;
   let was: number;
   do {
@@ -2919,12 +3000,6 @@ export function compile_book(book: Bend.Book): string {
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
   FL.segs = FL.segs.filter((s) => live.has(s.fid));
   FL.spins = FL.spins.filter((s) => live.has(s.fid));
-  const desc = show === null ? [] : ["#if !DEVICE",
-    `static const u32 SHOW_DESC[] = { ${show.map((c) =>
-      typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
-    `static const char* SHOW_NAMES[] = { ${names.map((n) =>
-      JSON.stringify(Bend.name_key(n))).join(", ")} };`,
-    "#endif"];
   const arg = val_new([""], W64);
   const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
     seg_new(CLO_APPLY, BOX, [arg, arg])];
@@ -2978,7 +3053,6 @@ export function compile_book(book: Bend.Book): string {
     .join(", ")}`, "",
   `#define WL_TABLE ${entries.map((s) => `WL_X(${s.fid})`).join(" ")
     } WL_X(FID_EXIT)`, `#define MAIN_FID ${seg_fid("main")}`,
-  `#define MAIN_PURE ${Number(show !== null)}`,
   `#define BLK_SHR ${Number(FL.hot.has("t:Array"))}`);
   const tabs = [defs.join("\n"), ...[...FL.tabs].map(([r, i]) =>
     `CONSTV u64 TAB_${i}[] = { ${r} };`)].join("\n\n");
@@ -2991,7 +3065,7 @@ export function compile_book(book: Bend.Book): string {
     return (dev.has(seg.fid) ? out : ["#if !DEVICE", ...out, "#endif"])
       .join("\n");
   }).join("\n\n");
-  const c = c_ids(runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
+  const c = c_ids(runtime_c(tabs, spins, segs,
     [...FL.effs.values()].map(([m, src]) => c_ids(src, m)).join("")));
   // keep nothing memoized: clang may run next, while this process waits
   FL = file_new(book, false);
@@ -3301,11 +3375,9 @@ export function js_lib(book: Bend.Book, mod = false): string {
 }
 
 export function js_book(book: Bend.Book): string {
-  const lib = js_lib(book);
-  const show = show_main();
-  return `${lib}\n${RUNTIME_MAIN}\ncli(process.argv.slice(1));\nio_exit(${
-    name_id("$", "main")}, ${JSON.stringify(show && show.map((c) =>
-      typeof c === "string" ? [js_tag(c), Bend.name_key(c)] : c))});`;
+  FL = file_new(book, true);
+  return `${js_lib(main_pure(book, true))}\n${RUNTIME_MAIN}\n`
+    + `cli(process.argv.slice(1));\nio_exit(${name_id("$", "main")});`;
 }
 
 // RuntimeC
@@ -5846,127 +5918,6 @@ static void io_wait(Env e, bool block) {
 
 ${NATIVE.IO}
 
-// Show
-// ====
-
-// show_val prints a pure main's value as term_show does: d is a SHOW_DESC
-// node (see show_main), w its words, chain the bracket of the list or tuple
-// the value continues, or 0.
-
-#if MAIN_PURE
-
-static void show_chr(u64 c, char q) {
-  char b[4];
-  int  k = c == 10 ? 'n' : c == 9 ? 't' : c == 13 ? 'r' : c == 0 ? '0'
-    : c == 92 || c == (u64)q ? (int)c : 0;
-  if (k != 0) {
-    printf("\\%c", k);
-  } else if (c < 32 || c == 127 || (c >= 0xD800 && c <= 0xDFFF)
-    || c > 0x10FFFF) {
-    printf("\\u{%llx}", (unsigned long long)c);
-  } else {
-    fwrite(b, 1, io_utf8(b, c), stdout);
-  }
-}
-
-static void show_f32(Term x) {
-  char buf[40];
-  f32_text(buf, f32_unbox(x));
-  int  m = (int)strcspn(buf, "e");
-  if (strpbrk(buf, ".ni") == NULL) {
-    printf("%.*s.0%s", m, buf, buf + m);
-  } else {
-    fputs(buf, stdout);
-  }
-}
-
-static void show_val(Env e, u32 d, const Term* w, char chain) {
-  const u32* D = SHOW_DESC;
-  Term one;
-  char zs[4];
-  u32  zn = 0;
-  for (bool tail = true; tail;) switch (tail = false, D[d]) {
-    case 0:
-      printf("%u", (u32)w[0]);
-      break;
-    case 1:
-      show_f32(w[0]);
-      break;
-    case 2:
-      printf("%llun", (unsigned long long)w[0]);
-      break;
-    case 3:
-      putchar('\'');
-      show_chr(D[d + 1] != 0 ? term_loc(w[0]) : w[0], '\'');
-      putchar('\'');
-      break;
-    case 4:
-      putchar('"');
-      for (Term s = w[0]; term_aux(s) == CID(SCon);) {
-        u64 l = term_peek(e.mem, s);
-        show_chr(e.mem[l], '"');
-        s = e.mem[l + 1];
-      }
-      putchar('"');
-      break;
-    case 5:
-      fputs("{==}", stdout);
-      break;
-    case 6:
-      putchar('[');
-      for (u32 i = 0, g = D[d + 2]; i < 1u << (blk_cls(w[0]) - g); i += 1) {
-        Term v[1u << g];
-        for (u32 j = 0; j < 1u << g; j += 1) {
-          v[j] = blk_read(e.mem, term_tag(w[0]) == TAG_ARR,
-            term_peek(e.mem, w[0]), (i << g) + j);
-        }
-        fputs(i > 0 ? ", " : "", stdout);
-        show_val(e, D[d + 1], v, 0);
-      }
-      putchar(']');
-      break;
-    default: {
-      Term t   = w[0];
-      bool box = D[d + 1] != 0;
-      u32  key = box ? (u32)term_aux(t) : D[d + 2] > 1 ? (u32)t : 0;
-      u32  a   = d + 3;
-      for (u32 i = 0; box ? D[a + 1] != key : i != key; i += 1) {
-        a += 4 + 2 * D[a + 2];
-      }
-      if (box) {
-        one = term_loc(t);
-        w   = term_tag(t) == TAG_PAK ? &one : e.mem + term_peek(e.mem, t);
-      }
-      char o = "{[("[D[a + 3]];
-      if (o == '{') {
-        fputs(SHOW_NAMES[D[a]], stdout);
-      }
-      if (chain != o) {
-        putchar(o);
-        zs[zn++] = "}])"[D[a + 3]];
-      }
-      for (u32 j = 0; j < D[a + 2]; j += 1) {
-        if (o == '[' ? j == 0 && chain == o : j > 0) {
-          fputs(", ", stdout);
-        }
-        if (j == 1 && o != '{') {
-          tail  = true;
-          chain = o;
-          d     = D[a + 5 + 2 * j];
-          w    += D[a + 4 + 2 * j];
-        } else {
-          show_val(e, D[a + 5 + 2 * j], w + D[a + 4 + 2 * j], 0);
-        }
-      }
-    }
-  }
-  while (zn > 0) {
-    putchar(zs[--zn]);
-  }
-}
-
-#endif
-
 // Run
 // ===
 
@@ -6015,11 +5966,6 @@ OUTLINE void io_loop(u64* H) {
   }
   Term m = corpus_eval(H, term_tsk(MAIN_FID, task_node(e, MAIN_FID,
     TERM_HOLE, 0, 0)));
-#if MAIN_PURE
-  show_val(e, 0, H + H_ROOT_WORD, 0);
-  putchar('\n');
-  return;
-#endif
   io_spawn(m);
   u64 look = 0;
   for (u32 n = 0;; n += 1) {
@@ -6247,44 +6193,6 @@ function cli(argv) {
   }
 }
 
-// Show
-// ====
-
-function show_chr(s, q) {
-  const c = char_code(s);
-  const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
-    ?? (s === q && q);
-  return k ? "\\" + k : c < 32 || c === 127
-    || s.length > 2 ? "\\u{" + c.toString(16) + "}" : s;
-}
-
-function show_val(D, d, v, chain) {
-  const k = D[d];
-  if (k === 7) {
-    const fs = Object.values(typeof v === "boolean"
-      ? { $: v ? "True" : "False" } : v);
-    let a = d + 3;
-    for (; D[a + 1][0] !== fs[0]; a += 4 + 2 * D[a + 2]) {}
-    const o = "{[("[D[a + 3]];
-    let s = o === "{" ? D[a + 1][1] + "{" : chain === o ? "" : o;
-    for (const [j, f] of fs.slice(1).entries()) {
-      if (o === "[" ? j === 0 && chain === o : j > 0) {
-        s += ", ";
-      }
-      s += show_val(D, D[a + 5 + 2 * j], f, j === 1 && o !== "{" ? o : 0);
-    }
-    return o === "{" || chain !== o ? s + "}])"[D[a + 3]] : s;
-  }
-  return k === 0 ? String(v)
-    : k === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
-    : k === 2 ? v + "n"
-    : k === 3 ? "'" + show_chr(v, "'") + "'"
-    : k === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
-      (c) => show_chr(c, "\"")) + "\""
-    : k === 5 ? "{==}"
-    : "[" + v.map((x) => show_val(D, D[d + 1], x, 0)).join(", ") + "]";
-}
-
 // Io
 // ==
 
@@ -6293,12 +6201,8 @@ function show_val(D, d, v, chain) {
 // out) and/or until at; once due, io_wait calls more and resumes k with its
 // value, or parks it again on undefined. Waits stay in deadline order.
 
-function io_exit(main, show) {
+function io_exit(main) {
   try {
-    if (show !== null) {
-      io_out(1, io_bytes(show_val(show, 0, run_loop(main()), 0) + "\n"));
-      process.exit(0);
-    }
     process.exit(io_run(main));
   } catch (e) {
     io_errs(String(e));
