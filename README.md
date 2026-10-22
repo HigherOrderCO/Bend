@@ -250,6 +250,8 @@ def add_zero(x):
 - `--verdict` checks the translated terms, the parser and translation into the kernel are not proven.
 - A binary needs clang 14+; ! needs 19+, Metal or CUDA 12.
 - No Windows (WSL works); on Linux, Window and Audio need X11 and ALSA headers.
+- Native runtime errors exit 1. Memory faults retain SIGSEGV/SIGBUS; their
+  handler writes the diagnostic without flushing stdio.
 - A hub package is a hash, unless its author names and versions it after `bend login`.
 - Error messages are terse; no debugger, profiler or REPL.
 - The editor tool only formats; the community bend2-lsp adds errors and hover.
