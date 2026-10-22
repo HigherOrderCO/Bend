@@ -36,8 +36,7 @@ def main(): f(Nl1{}, Nl1{}, Nl1{})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Cl1
-#|- observed : \{}
+#|- message  : this match doesn't cover Cl1
 #|Context:
 #|- b : Lz1<Nz1>
 #|Location: f
@@ -45,4 +44,5 @@ def main(): f(Nl1{}, Nl1{}, Nl1{})
 #|24>|   match a, b, c:
 #|   |   ^^^^^^^^^^^^^^
 #|25 |     case Nl1{}, a, Nl1{}:
+#|Note: add a case for `Cl1` (its fields may be dependent, so a case with them may not check), or a catch-all case.
 #|exit 1

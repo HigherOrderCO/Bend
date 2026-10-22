@@ -11,11 +11,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for U32
-#|- observed : \{}
+#|- message  : this match doesn't cover U32
 #|Location: main
 #| 9 | def main():
 #|10>|   \{}
 #|   |   ^^^
-#|11 |
+#|11 | 
+#|Note: add a case for `U32` (its fields may be dependent, so a case with them may not check), or a catch-all case.
 #|exit 1

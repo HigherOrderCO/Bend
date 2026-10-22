@@ -8,11 +8,11 @@ def bad() -> Bool -> Bool:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for False
-#|- observed : \{}
+#|- message  : this match doesn't cover False
 #|Location: bad
 #|6 | def bad() -> Bool -> Bool:
 #|7>|   \{True: True{}}
 #|  |   ^^^^^^^^^^^^^^^
-#|8 |
+#|8 | 
+#|Note: add a case for `False` (pattern `False{}`), or a catch-all case.
 #|exit 1

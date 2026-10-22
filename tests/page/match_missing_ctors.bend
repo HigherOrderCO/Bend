@@ -19,11 +19,11 @@ def main(): f(Tt{})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Tt, Ff
-#|- observed : \{}
+#|- message  : this match doesn't cover Tt, Ff
 #|Location: f
 #|12 | def f(b):
 #|13>|   match b:
 #|   |   ^^^^^^^^
-#|14 |
+#|14 | 
+#|Note: add cases for `Tt` (pattern `Tt{}`), `Ff` (pattern `Ff{}`), or a catch-all case.
 #|exit 1

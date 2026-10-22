@@ -24,11 +24,11 @@ def main(): f(Se2{Ze2{}})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for Ze2
-#|- observed : \{}
+#|- message  : this match doesn't cover Ze2
 #|Location: f
 #|15 | def f(a):
 #|16>|   match a:
 #|   |   ^^^^^^^^
 #|17 |     case Se2{a}:
+#|Note: add a case for `Ze2` (pattern `Ze2{}`), or a catch-all case.
 #|exit 1

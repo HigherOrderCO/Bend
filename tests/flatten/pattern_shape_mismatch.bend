@@ -25,11 +25,11 @@ def main(a):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : cases for True
-#|- observed : \{}
+#|- message  : this match doesn't cover True
 #|Location: main
 #|19 | def main(a):
 #|20>|   match a:
 #|   |   ^^^^^^^^
 #|21 |     case 0:
+#|Note: add a case for `True` (pattern `True{}`), or a catch-all case.
 #|exit 1
