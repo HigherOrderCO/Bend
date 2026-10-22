@@ -1690,10 +1690,6 @@ export function parse_call(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
   return xs.reduce<LTerm>((f, x) => App(f, x, s), Ref(parse_reso(p, k), s));
 }
 
-export function parse_sugar(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
-  return xs.reduce<LTerm>((f, x) => App(f, x, s), Ref(parse_own(p, k), s));
-}
-
 // Quant
 // -----
 
@@ -1911,7 +1907,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         return Eql(a, b, T);
       }
       const s = parse_span(p, beg);
-      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), parse_sugar(p, "Empty", [], ns), s);
+      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), Ref(parse_own(p, "Empty"), ns), s);
     }
     case "(": {
       parse_bump(p);
@@ -1941,7 +1937,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
           }
           d = Lit("Nat", k, n.s);
         }
-        return parse_sugar(p, "Array.new", [T, d, xs[0]], s);
+        return App(App(App(Ref(parse_own(p, "Array.new"), s), T, s), d, s), xs[0], s);
       }
       parse_take(p, ",");
       const ys  = xs.concat(parse_term_args(p, "]"));
@@ -2070,9 +2066,9 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       parse_skip(p);
       if (!parse_nl(p) && parse_take(p, "<-")) {
         const v = parse_term(p, 2);
-        out = parse_sugar(p, "Array.set", [u, out, ix, v], s);
+        out = App(App(App(App(Ref(parse_own(p, "Array.set"), s), u, s), out, s), ix, s), v, s);
       } else {
-        out = parse_sugar(p, "Array.get", [u, out, ix], s);
+        out = App(App(App(Ref(parse_own(p, "Array.get"), s), u, s), out, s), ix, s);
       }
       continue;
     }
@@ -2179,7 +2175,7 @@ export function parse_term_all(p: Parse, exi: boolean): LTerm {
   parse_close(p, n0);
   if (exi) {
     const s = parse_span(p, beg);
-    return parse_sugar(p, "Exists", [A, Lam(k, i, B, s)], s);
+    return App(App(Ref(parse_own(p, "Exists"), s), A, s), Lam(k, i, B, s), s);
   }
   return All(q, k, i, A, B);
 }
@@ -2579,12 +2575,12 @@ export function parse_book(book: Book, dir: string, src: string, ns: string, al:
           const i  = parse_open(p, c);
           const w  = parse_term(p);
           parse_close(p, n1);
-          A = App(App(parse_sugar(p, "Exists", [], ws), A, s), Lam(c, i, w, s), s);
+          A = App(App(Ref(parse_own(p, "Exists"), ws), A, s), Lam(c, i, w, s), s);
         }
         cls.push([all, q, c, parse_open(p, c), A, s]);
       }
       const T = cls.reduceRight((T, [all, q, c, i, A, s]) =>
-        all ? All(q, c, i, A, T, s) : parse_sugar(p, "Exists", [A, Lam(c, i, T, s)], s), parse_block(p));
+        all ? All(q, c, i, A, T, s) : App(App(Ref(parse_own(p, "Exists"), s), A, s), Lam(c, i, T, s), s), parse_block(p));
       const n = cls.findIndex((c) => !c[0]);
       book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc, m: p.ns, l: true };
       book.order.push(k);
