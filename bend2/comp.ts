@@ -3233,7 +3233,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       return file_push(sc, `return { $: ${JSON.stringify(k)
         }, args: [${params.slice(0, -1)}], kont: (x) => ${params.at(-1)}(${
-        host_in(K?.$ === "All" ? K.A : null, "x")}) };`);
+        host(K?.$ === "All" ? K.A : null, "x")}) };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3257,19 +3257,13 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// What comes in from a host: a Nat comes as a number, which nat_in checks,
-// and an F32 is rounded to one.
-function host_in(A: HTerm | null, x: string): string {
+// What crosses to or from a host: a Nat comes in as a number, which nat_in
+// checks; an export's text gets U+FFFD for what is no Unicode scalar.
+function host(A: HTerm | null, x: string, to?: "in" | "out"): string {
   const k = ty_adt(A)?.k;
-  return k === "Nat" ? `nat_in(${x})` : k === "F32" ? `Math.fround(${x})` : x;
-}
-
-// What crosses to or from an export's caller: text is a host string, with
-// U+FFFD for what is no Unicode scalar; the rest comes in as host_in reads.
-function lib_host(A: HTerm | null, x: string, out = false): string {
-  const k = ty_adt(A)?.k;
-  return k === "Char" || k === "String" ? `${out ? "str_out" : "str_in"}(${x})`
-    : out ? x : host_in(A, x);
+  return (k === "Char" || k === "String") && to ? `str_${to}(${x})`
+    : k === "Nat" && to !== "out" ? `nat_in(${x})`
+    : k === "F32" && to !== "out" ? `Math.fround(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
@@ -3292,9 +3286,9 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
-    const xs = live.map(([, , A], i) => lib_host(A, ps[i]));
-    return `  ${js_key(k)}run_lib((${ps}) => ${lib_host(tele_unbind(
-      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, true)
+    const xs = live.map(([, , A], i) => host(A, ps[i], "in"));
+    return `  ${js_key(k)}run_lib((${ps}) => ${host(tele_unbind(
+      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, "out")
     }, ${lays.length}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
