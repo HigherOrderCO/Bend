@@ -70,9 +70,13 @@ function output_input_links() {
       fs.writeFileSync(cache, text);
       inputs.set(cache, text);
       fs.symlinkSync(cache, entry);
+      const tmp = path.join(dir, "tmp");
+      fs.mkdirSync(tmp);
       const got = child.spawnSync(process.execPath,
-        [path.resolve("bend2/main.ts"), entry, "-o", bin], options);
-      if (!rejects(got, "GPU output") || fs.existsSync(bin)) return code;
+        [path.resolve("bend2/main.ts"), entry, "-o", bin],
+        { ...options, env: { ...options.env, TMPDIR: tmp } });
+      if (!rejects(got, "GPU output") || fs.existsSync(bin)
+        || fs.readdirSync(tmp).length !== 0) return code;
     }
     return 0;
   } finally {
