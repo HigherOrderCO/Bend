@@ -83,10 +83,10 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // Constants
 // =========
 
-// CLO_APPLY and IO_EMIT are the runtime's own segments (a ~ keeps any file
+// CLO_APPLY and IO_EMIT are the runtime's own segments (the ~ keeps files
 // from declaring them). FOLD_FUEL caps the nodes unfolds add to a segment.
-// A spin of SPIN_FAR characters is a call on the device (DFAR). A node past
-// WIDE pads to its size class (240 + log2 in CID_T). An argument nested past
+// A spin of SPIN_FAR characters is a device call (DFAR). A node past WIDE
+// pads to its size class (240 + log2 in CID_T). An argument nested past
 // TPL_DEEP brackets goes to a local (clang allows 256).
 
 const CLO_APPLY = "Clo~apply";
@@ -625,8 +625,8 @@ function graph_close<K>(set: Set<K>, edges: K[][]): Set<K> {
 // ====
 
 // A literal is a constant tree, except a Nat past the cap: U32.to_nat of
-// its word. A spine calls its def directly when the live arguments meet
-// the def's parameters, else Clo~apply over the outermost live one.
+// its word. A spine calls its def directly when its live arguments fill the
+// parameters, else Clo~apply over the outermost live one.
 
 function lit_call(s: Of<"Lit">): HTerm | null {
   return s.k === "Nat" && s.v > Bend.NAT_LITERAL_MAX
@@ -1233,10 +1233,10 @@ function mat_ops(eq: (k: Name) => string): string {
 // Fun
 // ===
 
-// fun_of raises a def: its arity grows by the lambdas its body opens
-// past its parameters, under every arm. A def is flat when it and every
-// def it calls have no fork, no bang call and only tail self-calls.
-// loop_of gives a def's tail cycle (Tarjan over its tail callees).
+// fun_of raises a def's arity by the lambdas its body opens past its
+// parameters, under every arm. A def is flat when it and every def it calls
+// have no fork, no bang call and only tail self-calls. loop_of gives a def's
+// tail cycle (Tarjan over its tail callees).
 
 function fun_of(k: Name): Fun {
   return memo(FL.funs, k, () => {
