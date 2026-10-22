@@ -38,11 +38,11 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a
-#|- observed : a (consumed more than once)
+#|- message  : a appears 2 times (at 37:8, 37:11), but a plain binding is used at most once
 #|Location: main
-#|35 | def main():
-#|36>|   a = mk()
-#|   |   ^
-#|37 |   use2(a, a)
+#|36 |   a = mk()
+#|37>|   use2(a, a)
+#|   |           ^
+#|38 |
+#|Note: a +a binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

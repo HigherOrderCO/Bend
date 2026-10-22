@@ -111,13 +111,13 @@ def main(): Uu{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : f
-#|- observed : f (consumed more than once)
+#|- message  : f appears 2 times (at 44:44, 44:51), but a plain binding is used at most once
 #|Context:
 #|- x : Type
 #|Location: tauinner
-#|43 | 
+#|43 |
 #|44>| def tauinner(): x => f => p => w => y => p(f(y(x)(f)))
-#|   |                      ^
+#|   |                                                   ^
 #|45 |
+#|Note: a +f binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

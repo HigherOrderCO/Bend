@@ -19,11 +19,11 @@ def c2():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : f
-#|- observed : f (consumed more than once)
+#|- message  : f appears 2 times (at 18:28, 18:36), but a plain binding is used at most once
 #|Location: c2
 #|17 | def c2():
 #|18>|   TLam{f => TLam{x => TApp{f, TApp{f, x}}}}
-#|   |        ^
+#|   |                                    ^
 #|19 |
+#|Note: a +f binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1

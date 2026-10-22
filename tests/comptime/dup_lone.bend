@@ -11,11 +11,11 @@ def main() -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : x
-#|- observed : x (consumed more than once)
+#|- message  : x appears 2 times (at 7:5, 7:5), but a plain binding is used at most once
 #|Location: app~0
-#|5 |
-#|6>| def app(~f: Nat -> Nat, x: Nat) -> Nat:
-#|  |                         ^
-#|7 |   f(x)
+#|6 | def app(~f: Nat -> Nat, x: Nat) -> Nat:
+#|7>|   f(x)
+#|  |     ^
+#|8 |
+#|Note: a +x binding may be used many times if its type is Data; otherwise use it once (a function or another Type value cannot be copied).
 #|exit 1
