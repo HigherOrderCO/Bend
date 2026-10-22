@@ -1997,6 +1997,14 @@ function main_pure(book: Bend.Book, whole = false): Bend.Book {
   const file = { str: "", ns: "", al: Object.fromEntries([
     ...new Set(ks.map((k) => k.split(":").slice(0, -1)[0]))].map((ns, i) =>
       [al + i, ns])) };
+  const b: Bend.Book = { ...book, order: book.order.map((k) =>
+    k === "main" ? pre + "main" : k),
+  tlds: Object.assign(Object.create(null), book.tlds, { [pre + "main"]: main }),
+  ctrs: Object.assign(Object.create(null), book.ctrs),
+  tmps: Object.assign(Object.create(null), ...Object.entries(book.tmps).map(
+    ([k, m]) => ({ [k]: new Map(m) }))) };
+  delete b.tlds.main;
+  const done = b.order.length;
   const fields = new Map<number, Dom>();
   const defs = new Map<string, [Name, HTerm]>();
   const src: string[] = [];
@@ -2076,40 +2084,39 @@ function main_pure(book: Bend.Book, whole = false): Bend.Book {
               [...cs, m].map(v)) : refuse()];
         }), end]);
       }) : null;
-    // an Array of Data is read in place by index; another becomes a List
-    const e = E && Bend.term_show(Bend.term_lower(E), -1, [], file);
+    // an Array of Data is read in place by index; another becomes a List;
+    // a ~ argument is closed, and no local shadows a name in its text
+    const e = E && (free(E).length ? refuse() : Bend.term_show(
+      Bend.term_lower(E), -1, [], file));
+    const id = (k: string): string =>
+      e?.split(/[^\w.]+/).includes(k) ? id(k + "_") : k;
+    const [x, s, y] = ["x", "s", "y"].map(id);
     let data = E !== null;
     try {
-      data &&= !!Bend.term_check_kind(book, { t: E!, n: 0, def: name,
+      data &&= !!Bend.term_check_kind(b, { t: E!, n: 0, def: name,
         qs: [] }, E!, Bend.Many(), "", Bend.ctx_nil(), 0);
     } catch (x) {
       if ((x as Bend.Err)?.$ !== "Err") throw x;
       data = false;
     }
     if (data) {
-      src.push(`def ${name}e(s: String, y: ${e}) -> ${whole ? "String"
-        : "IO(Unit)"}:\n  ` + seq([["s", false], piece([], E!, "", ["y"])]));
+      src.push(`def ${name}e?(${s}: String, ${y}: ${e}) -> ${whole ? "String"
+        : "IO(Unit)"}:\n  ` + seq([[s, false], piece([], E!, "", [y])]));
     }
-    src.push(`def ${name}(${ms.map((m) => `-${v(m)}: Unit, `).join("")
-      }x: Unit) -> IO(Unit):\n  ` + (data ? `Array.${whole ? "show" : "write"
-      }(~${e}, ~${name}e, x)` : E ? `${show([],
+    // a printer is @unsafe: printers of types that hold each other call
+    // each other
+    src.push(`def ${name}?(${ms.map((m) => `-${v(m)}: Unit, `).join("")
+      }${x}: Unit) -> IO(Unit):\n  ` + (data ? `Array.${whole ? "show"
+      : "write"}(~${e}, ~${name}e, ${x})` : E ? `${show([],
       ty_all(ty_all(book.tlds["Array.to_list"].T).B(E)).B(DUMMY), "")
-      }(Array.to_list(~${e}, x))` : arms ? "match x:\n" + arms.join("\n")
+      }(Array.to_list(~${e}, ${x}))` : arms ? "match x:\n" + arms.join("\n")
       : refuse()));
     return name;
   };
   const refuse = () => die("main's type " + Bend.term_show(
     Bend.term_lower(main.T)) + " cannot be printed (a function, a Type, an"
-    + " erased or dependent field)");
+    + " erased field or an Array of a field's type)");
   const top = seq([piece([], main.T, "", [pre + "main()"]), "\n"]);
-  const b: Bend.Book = { ...book, order: book.order.map((k) =>
-    k === "main" ? pre + "main" : k),
-  tlds: Object.assign(Object.create(null), book.tlds, { [pre + "main"]: main }),
-  ctrs: Object.assign(Object.create(null), book.ctrs),
-  tmps: Object.assign(Object.create(null), ...Object.entries(book.tmps).map(
-    ([k, m]) => ({ [k]: new Map(m) }))) };
-  delete b.tlds.main;
-  const done = b.order.length;
   Bend.parse_book(b, "", [...src, "def main() -> IO(Unit):\n  "
     + (whole ? `IO.write(${top})` : top)].join("\n\n"), "", file.al);
   for (const [name, T] of defs.values()) {
