@@ -1,8 +1,9 @@
-# io (io_marshal_char_scalar): a Char holds any u32 code (#1080), and
-# only text that leaves Bend turns a code that is no Unicode scalar (a
-# surrogate, past U+10FFFF) into U+FFFD: a host handed Chr{55296} gets
-# "\uFFFD" and hands it back as 65533, while Bend's own Chr{55296} keeps
-# 55296. The boundary scalars (55295, 57344, 1114111) cross as they are.
+# io (io_marshal_char_scalar): a Char holds any u32 code (#1080), and an
+# effect gets Bend's own text: echo hands Chr{55296} back as 55296. Only
+# the effect's str_out, as text leaves Bend, turns a code that is no
+# Unicode scalar (a surrogate, past U+10FFFF) into U+FFFD: seen hands it
+# back as 65533. The boundary scalars (55295, 57344, 1114111) cross as
+# they are.
 import Base
 
 law echo:
@@ -10,6 +11,13 @@ law echo:
   IO(Char)
 
 def echo(c):
+  import "./marshal_char_scalar.js"
+
+law seen:
+  for c: Char
+  IO(Char)
+
+def seen(c):
   import "./marshal_char_scalar.js"
 
 law main:
@@ -25,11 +33,12 @@ def main():
     v : Unit <- IO.print(U32.show(Char.to_u32(b)))
     w : Unit <- IO.print(U32.show(Char.to_u32(c)))
     x : Unit <- IO.print(U32.show(Char.to_u32(d)))
-    y : Unit <- IO.print(U32.show(Char.to_u32(Chr{55296})))
+    e : Char <- seen(Chr{55296})
+    y : Unit <- IO.print(U32.show(Char.to_u32(e)))
     return 0
 
 #|55295
 #|57344
 #|1114111
-#|65533
 #|55296
+#|65533

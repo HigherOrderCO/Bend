@@ -3232,9 +3232,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       return file_push(sc, `return { $: ${JSON.stringify(k)
-        }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
-        }], kont: (x) => ${params.at(-1)}(${host(K?.$ === "All" ? K.A : null,
-        "x")}) };`);
+        }, args: [${params.slice(0, -1)}], kont: (x) => ${params.at(-1)}(${
+        host(K?.$ === "All" ? K.A : null, "x", "")}) };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3259,12 +3258,12 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 }
 
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
-function host(A: HTerm | null, x: string, out = 0): string {
+// checks; an export's text gets U+FFFD for what is no Unicode scalar.
+function host(A: HTerm | null, x: string, to = "in"): string {
   const k = ty_adt(A)?.k;
-  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
-    : k === "Nat" && !out ? `nat_in(${x})`
-    : k === "F32" && !out ? `Math.fround(${x})` : x;
+  return (k === "Char" || k === "String") && to ? `str_${to}(${x})`
+    : k === "Nat" && to !== "out" ? `nat_in(${x})`
+    : k === "F32" && to !== "out" ? `Math.fround(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
@@ -3289,7 +3288,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host(A, ps[i]));
     return `  ${js_key(k)}run_lib((${ps}) => ${host(tele_unbind(
-      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
+      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, "out")
     }, ${lays.length}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();

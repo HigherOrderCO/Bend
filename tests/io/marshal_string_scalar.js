@@ -11,7 +11,7 @@ function edge() {
   return "\uD7FF";
 }
 function torn() {
-  return "a\uD800";
+  return str_in("a\uD800");
 }
 
 io_eff(CID(low), low);
