@@ -886,7 +886,7 @@ function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   const xs = t.x.map((x, i) => vs[i] ? Bend.term_key(Bend.term_lower(x)) : "");
   const ys = w.on.get(t.k);
   const re = !!ys && xs.some((x, i) => x.length > ys[i]);
-  const key = t.k + (!re && xs);
+  const key = JSON.stringify([t.k, re ? false : xs]);
   const at = w.seen.get(key);
   if (tld?.$ !== "ADT" || at !== undefined) {
     w.low = Math.min(w.low, at ?? Infinity);
@@ -1749,7 +1749,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
   emit_chain(sc, arms.map((k, i) => [box ? `term_aux(${t}) == ${cid_mac(k[0])}`
     : `${t} == ${i}`, () => {
     file_push(sc, `${out[0]} = ${i};`);
-    const ks = lay.arms![k].flatMap((l) => l.ks);
+    const ks = k[1].flatMap((l) => l.ks);
     ws({ ...sc, spares: [] }, k).forEach((w, n) => {
       if (ks[n] === "box") {
         rs[1 + n].push(sc.brwl.get(w) ?? null);
