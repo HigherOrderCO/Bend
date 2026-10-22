@@ -1,5 +1,6 @@
-// Humans designed Bend's runtime. AI wrote most of this optimized file.
-// Tests pass, but bugs are expected until the compiler is stable.
+// NOTE: Bend's runtime was designed by humans, but this file was mostly written
+// by AI's, as it includes a ton of optimizations. It works and tests pass, yet,
+// bugs ARE expected. It will take some time for the compiler to be stable.
 
 // Comp
 // ====
@@ -18,7 +19,8 @@ type Kind = "w32" | "w64" | "box";
 
 type Lay = { ks: Kind[]; arms: Record<Name, Lay[]> | null };
 
-type Val = { ws: string[]; lay: Lay; stat: boolean };
+// boxed marks incoming parameters boxed by lay_limit, until their binding.
+type Val = { ws: string[]; lay: Lay; stat: boolean; boxed?: boolean };
 
 type Bind = { val: Val; n: number; A: HTerm };
 
@@ -77,15 +79,17 @@ type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
 
-type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
+type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay;
+  boxed?: boolean[] };
 
 // Constants
 // =========
 
-// CLO_APPLY and IO_EMIT use ~ to reserve their names. FOLD_FUEL limits
-// unfolded nodes per segment. SPIN_FAR selects device calls (DFAR). Nodes
-// past WIDE pad to size classes (240 + log2 in CID_T). TPL_DEEP limits
-// argument nesting (clang allows 256).
+// CLO_APPLY and IO_EMIT are the runtime's own segments (a ~ keeps any file
+// from declaring them). FOLD_FUEL caps the nodes unfolds add to a segment.
+// A spin of SPIN_FAR characters is a call on the device (DFAR). A node past
+// WIDE pads to its size class (240 + log2 in CID_T). An argument nested past
+// TPL_DEEP brackets goes to a local (clang allows 256).
 
 const CLO_APPLY = "Clo~apply";
 
@@ -234,9 +238,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // Optimized
 // ---------
 
-// Native constructors define builders, field readers and tests.
-// The runtime lays out RUNTIME_ADTS. Only Base may declare OWNED names,
-// which the compiler encodes.
+// Per native constructor: its builder, field readers and test. The runtime
+// lays out RUNTIME_ADTS itself; OWNED are the Base names the compiler
+// encodes, which only Base may declare.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -286,9 +290,9 @@ const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
 // Native
 // ------
 
-// Metal uses fast:: sin/cos/tan (same pixels), otherwise precise::.
-// atan2_c99 returns libm's +-0 or +-pi at the origin. U32_QUO halves
-// dividends to avoid Metal's f32 folding near 2^32.
+// On Metal, sin, cos and tan are fast:: (same pixels), the rest precise::;
+// atan2_c99 answers libm's +-0 or +-pi at the origin, not NaN; U32_QUO
+// halves the dividend, as Metal folds one near 2^32 through an f32.
 
 const SHIMS = "sqrt exp log log2 log10 sin cos tan pow fmod".split(" ")
   .map((n) => "#define " + n.padEnd(5) + ("sin cos tan".includes(n)
@@ -623,9 +627,9 @@ function graph_close<K>(set: Set<K>, edges: K[][]): Set<K> {
 // Term
 // ====
 
-// Literals are constant trees; Nat literals past the cap use U32.to_nat.
-// Spines call defs directly when live arity matches, otherwise Clo~apply
-// over the outermost live argument.
+// A literal is a constant tree, except a Nat past the cap: U32.to_nat of
+// its word. A spine calls its def directly when the live arguments meet
+// the def's parameters, else Clo~apply over the outermost live one.
 
 function lit_call(s: Of<"Lit">): HTerm | null {
   return s.k === "Nat" && s.v > Bend.NAT_LITERAL_MAX
@@ -861,13 +865,12 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
   return adt;
 }
 
-// Search A for p through non-word datatype fields. Track each instance.
-// On family re-entry with larger value keys, replace value arguments with
-// unknowns; fields stuck on them hold. on keeps shortest path keys per
-// family. Cache positive results per file, or results that depend only on
-// instances opened beneath them. Predicate text is a key; predicates capture
-// nothing.
-
+// Whether A holds a type p seeks: a datatype p rejects is looked into,
+// but for the words; per instance, but with its value arguments unknown
+// once it re-enters its own family with one of them grown (a field stuck
+// on them holds). on keeps each family's shortest value keys on the path;
+// an answer is kept per file (p by its text: it captures nothing) if it
+// holds or met only instances opened under it: a new walk agrees.
 function ty_holds(A: HTerm | null, p: Name | ((t: HTerm | null) => boolean),
   w = { seen: new Map<string, number>(), on: new Map<Name, number[]>(),
     low: Infinity }): boolean {
@@ -943,10 +946,12 @@ function ty_srcs(T: HTerm): void {
 // Lay
 // ===
 
-// Arrays, IO.OP and recursive datatypes use BOX. A layout without arms is
-// W32, W64 or BOX. Array cells use the element's open layout. lay_el rejects
-// open element types, but boxes type formers. adt_of and js_expr use it only
-// to check the element type.
+// An Array, an IO.OP and a datatype that re-enters itself (maybe through a
+// family) are one box. A lay without arms is W32, W64 or BOX. An Array cell
+// takes its element type's open layout, so all callers agree. lay_el refuses
+// an open element type (a variable, a hole, a bodiless law or family); a
+// type former, such as a function, is a box. adt_of and js_expr call it
+// only for that check.
 
 function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
@@ -1118,10 +1123,11 @@ function facts_packed(t: HTerm): boolean {
 // Mat
 // ===
 
-// Match rows hold an arm, low-bit count (32: exact), value and field count.
-// Nat rows bind the scrutinee minus the level. Defaults cover deeper rows;
-// their arm name is "". U32 uses a table if hits cover over half of 0..max
-// and remaining rows share a body.
+// A Nat or word match's row holds the arm, the low bits known (32: a hit),
+// their value and the fields bound; a Nat row binds the scrutinee less its
+// level. A default covers the deeper rows that replay it. A U32 match reads
+// a table when its hits cover over half of 0..max and the rest share one
+// body. A default arm is named "".
 
 function mat_head(t: HTerm): boolean {
   return t.$ === "Mat" || t.$ === "Efq";
@@ -1244,9 +1250,10 @@ function mat_ops(eq: (k: Name) => string): string {
 // Fun
 // ===
 
-// fun_of raises arity by the lambdas opened past parameters in every arm.
-// A flat def and its callees have no forks, bang calls or non-tail self-calls.
-// loop_of finds tail cycles with Tarjan's algorithm.
+// fun_of raises a def: its arity grows by the lambdas its body opens
+// past its parameters, under every arm. A def is flat when it and every
+// def it calls have no fork, no bang call and only tail self-calls.
+// loop_of gives a def's tail cycle (Tarjan over its tail callees).
 
 function fun_of(k: Name): Fun {
   return memo(FL.funs, k, () => {
@@ -1262,16 +1269,16 @@ function fun_of(k: Name): Fun {
     if (def_foreign(tld)) {
       return { n, h, live, lays: Array(live.length + 1).fill(BOX), ret: BOX };
     }
-    const lays = live.map(([, , A]) => lay_of(A));
+    const lays = lay_limit(live.map(([, , A]) => lay_of(A)));
     const ret = lay_of(tele_fill(tld.T, Array(n).fill(DUMMY)));
-    return { n, h, live, lays: lay_limit(lays),
+    return { n, h, live, lays,
+      boxed: lays.map((l, i) => l === BOX && lay_of(live[i][2]) !== BOX),
       ret: ret.ks.length === 0 ? BOX : ret };
   });
 }
 
-// One spin per erased-argument layout takes and returns words at that layout
-// if self-calls preserve it.
-
+// A flat def's spin, one per layout of its erased arguments, takes and
+// returns words at those layouts if its self-calls pass them on.
 function fun_at(ck: Spine): Fun {
   const f = fun_of(ck.k!);
   let [T, b] = [ck.tld!.T, f.h!];
@@ -1298,7 +1305,7 @@ function fun_at(ck: Spine): Fun {
       const m = term_spine(s);
       return tail && m.k === ck.k && m.all.filter((_, i) => !dom_live(doms[i]))
         .some((a, j) => probe_of(term_strip(a)) !== ps[j]);
-    }) ? f : { ...f, lays, ret };
+    }) ? f : { ...f, lays, ret, boxed: [] };
 }
 
 function brw_of(k: Name): boolean[] {
@@ -1407,10 +1414,11 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // File
 // ====
 
-// FL holds the book, facts, output and caches. Emission computes facts:
-// boxed parameters start borrowed, then become owned when owned or unlent.
-// Holders request lends; lent roots pass them (k~i<j~q). Shared values mark
-// their types hot. compile_book repeats until no fact changes.
+// A File (FL) is the book being compiled: its facts, output and caches. The
+// emitter is the analysis: a boxed parameter starts borrowed (brwl) and
+// becomes owned (own) when owned or unlent; a lend is asked by a holder or
+// passed on from a lent root (k~i<j~q). A shared value heats its type (hot).
+// compile_book emits until a pass changes no fact.
 
 function file_new(book: Bend.Book, js: boolean) {
   PROBES.length = 1;
@@ -1458,8 +1466,8 @@ function file_new(book: Bend.Book, js: boolean) {
   };
 }
 
-// Nested arms, closures and forks copy the emitter scope.
-
+// A scope is where the emitter writes; a nested arm, closure or fork copies
+// it.
 function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
@@ -1721,13 +1729,15 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
 // Val
 // ===
 
-// brwl maps borrowed boxes to roots. Other words hold no references.
-// val_own owns each root at an owned position. At a lent position, it
-// passes the root's lend, or owns `at` for an unheld owned box. A destination
-// remains rooted if every arm fills it from the same root.
+// A box rooted in a borrowed parameter (brwl) is not owned; a word that is
+// not a box holds no reference, so it neither roots nor owns. val_own is
+// the one gate: at an owned position a rooted word owns its root; lent
+// at `at`, a rooted word passes its lend on, and an unheld owned box
+// owns `at`. A destination every arm boxing it fills from one root stays
+// rooted.
 
-function val_new(ws: string[], lay: Lay, stat = false): Val {
-  return { ws, lay, stat };
+function val_new(ws: string[], lay: Lay, stat = false, boxed = false): Val {
+  return { ws, lay, stat, boxed };
 }
 
 function val_arm(v: Val, k = Object.keys(v.lay.arms!)[0]): Val[] {
@@ -1898,8 +1908,9 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // Bind
 // ====
 
-// The last use takes a value; earlier uses share it. Shared flat values
-// unbox before sharing to copy words. Frame slots store the shared word.
+// A binding counts its uses: the last takes the value, an earlier one
+// shares it. A shared box of a flat type unboxes first, so its words copy,
+// not its node. A frame slot holding a shared word takes the wrapped one.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -1948,6 +1959,7 @@ function bind_dead(sc: Scope, rest: HTerm[], ps = [...sc.uses.keys()]): void {
   }
 }
 
+// Replace entries in live in place; callers must use the updated entries.
 function bind_caps(sc: Scope, live: [Of<"Var">, Bind][],
   results: number): void {
   lay_limit(live.map(([, b]) => b.val.lay), results).forEach((l, i) => {
@@ -1983,9 +1995,10 @@ function memo_gc(): void {
 // Show
 // ====
 
-// Main's print descriptor has a node per (type, layout): 0 U32, 1 F32,
-// 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array (element, lgs),
-// 7 Data (boxed?, arms: name, cid, fields, bracket, field offsets and nodes).
+// A pure main prints through a descriptor of its type, a node per (type,
+// layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
+// (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
+// then an (offset, node) per field).
 
 function show_main(): (number | Name)[] | null {
   const main = FL.book.tlds.main;
@@ -2155,12 +2168,13 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
 // Emit
 // ====
 
-// Calls emit nested arguments, pop owned arguments, then read borrowed
-// arguments to request lends. Closures move captures into nodes. A jump
-// cuts unless return layouts agree or both use one word. Forks create join
-// and call tasks; sequential calls share a frame. Self-jumps read parameters
-// back for typed device loops. A foreign def without its continuation is an
-// IO action. C stores F32 table rows as bits to keep NaN payloads.
+// A call emits its nested arguments, pops the owned ones, then reads the
+// borrowed ones (a read asks a lend). A closure moves its captures into a
+// node. A jump's returns must agree or both be one word, else it is a cut.
+// A fork runs a join task and a task per call; in sequence one frame serves
+// every step. A self-jump reads its parameters back, so the device's loop
+// keeps them typed. A foreign def short of its continuation is an IO action.
+// On C, an F32 table row is its bits (a NaN payload has no JS number).
 
 function emit_hold(sc: Scope, exprs: string[], k: string,
   ks?: Kind[]): string[] {
@@ -2269,7 +2283,8 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const ws = emit_args(sc, ck, tail && !flat, false, lays);
   if (!flat) {
     return emit_body({ ...sc, def: k }, h!, T, ers,
-      lays.map((lay) => val_new(ws.splice(0, lay.ks.length), lay)), dst);
+      lays.map((lay, i) => val_new(ws.splice(0, lay.ks.length), lay,
+        false, f.boxed?.[i])), dst);
   }
   const name = emit_native(sc, k, ers, f);
   const o = name_local(sc, "o");
@@ -2286,7 +2301,7 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   emit_put(sc, dst, out);
 }
 
-// A foreign def takes continuation k after its live parameters.
+// A foreign def's last parameter, past its live ones, is its continuation k.
 function emit_open(sc: Scope, k: Name, f = fun_of(k)): [Scope, Val[]] {
   FUEL = FOLD_FUEL;
   const { live, lays, ret } = f;
@@ -2297,7 +2312,7 @@ function emit_open(sc: Scope, k: Name, f = fun_of(k)): [Scope, Val[]] {
       sc.brwl.set(w, k + "~" + i);
     }
     return w;
-  }), l));
+  }), l, false, f.boxed?.[i]));
   const seg = seg_new(k, ret, vals);
   return [{ ...sc, seg, spares: [], uses: new Map(), def: k }, vals];
 }
@@ -2599,8 +2614,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
         return emit_body(sc, x.f(t), all.B(t), ers.slice(1), args, dst);
       }
       const o = term_open(x);
-      const box = args[0].lay === BOX && fun_of(sc.def).live
-        .reduce((n, [, , A]) => n + lay_of(A).ks.length, 0) > WIDE;
+      const box = args[0].boxed;
       bind_uses(sc, o.ps[0], val_hold(sc, box ? args[0] : val_to(sc, args[0],
         lay_at(all.A, args[0])), x.k), [o.b], all.A, !box);
       return emit_body(sc, o.b, all.B(DUMMY), ers, args.slice(1), dst);
@@ -2844,9 +2858,10 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // Compile
 // =======
 
-// CID(k)/FID(k) use the source namespace, then unqualified names.
-// Read each effect source once, in one namespace. C splices backslash-newlines
-// before parsing, including comments; JS does not.
+// Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
+// namespace, else as is. An effect source is read once, in one namespace.
+// effect_src splices a C source's backslash-newlines first, as C does even
+// in a comment; JS does not.
 
 const ID_WORDS = /\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|(?<![$\u200c\u200d\p{ID_Continue}])([CF]ID)\(([\w./~-]+)\)/gu;
 
@@ -2894,10 +2909,10 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
 // C
 // -
 
-// Forks propagate through reachable segments; Clo~apply reaches all closures.
-// The device holds segments reachable from bangs, and all closures if a
-// bang may take one. Host slot 12 is rp to keep rax free for tail calls.
-// WL_LOAD avoids clang's O(n^2) compilation of fallthrough switches.
+// A segment may fork if one it reaches does; Clo~apply reaches every
+// closure. The device holds what the bangs reach (every closure, if a bang
+// may take one). rp pads the host's twelfth slot to keep rax free for the
+// tail call. WL_LOAD is a ladder: clang is O(n^2) on a fallthrough switch.
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
@@ -3026,10 +3041,11 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect runs once in a closure and registers with io_eff(CID(k), run).
-// Tail cycles use one loop over their bodies, selected by $pc. Only closure
-// tail calls bounce via run_tail. Call markers select run_loop after all
-// defs emit, only for callees that can return a bounce.
+// Each effect source runs once in its own closure and registers with
+// io_eff(CID(k), run). A def on a tail cycle is one loop over the cycle's
+// bodies ($pc picks one). Only a closure's tail call bounces (run_tail), so
+// a call goes through run_loop only if its callee may return one: a marker
+// per call resolves once every def is out.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -3279,7 +3295,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// nat_in checks host Nat numbers. Text replaces non-scalars with U+FFFD.
+// What crosses to or from a host: a Nat comes in as a number, which nat_in
+// checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const k = ty_adt(A)?.k;
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
