@@ -149,8 +149,8 @@ function formatTokens(tokens: Token[]): [string, number[]] {
   return [output, starts];
 }
 
-// Lines inside brackets and comment-only lines: their columns mean nothing to
-// the parser.
+// Bracketed continuations and comment-only lines use relative indentation;
+// inline body pins below preserve the columns that still matter to the parser.
 function looseLines(lines: Line[]): boolean[] {
   let open = 0;
   return lines.map((line) => {
@@ -163,47 +163,112 @@ function looseLines(lines: Line[]): boolean[] {
   });
 }
 
+type BodyScope = { open: number; angle: number; end: number };
+type InlineBody = { at: number; scope?: BodyScope };
+
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, as in `do IO<Unit>: a`: Bend pins the lines after it to the
-// column of `a`.
-function inlineBodies(lines: Line[]): number[][] {
+// `def` header, `=>` lambda opener, `;` separator or `(` group opener. As in
+// `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
+function inlineBodies(lines: Line[]): InlineBody[][] {
   let open = 0;
+  const angles = [0];
+  const bodyScopes: BodyScope[] = [];
   let header: { open: number; angle: number; typed: boolean } | null = null;
-  return lines.map((line) => line.tokens.flatMap((token, index) => {
+  return lines.map((line, row) => line.tokens.flatMap((token, index): InlineBody[] => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
+    } else if (token.text === "=>" || token.text === ";") {
+      if (open > 0) bodyScopes.push({ open, angle: angles[open], end: lines.length });
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
+      angles.push(0);
+      if (token.text === "(" && index + 1 < line.tokens.length) {
+        bodyScopes.push({ open, angle: angles[open], end: lines.length });
+        return [{ at: index + 1, scope: bodyScopes.at(-1) }];
+      }
     } else if ([")", "]", "}"].includes(token.text)) {
+      if (open > 0) angles.pop();
       open = Math.max(0, open - 1);
-    } else if (header?.typed && ANGLES.has(token.text)) {
-      header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
+    } else if (ANGLES.has(token.text)) {
+      if (token.text === "<") angles[open]++;
+      else if (token.text[0] === ">") angles[open] = Math.max(0, angles[open] - token.text.length);
+      if (header?.typed && open === header.open) {
+        header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
+      }
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;
-      return index + 1 < line.tokens.length ? [index + 1] : [];
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
+    }
+    // Only commas outside an inline body's type arguments end its argument/body scope.
+    while (bodyScopes.length) {
+      const scope = bodyScopes.at(-1)!;
+      const inside = scope.open < open || scope.open === open && scope.angle <= angles[open];
+      const comma = token.text === "," && scope.open === open && scope.angle === angles[open];
+      if (inside && !comma) break;
+      // A leading closer/separator has no body statement to pin on this line.
+      bodyScopes.pop()!.end = row - (index === 0 ? 1 : 0);
     }
     return [];
   }));
 }
 
-// A tab is one column, as in the parser. Loose lines measure against a copy of
-// the levels, so they can't shift the statements after them.
-function indentDepths(lines: Line[], loose = looseLines(lines)): number[] {
+type Level = { col: number; depth: number; parent?: Level };
+
+// A tab is one column, as in the parser. Loose lines use a separate path.
+// As in bend-lint's Layout, cases retain their match's path across body dedents.
+// Inline first cases anchor their later arms and nested matches.
+function indentDepths(lines: Line[], loose = looseLines(lines), anchors: (Token | undefined)[] = []): number[] {
   const depths: number[] = [];
-  const stack = [0];
-  let levels = stack;
+  const scopes: { parent: number; first?: number; current: number; level?: Level; anchor?: Token }[] = [];
+  let main: Level = { col: 0, depth: 0 };
+  let level = main;
+  let wasLoose = false;
+  let brackets = 0;
   for (const [index, line] of lines.entries()) {
     if (line.code === "" && line.comment === "") {
       depths.push(-1);
       continue;
     }
-    if (!loose[index]) levels = stack;
-    else if (levels === stack) levels = [...stack];
+    if (!loose[index] || !wasLoose) level = main;
     const width = line.indent.length;
-    while (levels.length > 1 && width < levels[levels.length - 1]) levels.pop();
-    if (width > levels[levels.length - 1]) levels.push(width);
-    else if (width !== levels[levels.length - 1]) levels[levels.length - 1] = width;
-    depths.push(levels.length - 1);
+    while (level.parent && width < level.col) level = level.parent;
+    if (width > level.col) level = { col: width, depth: level.depth + 1, parent: level };
+    const head = line.tokens[0];
+    for (const token of line.tokens) {
+      if (token.kind === "symbol" && ["(", "[", "{"].includes(token.text)) brackets++;
+      else if (token.kind === "symbol" && [")", "]", "}"].includes(token.text)) brackets--;
+      else if (brackets === 0 && head?.text !== "import" && token.kind === "word") {
+        if (["def", "type", "law"].includes(token.text)) scopes.length = 0;
+        if (token.text === "match") {
+          scopes.push({ parent: scopes.at(-1)?.current ?? -1, current: -1, anchor: scopes.at(-1)?.anchor });
+        } else if (token.text === "case") {
+          while (scopes.length) {
+            const scope = scopes.at(-1)!;
+            if (scope.first === undefined ? token.col > scope.parent : token.col >= scope.first) break;
+            scopes.pop();
+          }
+          const scope = scopes.at(-1);
+          if (!scope) continue;
+          if (scope.first === undefined) {
+            scope.first = token.col;
+            if (token === head) {
+              const parent = scopes.at(-2)?.level;
+              if (parent && level.depth <= parent.depth) level = { col: token.col, depth: parent.depth + 1, parent };
+              scope.level = level;
+            } else scope.anchor = token;
+          } else if (token === head && scope.level) {
+            level = scope.level.col === token.col ? scope.level : { ...scope.level, col: token.col };
+            scope.level = level;
+          }
+          if (token === head) anchors[index] = scope.anchor;
+          scope.current = token.col;
+        }
+      }
+    }
+    if (!loose[index]) main = level;
+    wasLoose = loose[index];
+    depths.push(level.depth);
   }
   return depths;
 }
@@ -214,7 +279,7 @@ function fingerprint(lines: Line[]): string {
 }
 
 export function formatBend(source: string, options: FormatOptions = {}): string {
-  const eol = source.includes("\r\n") ? "\r\n" : "\n";
+  const endings = source.match(/\r?\n/g) ?? [];
   const finalEol = source.endsWith("\n");
   const rawLines = source.split(/\r?\n/);
   if (finalEol) rawLines.pop();
@@ -225,24 +290,36 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
     return source;
   }
   const loose = looseLines(lines);
-  const depths = indentDepths(lines, loose);
+  const anchors: (Token | undefined)[] = [];
+  const depths = indentDepths(lines, loose, anchors);
   const bodies = inlineBodies(lines);
   const size = Math.max(1, options.tabSize ?? 2);
   const spaces = options.insertSpaces !== false;
   // A line at or right of an inline body's column moves as far as that body.
-  const pins: { from: number; to: number; prefix: string }[] = [];
+  const pins: { from: number; to: number; prefix: string; scope?: BodyScope }[] = [];
+  const bodyPins = new Map<Token, typeof pins[number]>();
   const formatted = lines.map((line, index) => {
-    if (line.code === "" && line.comment === "") return "";
+    const ending = endings[index] ?? "";
+    if (line.code === "" && line.comment === "") return ending;
+    for (let at = pins.length - 1; at >= 0; at--) {
+      if ((pins[at].scope?.end ?? lines.length) < index) pins.splice(at, 1);
+    }
     const width = line.indent.length;
     if (!loose[index]) while (pins.length > 0 && pins[pins.length - 1].from > width) pins.pop();
-    const pin = pins.filter((pin) => pin.from <= width).pop();
+    const anchor = anchors[index];
+    const pin = anchor ? bodyPins.get(anchor) : pins.filter((pin) => pin.from <= width).pop();
+    if (anchor && pin && pins.at(-1) !== pin) pins.push(pin);
     const prefix = pin ? pin.prefix + " ".repeat(width - pin.from + pin.to - pin.prefix.length)
       : spaces ? " ".repeat(depths[index] * size) : "\t".repeat(depths[index]);
     const [code, starts] = formatTokens(line.tokens);
-    for (const at of bodies[index]) pins.push({ from: line.tokens[at].col, to: prefix.length + starts[at], prefix });
-    if (code === "") return prefix + line.comment;
-    return prefix + code + (line.comment === "" ? "" : "  " + line.comment);
-  }).join(eol) + (finalEol ? eol : "");
+    for (const { at, scope } of bodies[index]) {
+      const pin = { from: line.tokens[at].col, to: prefix.length + starts[at], prefix, scope };
+      pins.push(pin);
+      bodyPins.set(line.tokens[at], pin);
+    }
+    if (code === "") return prefix + line.comment + ending;
+    return prefix + code + (line.comment === "" ? "" : "  " + line.comment) + ending;
+  }).join("");
   try {
     if (fingerprint(lines) !== fingerprint(formatted.replace(/\r\n/g, "\n").split("\n").slice(0, finalEol ? -1 : undefined).map(splitLine))) return source;
   } catch {

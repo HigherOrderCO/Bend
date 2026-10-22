@@ -9,7 +9,7 @@
 import Base
 
 law handle.sent:
-  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>
   IO(Unit)
 
 def handle.sent(m):
@@ -24,7 +24,7 @@ def handle.read(m):
   (s, r) = m
   do IO<Unit>:
     data : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
-    sent : Socket & Result<&1, &1, (U32 & String) & String, Unit> <-
+    sent : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <-
       TCP.send(s, String.append("echo:", Maybe.default(&1, String, data, "")))
     handle.sent(sent)
 
@@ -74,7 +74,7 @@ def client.read(m):
     return Maybe.default(&1, String, reply, "ended")
 
 law client.sent:
-  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>
   IO(String)
 
 def client.sent(m):
@@ -96,7 +96,7 @@ law client:
 def client(port, tag):
   do IO<String>:
     s : Socket <- IO.try(Socket, TCP.connect("127.0.0.1", port))
-    m : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, tag)
+    m : Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit> <- TCP.send(s, tag)
     client.sent(m)
 
 law main.go:

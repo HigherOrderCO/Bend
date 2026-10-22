@@ -30,7 +30,7 @@ import * as Safe from "./safe.ts";
 // Constants
 // =========
 
-const VERSION = "2.0.37";
+const VERSION = "2.0.38";
 
 // the commands, one row each: [usage, what it does]; bend guide stays last
 const USAGE = [
@@ -154,7 +154,7 @@ async function cli(): Promise<void> {
   } else {
     await cli_file(args);
   }
-  await check();
+  await check().catch(() => {});
 }
 
 // cli_guide prints guide/<NAME>.md: the guide, or a named extra.
@@ -315,10 +315,17 @@ async function cli_file(args: string[]): Promise<void> {
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
       t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
     for (const out of outs) {
-      const at = path_real(out);
-      if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
+      if (output_conflicts(out, ins)) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
+      // A binary's GPU build also writes <binary>.gpu.
+      if (!/\.(mjs|c?js|c|bendtt)$/.test(out)
+        && output_conflicts(out + ".gpu", ins)) {
+        cli_fail("GPU output " + out + ".gpu is a file the program reads, or a"
+          + " directory");
+      }
+    }
+    for (const out of outs) {
       cli_emit(book, out);
     }
   } catch (e) {
@@ -370,6 +377,22 @@ function path_real(p: string): string {
   return fs.existsSync(p) ? fs.realpathSync(p) : path.resolve(p);
 }
 
+// same_file compares device and inode, so links to one file agree.
+function same_file(a: string, b: string): boolean {
+  if (!fs.existsSync(a) || !fs.existsSync(b)) {
+    return false;
+  }
+  const x = fs.statSync(a, { bigint: true });
+  const y = fs.statSync(b, { bigint: true });
+  return x.dev === y.dev && x.ino === y.ino;
+}
+
+function output_conflicts(out: string, ins: Set<string>): boolean {
+  const at = path_real(out);
+  return ins.has(at) || (fs.existsSync(at) && (fs.statSync(at).isDirectory()
+    || [...ins].some((input) => same_file(at, input))));
+}
+
 function cli_emit(book: Bend.Book, out: string): void {
   if (out.endsWith(".mjs")) {
     fs.writeFileSync(out, Comp.js_lib(book, true));
@@ -398,7 +421,8 @@ function cli_emit(book: Bend.Book, out: string): void {
 // cc_find is the first of $CC, clang and every clang-NN on PATH (newest
 // first) that is new enough: clang 14 for a CPU build, and for a GPU build
 // clang 19 (Apple clang 17, which ships LLVM 19), whose #embed
-// carries the device program.
+// carries the device program. A $CC that is not one of these is skipped with
+// a warning, which names the compiler bend builds with instead.
 function cc_find(gpu: boolean): string {
   function dir_list(dir: string): string[] {
     try {
@@ -411,18 +435,28 @@ function cc_find(gpu: boolean): string {
   const nums = [...new Set(dirs.flatMap(dir_list).filter((f) =>
     /^clang-\d+$/.test(f)))].sort((a, b) => Number(b.slice(6)) - Number(a.slice(6)));
   const olds: string[] = [];
-  const ccs  = [...(process.env.CC ? [process.env.CC] : []), "clang", ...nums];
+  const want = gpu ? "19 (Apple clang 17)" : "14";
+  const env  = process.env.CC;
+  const ccs  = [...new Set([...(env ? [env] : []), "clang", ...nums])];
   for (const cc of ccs) {
     const [got, out] = Safe.run_read(cc, ["--version"]);
     const m   = /^(Apple )?(?:\w+ )?clang version (\d+)/m.exec(out);
     const need = gpu ? (m?.[1] === undefined ? 19 : 17) : 14;
     if (m !== null && Number(m[2]) >= need) {
+      if (env && cc !== env) {
+        process.stderr.write("warning: $CC is not a clang " + want + " or newer (found "
+          + olds[0] + "), so bend builds with " + cc + "\n");
+      }
       return cc;
     }
+    const err = (got.error as NodeJS.ErrnoException | undefined)?.code;
     olds.push(m !== null ? "clang " + m[2] + " as " + cc
-      : got.status === 0 && out ? cc + ", which is not clang" : "no " + cc);
+      : err === "ENOENT" ? "no " + cc + (/\s/.test(cc) ? " ($CC names one program, without flags)" : "")
+      : err ? cc + ", which does not run (" + err + ")"
+      : got.status !== 0 ? cc + ", which fails --version"
+      : out ? cc + ", which is not clang" : cc + ", which prints no version");
   }
-  throw "Error: bend needs clang " + (gpu ? "19 (Apple clang 17)" : "14")
+  throw "Error: bend needs clang " + want
     + " or newer to build " + (gpu ? "a GPU program" : "binaries") + " (found "
     + olds.join(", ") + "); on Debian/Ubuntu: curl -fsSL"
     + " https://apt.llvm.org/llvm.sh | sudo bash -s 19; on macOS: xcode-select"
@@ -436,6 +470,7 @@ function cc_find(gpu: boolean): string {
 // lib; else the ! runs on the cores). On macOS a program with a framework
 // (#import: a window, audio) builds as Objective-C; on Linux it links the X11
 // (plus libdl, for dlopen before glibc 2.34) and ALSA libraries it includes.
+// The GPU program's build runs without the user's $BENDRTS.
 function cli_build(bin: string, file: string): void {
   const c     = fs.readFileSync(file, "utf8");
   const mac   = process.platform === "darwin";
@@ -454,9 +489,10 @@ function cli_build(bin: string, file: string): void {
     : ["-DBEND_CUDA=1", "-I" + cuda + "/include", "-L" + cuda + "/lib64",
       "-L" + cuda + "/lib", ...cpu, "-lcuda", "-lnvrtc"];
   const steps: [string, string[]][] = bangs
-    ? [[cc, gpu], [path.resolve(bin), ["--gpu-build"]]] : [[cc, cpu]];
+    ? [[cc, gpu], [path.resolve(bin), ["+RTS", "--gpu-build"]]] : [[cc, cpu]];
   for (const [cmd, args] of steps) {
-    if (child.spawnSync(cmd, args, { stdio: "inherit" }).status !== 0) {
+    if (child.spawnSync(cmd, args, { stdio: "inherit",
+      env: { ...process.env, BENDRTS: "" } }).status !== 0) {
       throw "Error: " + path.basename(cmd) + " failed to build " + bin;
     }
   }
@@ -495,16 +531,26 @@ function cli_base(what?: string): void {
 }
 
 // An inline module script; an empty svg <script/> can't have content.
+// HTMLRewriter keeps character references in attributes. Only ASCII
+// references and HTML whitespace can turn a type into "module"; NBSP cannot.
 function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  const type = el.getAttribute("type")?.replace(
+    /&#(?:[xX]([\da-fA-F]+)|(\d+));?|&(Tab|NewLine);/g, (t, hex, dec, ws) => {
+      if (ws) return ws === "Tab" ? "\t" : "\n";
+      const n = parseInt(hex ?? dec, hex === undefined ? 10 : 16);
+      return n < 128 ? String.fromCharCode(n) : t;
+    });
   return el.canHaveContent && !el.hasAttribute("src")
-    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+    && type?.replace(/^[\t\n\f\r ]+|[\t\n\f\r ]+$/g, "").toLowerCase() === "module";
 }
 
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
+// Virtual names must not shadow real files; only their diagnostics map to a page.
 async function cli_bundle(page: string, dir: string): Promise<void> {
-  const code = new Map<string, string>();
+  type Inline = { id: string; page: string; text: string };
+  const code = new Map<string, Inline>();
   const inline: BunPlugin = {
     name: "bend inline",
     setup(build) {
@@ -513,7 +559,7 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         return code.has(id) ? { path: id, namespace: "inline" } : undefined;
       });
       build.onLoad({ filter: /.*/, namespace: "inline" }, (a) =>
-        ({ contents: code.get(a.path)!, loader: "js" }));
+        ({ contents: code.get(a.path)!.text, loader: "js" }));
       build.onLoad({ filter: /\.html$/ }, async (a) => {
         const src = await Bun.file(a.path).text();
         // HTMLRewriter gives no offsets, so a first pass marks where each
@@ -529,15 +575,20 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
             }
           },
         }).transform(src);
-        const mods: { id: string; text: string }[] = [];
-        let mod: { id: string; text: string } | null = null;
+        const mods: Inline[] = [];
+        let mod: Inline | null = null;
+        let serial = 0;
         const html = new HTMLRewriter().on("script", {
           element(el) {
             mod = null;
             if (is_inline_module(el)) {
-              const name = "." + path.basename(a.path) + ".bend-inline-"
-                + mods.length + ".js";
-              mod = { id: path.join(path.dirname(a.path), name), text: "" };
+              let name: string;
+              let id: string;
+              do {
+                name = "." + path.basename(a.path) + ".bend-inline-" + serial++ + ".js";
+                id = path.join(path.dirname(a.path), name);
+              } while (fs.existsSync(id));
+              mod = { id, page: a.path, text: "" };
               mods.push(mod);
               el.setAttribute("src", "./" + name);
             }
@@ -556,7 +607,8 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
           const at = marked.indexOf(mark, end + skip) - skip;
           line += src.slice(end, at).split("\n").length - 1;
           const col = at - src.lastIndexOf("\n", at - 1) - 1;
-          code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
+          m.text = "\n".repeat(line) + " ".repeat(col) + m.text;
+          code.set(m.id, m);
           end = at;
         }
         return { contents: html, loader: "html" };
@@ -564,8 +616,14 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
     },
   };
   try {
+    // Only the page keeps its name in the bundle (chunks and assets are hashed),
+    // so it is the input an -o can overwrite: refuse that, through links too.
+    const entry = path_real(page);
+    if (same_file(path.join(dir, path.basename(entry)), entry)) {
+      cli_fail("-o " + dir + " would overwrite the page");
+    }
     const out = await Bun.build({
-      entrypoints: [page],
+      entrypoints: [entry],
       outdir: dir,
       target: "browser",
       minify: true,
@@ -575,7 +633,11 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
       cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
     }
   } catch (e) {
-    throw book_err(e).replace(/\.([^/\\]+)\.bend-inline-\d+\.js/g, "$1");
+    let message = book_err(e);
+    for (const [id, mod] of code) {
+      message = message.replaceAll(id + ":", mod.page + ":");
+    }
+    throw message;
   }
 }
 
@@ -903,11 +965,22 @@ function term_refs(t: object, out: Set<string>): void {
 
 // cli_say writes text to fd, and drops it if the reader has left (EPIPE).
 function cli_say(fd: number, text: string): void {
-  try {
-    fs.writeSync(fd, text);
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "EPIPE") {
-      throw e;
+  const data = Buffer.from(text);
+  for (let at = 0; at < data.length;) {
+    try {
+      const n = fs.writeSync(fd, data, at, data.length - at);
+      if (n === 0) {
+        throw new Error("bend: a write made no progress");
+      }
+      at += n;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EPIPE") {
+        return;
+      }
+      if (code !== "EAGAIN" && code !== "EINTR") {
+        throw e;
+      }
     }
   }
 }

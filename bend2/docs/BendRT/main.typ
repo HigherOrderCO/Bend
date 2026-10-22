@@ -111,7 +111,7 @@ and sharing exists only where the compiler placed a counted share or a
 borrow. The evaluator is flat: every function is a case tree inside
 one worklist function with no C call stack, and every call site reads
 two ways, sequential and parallel, so one text serves every executor.
-Tasks live in a _cube_, a fixed 128 by 128 grid of rings that forks
+Tasks live in a _cube_, a 128 by 128 grid of rings that forks
 along its rows in a grow phase and drains along its columns in a work
 phase, with no shared queue, no lock and no work stealing. The price
 is a contract: the program's forks must split their work evenly. On an
@@ -294,11 +294,12 @@ a closure, a task, and a flat _block_ (an array) point at a node.
 
 Every executor shares one flat array of words, the _corpus_: a header,
 the $2^14$ task rings of @sec:cube, the lane stacks, and the heap. The
-host reserves 8 TB and pages fault in on touch; the GPU fixes its span
-before the first dispatch (@sec:gpu). Both processors address the same
-words. Each lane allocates from its own free lists and claims fresh
-pages off one global counter, so an allocation is a pop or a bump, a
-free is two stores, and neither crosses a thread.
+host maps 8 GB and doubles it in place as the heap fills, up to 8 TB,
+with pages faulting in on touch; the GPU fixes its span before the
+first dispatch (@sec:gpu). Both processors address the same words.
+Each lane allocates from its own free lists and claims fresh pages off
+one global counter, so an allocation is a pop or a bump, a free is two
+stores, and neither crosses a thread.
 
 == Ownership at Run Time <sec:ownership>
 
@@ -307,15 +308,16 @@ cannot. _Take_ consumes a value at a match: read the fields, free the
 node. _Keep_ gives a value a second owner and is emitted exactly at a
 binder's second use: the first keep mints a _redirect_, one word
 holding the node's address and a count, and turns the local into a
-pointer at it; the count lives there, never on the node, so an
-unshared value carries no count anywhere. _Drop_ releases an owner: a
-packed term costs nothing, a counted pointer decrements and only the
-last one collects, a sole owner collects at once. Take respects
+pointer at it; the count lives there, never on the node. _Drop_
+releases an owner: a packed term costs nothing, a counted pointer
+decrements and only the last one collects, a sole owner collects at
+once. Take respects
 sharing: at count one it collapses the redirect and owns the node;
 above one it copies the fields out and releases its pointer. Every
 decrement is a release and whoever sees zero acquires first, so a
-field read never races a free. Only hot types pay any of this, and
-they seal every stored field with a count at build time.
+field read never races a free. Only hot types pay any of this, but
+they pay it on every node, shared or not: each stored field is sealed
+with a count at build time.
 
 Drop is the runtime's only collector: an iterative walk that threads
 its worklist through the nodes being freed, so it allocates nothing
@@ -405,14 +407,16 @@ round.], {
 }) <fig:cube>
 
 The frontier lives in the _cube_: $2^14$ rings arranged as a 128 by
-128 square, one ring per lane, the same on every target; a single
-thread serves the whole square when parallelism is off. A ring is a
-fixed FIFO of 1024 slots with one producer step, a fetch-add and two
-stores, and one consumer per phase, the lane that owns it. The square
-is stored slot-major, so a row and a column are both $O(1)$ index
-maps, and _flipping_ the cube, turning the rows one phase filled into
-the columns the next phase drains, swaps the indexer and moves no
-task (@fig:cube).
+128 square, one ring per lane, on the CPU and Metal. CUDA sizes the
+cube to its L2, one group of 128 lanes per 64 KB, from 128 by 16 to
+128 by 128, and deepens each ring to match, so a cube always holds
+$2^21$ slots. A single thread serves the whole square when parallelism
+is off. A ring is a fixed FIFO of 1024 slots (up to 8192 on CUDA) with
+one producer step, a fetch-add and two stores, and one consumer per
+phase, the lane that owns it. The square is stored slot-major, so a
+row and a column are both $O(1)$ index maps, and _flipping_ the cube,
+turning the rows one phase filled into the columns the next phase
+drains, swaps the indexer and moves no task (@fig:cube).
 
 == Grow and Work
 
@@ -543,10 +547,10 @@ notification is retired by a later frame or request rather than staying busy.
 The same rewritten definitions (@sec:compile) print as plain
 JavaScript over the host's garbage collector: one function per live
 definition, constructors as tagged objects; tail calls trampoline,
-forks run in sequence, and a request unwinds to the loop as a thrown
-value. `bend file.bend` runs this backend in memory, and a loader makes
-a `.bend` file a module under node and Bun, so a Bend program is also a
-JavaScript library.
+forks run in sequence, and a request returns to the loop as an object
+carrying its continuation. `bend file.bend` runs this backend in
+memory, and a loader makes a `.bend` file a module under node and Bun,
+so a Bend program is also a JavaScript library.
 
 = Results <sec:eval>
 
@@ -623,22 +627,22 @@ collector-free functional memory; Rust @matsakis2014 made ownership
 with static borrows mainstream; Lean @ullrich2019 and Perceus
 @reinking2021 count precisely and reuse in place. Bend differs in
 where counts live and when they exist: contraction exists only at
-`Data`, so counts are minted only where a whole-program analysis finds
-sharing, in a redirect word beside the node, and the unshared majority
-of a program compiles to moves, borrows and frees with no count
+`Data`, so counts are minted only for the types a whole-program
+analysis finds shared, in a redirect word beside the node, and the
+rest of a program compiles to moves, borrows and frees with no count
 traffic.
 
 = Limitations <sec:limits>
 
 The equal-parts contract is unverified: a skewed program silently
 loses its parallelism. The CPU and the GPU never compute together, and
-a mark is honored only at a sequential point. A ring holds 1024 tasks,
-a count saturates at $2^24$, a natural at $2^48$, a block at depth 31;
-each overflow is a numbered fail-stop, not a fallback. The Metal lane
-is measured; the CUDA lane is in the source and not measured here. The
-C runtime is unverified: the correctness argument is the checksum
-discipline plus the type system's guarantees, and the companion
-paper's theorems stop at the calculus.
+a mark is honored only at a sequential point. A ring holds 1024 tasks
+(up to 8192 on CUDA), a count saturates at $2^24$, a natural at
+$2^48$, a block at depth 31; each overflow is a numbered fail-stop,
+not a fallback. The Metal lane is measured; the CUDA lane is in the
+source and not measured here. The C runtime is unverified: the
+correctness argument is the checksum discipline plus the type system's
+guarantees, and the companion paper's theorems stop at the calculus.
 
 = Conclusion <sec:conclusion>
 

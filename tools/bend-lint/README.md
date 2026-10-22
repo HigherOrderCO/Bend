@@ -45,6 +45,8 @@ Every fix is marked `safe`, `suggested` or `dangerous`:
 Fixes go into the file you passed in, even if the run had errors. A fix that
 also edits another file is skipped. When two fixes overlap, the later one is
 skipped. Run it again to get it.
+All edit offsets refer to the original text. Accepted edits are assembled in one
+pass rather than copying the whole file for each edit.
 
 Exit code is 0 if there were no errors (warnings don't count), 1 for a checker
 or rule error, and 2 for bad arguments or a crash.
@@ -64,7 +66,9 @@ source it tries, in order:
 
 Downloads are cached in `~/.cache/bend-lint/`. `XDG_CACHE_HOME` moves that, and
 on Windows it's under `LOCALAPPDATA`. With no network it falls back to the
-newest cached release.
+newest complete cached release, ignoring interrupted downloads. Completeness
+includes Base's host-effect files. Missing files trigger a fresh download;
+concurrent downloads keep already returned checkout directories in place.
 
 ## Rules included
 
@@ -80,6 +84,8 @@ Declaration order and literals stay as written. The only comment change is a
 space added after `#` when it's missing. Before offering a fix it parses
 its own output and compares that to the original program. If they differ you
 get a warning and no fix.
+
+Block-match arms keep their scope even when a body is under-indented.
 
 `style/file-length` (`tools/bend-lint/rules/file_length.bend`) warns when the file has more than
 `maxLines` lines (default 500). Imports don't count. No fix.
@@ -131,6 +137,8 @@ A module exports `rules: LintRule[]`. A rule has an `id` (`namespace/name`, it
 becomes the finding's `code`) and `run(cx, signal)`, which returns diagnostics
 and can be async. It can also have `facts` and `options`. If `run` throws or the
 signal aborts, the error goes to whoever called the library.
+Aborting also rejects while an async rule is pending; the caller need not wait
+for that rule to finish or cooperate with cancellation.
 
 Build findings with `cx.diag()`. Severity defaults to `warning`. Rules run in
 order and see earlier findings in `cx.prior`. The first `error` ends the run:
@@ -330,8 +338,9 @@ if (result.ok) {
 Set `BEND_DIR` before importing bend-lint to pick a Bend checkout. Import
 bend-lint before you load Bend yourself, so the patching happens first. `lint`
 takes `{ config, signal, unsaved }` as a third argument. Without `config` it looks
-next to the file. `unsaved` maps file paths to editor text that isn't saved yet.
-Bend and the rules read that text instead of the file, for that run only. Runs
+next to the file. `unsaved` maps file paths to editor text that isn't saved yet;
+new files and imports need not exist on disk. Bend and the rules read that text
+for that run only, without creating files or directories. Runs
 at the same time wait for each other's check, one at a time; rules still run
 side by side. `position(span)` gives an LSP range.
 
@@ -394,9 +403,9 @@ into `/` paths so imports resolve on Windows. `comp.ts` also exports
 code as `bend <file>`, never a copy of it. Imported, `main.ts` also registers
 Bend's loader for `import "x.bend"`.
 
-If a file has a line that's exactly `import Base` (what `bend --checkup` reads),
-it reuses one Base, checked once per process. Base facts are left out of rule
-requests.
+If a file imports Base in its initial header (what `bend --checkup` reads),
+it reuses the latest checked Base, checking it again when its source changes.
+Base facts are left out of rule requests.
 
 A failed check is one `bend/check` finding. Its message is Bend's, without the
 location: expected and observed, with the names in scope, and Bend's note.

@@ -11,6 +11,10 @@ static int file_open_mode(const char* mode) {
   if (strcmp(mode, "a") == 0) {
     return O_WRONLY | O_CREAT | O_APPEND;
   }
+  // "x" creates the file, and fails EEXIST if the path is there.
+  if (strcmp(mode, "x") == 0) {
+    return O_WRONLY | O_CREAT | O_EXCL;
+  }
   return -1;
 }
 
@@ -23,20 +27,43 @@ static Term file_open_pack(Env e, IoWork* w) {
   return io_res(e, w, io_hand(w->made));
 }
 
-Term file_open_run(Env e, Term* f, IoWork* w) {
+// cons is CID(SCon) for a String path, opened as its UTF-8, or CID(Con)
+// for a List, opened as its bytes (NULL past 255).
+static Term file_open_start(Env e, Term* f, IoWork* w, u64 cons) {
   uint64_t mn = 0;
-  w->data = io_cstr(e, f[0], &w->size);
+  w->data = io_cbuf(e, f[0], &w->size, cons);
   char* mode = io_cstr(e, f[1], &mn);
   int flags = io_nul(mode, mn) ? -1 : file_open_mode(mode);
   free(mode);
   w->word = (uint32_t)flags;
-  if (io_nul(w->data, w->size) || flags < 0) {
-    w->code = io_nul(w->data, w->size) ? EILSEQ : EINVAL;
+  w->code = w->data == NULL ? EINVAL : io_nul(w->data, w->size) ? EILSEQ
+    : flags < 0 ? EINVAL : 0;
+  if (w->code != 0) {
     return file_open_pack(e, w);
   }
   return io_work(w, file_open_call, file_open_pack);
 }
 
+#ifdef CID(File.open)
+
+Term file_open_run(Env e, Term* f, IoWork* w) {
+  return file_open_start(e, f, w, CID(SCon));
+}
+
 static void __attribute__((constructor)) file_open_use(void) {
   io_eff(CID(File.open), file_open_run);
 }
+
+#endif
+
+#ifdef CID(File.open_bytes)
+
+Term file_open_bytes_run(Env e, Term* f, IoWork* w) {
+  return file_open_start(e, f, w, CID(Con));
+}
+
+static void __attribute__((constructor)) file_open_bytes_use(void) {
+  io_eff(CID(File.open_bytes), file_open_bytes_run);
+}
+
+#endif

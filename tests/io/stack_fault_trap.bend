@@ -22,6 +22,9 @@
 # limit now loud AND numbered. The device half of the law (WL_ROOM posting
 # ERR_DEEP on the strided device stacks) rides on no host drive, so
 # a csrc pin holds it verbatim beside the four host trap sites.
+# The print BEFORE the deep call pins the trap's stdout flush: stdout is
+# buffered when it goes to a pipe, so a trap that skips the flush loses
+# what the program already printed.
 import Base
 
 law deep:
@@ -53,8 +56,10 @@ law main:
 
 def main():
   do IO<U32>:
+    a : Unit <- IO.print("BEFORE")
     u : Unit <- IO.print(U32.show(run(300000000)))
     return 0
 
+#|BEFORE
 #|bend: memory fault (machine stack overflow?)
 #|exit 1
