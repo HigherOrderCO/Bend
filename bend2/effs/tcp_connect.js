@@ -4,7 +4,7 @@
 // The socket is non-blocking for life: EINPROGRESS parks the computation
 // until the socket is writable, and then SO_ERROR says how the connect ended.
 function tcp_connect(host, port, k) {
-  const at = io_addr(host, Number(port));
+  const at = io_addr(str_out(host), Number(port));
   if (at === null) {
     return io_fail(22);
   }

@@ -2,7 +2,7 @@
 // ===
 
 function tcp_listen(host, port) {
-  const at = io_addr(host, Number(port));
+  const at = io_addr(str_out(host), Number(port));
   if (at === null) {
     return io_fail(22);
   }

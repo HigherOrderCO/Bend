@@ -8,7 +8,7 @@ function udp_send_to_with(socket, host, port, data, b, k, at) {
   const fail = (code) => io_tup(socket, io_ready(at, io_fail(code, data)));
   const sys = io_sys();
   const fd = socket;
-  const to = io_addr(host, Number(port));
+  const to = io_addr(str_out(host), Number(port));
   if (to === null) {
     return fail(22);
   }

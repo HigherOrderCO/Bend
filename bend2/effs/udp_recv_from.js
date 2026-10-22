@@ -33,7 +33,7 @@ function udp_recv_from_with(socket, max, k, read, at) {
     }
     const host = peer[4] + "." + peer[5] + "." + peer[6] + "." + peer[7];
     const port = (peer[2] << 8) | peer[3];
-    const dgram = io_tup(host, port, read(b, n));
+    const dgram = io_tup(str_in(host), port, read(b, n));
     return io_tup(socket, io_ready(at, io_done(dgram)));
   };
   io_park_on(fd, false, k, go, at);
