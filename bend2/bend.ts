@@ -2230,7 +2230,7 @@ export function parse_term_num(p: Parse): LTerm {
       return Lit("Nat", n + out.v, spn);
     }
     if (n > NAT_LITERAL_MAX) {
-      return App(App(Ref("Nat.add", spn), Lit("Nat", n, spn), spn), out, spn);
+      return App(App(Ref(parse_own(p, "Nat.add"), spn), Lit("Nat", n, spn), spn), out, spn);
     }
     for (let i = 0; i < n; i++) {
       out = Ctr("Succ", [out], spn);
