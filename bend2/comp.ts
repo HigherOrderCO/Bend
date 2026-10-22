@@ -3755,7 +3755,7 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// The first to fail gets 1; others wait a second for its _exit, then 0.
+// First failure wins; others wait a second for it to terminate.
 FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
