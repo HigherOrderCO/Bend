@@ -318,9 +318,15 @@ async function cli_file(args: string[]): Promise<void> {
       if (output_conflicts(out, ins)) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
+      // A binary's GPU build also writes <binary>.gpu.
+      if (!/\.(mjs|c?js|c|bendtt)$/.test(out)
+        && output_conflicts(out + ".gpu", ins)) {
+        cli_fail("GPU output " + out + ".gpu is a file the program reads, or a"
+          + " directory");
+      }
     }
     for (const out of outs) {
-      cli_emit(book, out, ins);
+      cli_emit(book, out);
     }
   } catch (e) {
     cli_say(2, book_err(e) + "\n");
@@ -387,7 +393,7 @@ function output_conflicts(out: string, ins: Set<string>): boolean {
     || [...ins].some((input) => same_file(at, input))));
 }
 
-function cli_emit(book: Bend.Book, out: string, ins: Set<string>): void {
+function cli_emit(book: Bend.Book, out: string): void {
   if (out.endsWith(".mjs")) {
     fs.writeFileSync(out, Comp.js_lib(book, true));
   } else if (/\.c?js$/.test(out)) {
@@ -405,7 +411,7 @@ function cli_emit(book: Bend.Book, out: string, ins: Set<string>): void {
       const c = path.join(dir, path.basename(out) + ".c");
       fs.writeFileSync(c, Comp.compile_book(book));
       Bun.gc(true);
-      cli_build(out, c, ins);
+      cli_build(out, c);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -465,18 +471,13 @@ function cc_find(gpu: boolean): string {
 // (#import: a window, audio) builds as Objective-C; on Linux it links the X11
 // (plus libdl, for dlopen before glibc 2.34) and ALSA libraries it includes.
 // The GPU program's build runs without the user's $BENDRTS.
-function cli_build(bin: string, file: string, ins: Set<string>): void {
+function cli_build(bin: string, file: string): void {
   const c     = fs.readFileSync(file, "utf8");
   const mac   = process.platform === "darwin";
   const cuda  = [process.env.CUDA_HOME, process.env.CUDA_PATH,
     "/usr/local/cuda", "/opt/cuda"]
     .find(d => d && fs.existsSync(d + "/include/nvrtc.h")) ?? "";
   const bangs = !/^#define BANGS\s+0$/m.test(c) && (mac || cuda !== "");
-  // The GPU build writes <binary>.gpu as well as the requested binary.
-  if (bangs && output_conflicts(bin + ".gpu", ins)) {
-    throw "bend: GPU output " + bin
-      + ".gpu is a file the program reads, or a directory (see bend --help)";
-  }
   const cc    = cc_find(bangs);
   const objc  = mac && (bangs || /^#import /m.test(c))
     ? ["-x", "objective-c", "-fobjc-arc", "-fmodules"] : [];
