@@ -29,6 +29,9 @@ function run({ argv, input, env, max, ms }) {
   return new Promise((yes, no) => {
     const proc = spawn(argv[0], argv.slice(1), { env,
       stdio: ["pipe", "pipe", "pipe"] });
+    // Node destroys proc.stdin at exit; a descendant may still read it.
+    const stdin = proc.stdin;
+    proc.stdin = null;
     const chunks = [[], []];
     let size = 0;
     let error;
@@ -36,12 +39,12 @@ function run({ argv, input, env, max, ms }) {
       if (error !== undefined) return;
       error = e;
       proc.kill("SIGKILL");
-      proc.stdin.destroy();
+      stdin.destroy();
       proc.stdout.destroy();
       proc.stderr.destroy();
     };
     proc.once("error", fail);
-    proc.stdin.on("error", (e) => {
+    stdin.on("error", (e) => {
       if (e.code !== "EPIPE") fail(e);
     });
     [proc.stdout, proc.stderr].forEach((stream, i) => {
@@ -53,8 +56,12 @@ function run({ argv, input, env, max, ms }) {
         else chunks[i].push(chunk);
       });
     });
-    // An exited child need not drain stdin held open by its descendants.
-    proc.once("exit", () => proc.stdin.destroy());
+    // Feed stdin until the child exits and its stdout and stderr close.
+    let live = 3;
+    const done = () => --live || stdin.destroy();
+    proc.once("exit", done);
+    proc.stdout.once("close", done);
+    proc.stderr.once("close", done);
     const timer = setTimeout(() => fail("ETIMEDOUT"),
       Math.min(ms, 2 ** 31 - 1));
     proc.once("close", (code, signal) => {
@@ -64,7 +71,7 @@ function run({ argv, input, env, max, ms }) {
         out: Buffer.concat(chunks[0]).toString("utf8"),
         err: Buffer.concat(chunks[1]).toString("utf8") });
     });
-    proc.stdin.end(input);
+    stdin.end(input);
   });
 }
 `;
