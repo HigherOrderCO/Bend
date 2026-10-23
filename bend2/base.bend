@@ -2406,6 +2406,81 @@ def U32.read(s: String) -> Maybe<&2, U32>:
     case SCon{h, t}:
       U32.read.go(SCon{h, t}, 0)
 
+law U32.hex.go:
+  for f   : Nat
+  for +n  : U32
+  for acc : String
+  String
+
+def U32.hex.fin(g: Nat, acc: String, +n: U32, z: Bool) -> String:
+  match z:
+    case True{}:
+      acc
+    case False{}:
+      +d = U32.and(n, 15)
+      U32.hex.go(g, U32.shrn(n, 4n),
+        SCon{Chr{(d + 48 + Bool.to_u32((d > 9 : U32)) * 39 : U32)}, acc})
+
+def U32.hex.go(f, n, acc):
+  match f:
+    case 0n:
+      acc
+    case 1n+g:
+      U32.hex.fin(g, acc, n, U32.is_zero(n))
+
+# a's hex digits, none for 0
+def U32.hex(a: U32) -> String:
+  U32.hex.go(8n, a, SNil{})
+
+def Char.quote.at(+x: U32, k: U32, plain: Bool, raw: Bool) -> String:
+  match plain raw:
+    case False{} _:
+      SCon{Chr{92}, SCon{Chr{k}, SNil{}}}
+    case True{} True{}:
+      "\\u{" ++ U32.hex(x) ++ "}"
+    case True{} False{}:
+      SCon{Chr{x}, SNil{}}
+
+# c as a quote q holds it: \n \t \r \0 \\ and q escaped; a control, a
+# surrogate or a code past Unicode as \u{hex}
+def Char.quote(+q: U32, c: Char) -> String:
+  match c:
+    case Chr{+x}:
+      +k = (Bool.to_u32(U32.is_eq(x, 10)) * 110 + Bool.to_u32(U32.is_eq(x, 9))
+        * 116 + Bool.to_u32(U32.is_eq(x, 13)) * 114 + Bool.to_u32(
+        U32.is_eq(x, 0)) * 48 + Bool.to_u32(U32.is_eq(x, 92)
+        || U32.is_eq(x, q)) * x : U32)
+      Char.quote.at(x, k, U32.is_zero(k), (x < 32 : U32) || U32.is_eq(x, 127)
+        || (x >= 55296 : U32) && (x <= 57343 : U32) || (x > 1114111 : U32))
+
+def String.quote.go(s: String, acc: String) -> String:
+  match s:
+    case SNil{}:
+      String.reverse(SCon{Chr{34}, acc})
+    case SCon{c, t}:
+      String.quote.go(t, String.reverse.go(Char.quote(34, c), acc))
+
+def String.quote(s: String) -> String:
+  String.quote.go(s, "\"")
+
+# F32.show with a point before an e, or at the end, when it has none
+def F32.show.dot(s: String) -> String:
+  match s:
+    case SNil{}:
+      ".0"
+    case SCon{Chr{+c}, t}:
+      F32.show.dot.at(c, t, U32.is_eq(c, 46) || U32.is_eq(c, 110)
+        || U32.is_eq(c, 105), U32.is_eq(c, 101))
+
+def F32.show.dot.at(+c: U32, t: String, stop: Bool, e: Bool) -> String:
+  match stop e:
+    case True{} _:
+      SCon{Chr{c}, t}
+    case False{} True{}:
+      ".0" ++ SCon{Chr{c}, t}
+    case False{} False{}:
+      SCon{Chr{c}, F32.show.dot(t)}
+
 def Bool.show(b: Bool) -> String:
   match b:
     case False{}:
@@ -2610,6 +2685,60 @@ def Array.to_list.go(~T: Type, a: Array<T>, acc: List<T>) -> List<T>:
 
 def Array.to_list(~T: Type, a: Array<T>) -> List<T>:
   Array.to_list.go(~T, a, Nil{})
+
+# Array.write writes [x0, x1, ...], reading the array in place by index:
+# f(s, x) writes s, then x, so each element is one write. Array.show
+# returns that text, f(s, x) being s followed by x's text. A pure main
+# prints an Array with them.
+def Array.write.go(
+  ~T: Data, ~f: String -> T -> IO(Unit), n: Nat, +i: U32, s: String,
+  r: Array<T> & T
+) -> IO(Unit):
+  match n:
+    case 0n:
+      (a, x) = r
+      do IO<Unit>:
+        Unit <- f(s, x)
+        IO.write("]")
+    case 1n+p:
+      (a, x) = r
+      +j = U32.inc(i)
+      do IO<Unit>:
+        Unit <- f(s, x)
+        Array.write.go(~T, ~f, p, j, ", ", Array.get(T, a, j))
+
+def Array.write.at(
+  ~T: Data, ~f: String -> T -> IO(Unit), an: Array<T> & U32
+) -> IO(Unit):
+  (a, +n) = an
+  Array.write.go(~T, ~f, U32.to_nat(U32.sub(n, 1)), 0, "[",
+    Array.get(T, a, 0))
+
+def Array.write(~T: Data, ~f: String -> T -> IO(Unit), a: Array<T>) -> IO(Unit):
+  Array.write.at(~T, ~f, Array.size(T, a))
+
+def Array.show.go(
+  ~T: Data, ~f: String -> T -> String, n: Nat, +i: U32, s: String,
+  r: Array<T> & T
+) -> String:
+  match n:
+    case 0n:
+      (a, x) = r
+      f(s, x) ++ "]"
+    case 1n+p:
+      (a, x) = r
+      +j = U32.inc(i)
+      Array.show.go(~T, ~f, p, j, f(s, x) ++ ", ", Array.get(T, a, j))
+
+def Array.show.at(
+  ~T: Data, ~f: String -> T -> String, an: Array<T> & U32
+) -> String:
+  (a, +n) = an
+  Array.show.go(~T, ~f, U32.to_nat(U32.sub(n, 1)), 0, "[",
+    Array.get(T, a, 0))
+
+def Array.show(~T: Data, ~f: String -> T -> String, a: Array<T>) -> String:
+  Array.show.at(~T, ~f, Array.size(T, a))
 
 def Array.map.go(
   ~T: Data, ~U: Data, ~f: T -> U, +n: Nat, +i: U32, b: Array<U>,
