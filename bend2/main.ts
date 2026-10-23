@@ -812,10 +812,11 @@ async function cli_login(): Promise<string> {
 // any case, is refused (it clashes with LICENSE on a case-blind disk).
 function pkg_files(file: string, book: Bend.Book,
   seen: Map<string, string | null>): Record<string, string> {
-  const dir = path.join(path.dirname(fs.realpathSync(file)), "/");
+  const ent = fs.realpathSync(file);
+  const dir = path.join(path.dirname(ent), "/");
   if (dir !== path.join(fs.realpathSync(path.dirname(file)), "/")) {
-    throw "Error: " + file + " cannot be published: it links to "
-      + fs.realpathSync(file) + ", in another directory; publish that file";
+    throw "Error: " + file + " cannot be published: it links to " + ent
+      + ", in another directory; publish that file";
   }
   if (dir === "/") {
     throw "Error: " + file + " cannot be published: it is at the file"
@@ -827,7 +828,8 @@ function pkg_files(file: string, book: Bend.Book,
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
-      [path.relative(dir, f), f]))];
+      [f.startsWith(dir) ? path.posix.normalize(f.slice(dir.length)) : f,
+        f]))];
   const files: Record<string, string> = {};
   for (const [p, src] of raws) {
     if (p.split("/").slice(0, -1).some((s) => s.toLowerCase() === "license")) {
@@ -845,12 +847,16 @@ function pkg_files(file: string, book: Bend.Book,
 }
 
 // pkg_read is the text of src, published at p: p and src's real path stay
-// inside dir, the entry's directory. A leading byte order mark is dropped:
-// the hub stores the text as sent, and an importer's fetch drops the mark,
-// so a file sent with one would never match its hash.
+// inside dir, the entry's directory. p is the import's own path, normalized
+// as text, since an importer resolves it inside the package that way; one
+// that climbs out and back in names a file the package lacks. A leading
+// byte order mark is dropped: the hub stores the text as sent, and an
+// importer's fetch drops the mark, so a file sent with one would never
+// match its hash.
 function pkg_read(p: string, src: string, dir: string, fix: string): string {
   const real = fs.realpathSync(src);
-  if (p === ".." || p.startsWith("../") || !real.startsWith(dir)) {
+  if (p === ".." || p.startsWith("../") || p.startsWith("/")
+    || !real.startsWith(dir)) {
     throw "Error: " + src + " cannot be published: it is outside " + dir
       + " (the entry's directory); " + fix + " inside";
   }
