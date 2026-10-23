@@ -149,8 +149,8 @@ function formatTokens(tokens: Token[]): [string, number[]] {
   return [output, starts];
 }
 
-// Lines inside brackets and comment-only lines: their columns mean nothing to
-// the parser.
+// Bracketed continuations and comment-only lines use relative indentation;
+// inline body pins below preserve the columns that still matter to the parser.
 function looseLines(lines: Line[]): boolean[] {
   let open = 0;
   return lines.map((line) => {
@@ -163,26 +163,51 @@ function looseLines(lines: Line[]): boolean[] {
   });
 }
 
+type BodyScope = { open: number; angle: number; end: number };
+type InlineBody = { at: number; scope?: BodyScope };
+
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, `=>` lambda opener or `;` statement separator. As in
+// `def` header, `=>` lambda opener, `;` separator or `(` group opener. As in
 // `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
-function inlineBodies(lines: Line[]): number[][] {
+function inlineBodies(lines: Line[]): InlineBody[][] {
   let open = 0;
+  const angles = [0];
+  const bodyScopes: BodyScope[] = [];
   let header: { open: number; angle: number; typed: boolean } | null = null;
-  return lines.map((line) => line.tokens.flatMap((token, index) => {
+  return lines.map((line, row) => line.tokens.flatMap((token, index): InlineBody[] => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
-    } else if ((token.text === "=>" || token.text === ";") && open === 0) {
-      return index + 1 < line.tokens.length ? [index + 1] : [];
+    } else if (token.text === "=>" || token.text === ";") {
+      if (open > 0) bodyScopes.push({ open, angle: angles[open], end: lines.length });
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
+      angles.push(0);
+      if (token.text === "(" && index + 1 < line.tokens.length) {
+        bodyScopes.push({ open, angle: angles[open], end: lines.length });
+        return [{ at: index + 1, scope: bodyScopes.at(-1) }];
+      }
     } else if ([")", "]", "}"].includes(token.text)) {
+      if (open > 0) angles.pop();
       open = Math.max(0, open - 1);
-    } else if (header?.typed && open === header.open && ANGLES.has(token.text)) {
-      header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
+    } else if (ANGLES.has(token.text)) {
+      if (token.text === "<") angles[open]++;
+      else if (token.text[0] === ">") angles[open] = Math.max(0, angles[open] - token.text.length);
+      if (header?.typed && open === header.open) {
+        header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
+      }
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;
-      return index + 1 < line.tokens.length ? [index + 1] : [];
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
+    }
+    // Only commas outside an inline body's type arguments end its argument/body scope.
+    while (bodyScopes.length) {
+      const scope = bodyScopes.at(-1)!;
+      const inside = scope.open < open || scope.open === open && scope.angle <= angles[open];
+      const comma = token.text === "," && scope.open === open && scope.angle === angles[open];
+      if (inside && !comma) break;
+      // A leading closer/separator has no body statement to pin on this line.
+      bodyScopes.pop()!.end = row - (index === 0 ? 1 : 0);
     }
     return [];
   }));
@@ -210,11 +235,11 @@ function indentDepths(lines: Line[], loose = looseLines(lines), anchors: (Token 
     while (level.parent && width < level.col) level = level.parent;
     if (width > level.col) level = { col: width, depth: level.depth + 1, parent: level };
     const head = line.tokens[0];
-    if (width === 0 && head && ["def", "type", "law", "@"].includes(head.text)) scopes.length = 0;
     for (const token of line.tokens) {
       if (token.kind === "symbol" && ["(", "[", "{"].includes(token.text)) brackets++;
       else if (token.kind === "symbol" && [")", "]", "}"].includes(token.text)) brackets--;
       else if (brackets === 0 && head?.text !== "import" && token.kind === "word") {
+        if (["def", "type", "law"].includes(token.text)) scopes.length = 0;
         if (token.text === "match") {
           scopes.push({ parent: scopes.at(-1)?.current ?? -1, current: -1, anchor: scopes.at(-1)?.anchor });
         } else if (token.text === "case") {
@@ -271,11 +296,14 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
   const size = Math.max(1, options.tabSize ?? 2);
   const spaces = options.insertSpaces !== false;
   // A line at or right of an inline body's column moves as far as that body.
-  const pins: { from: number; to: number; prefix: string }[] = [];
+  const pins: { from: number; to: number; prefix: string; scope?: BodyScope }[] = [];
   const bodyPins = new Map<Token, typeof pins[number]>();
   const formatted = lines.map((line, index) => {
     const ending = endings[index] ?? "";
     if (line.code === "" && line.comment === "") return ending;
+    for (let at = pins.length - 1; at >= 0; at--) {
+      if ((pins[at].scope?.end ?? lines.length) < index) pins.splice(at, 1);
+    }
     const width = line.indent.length;
     if (!loose[index]) while (pins.length > 0 && pins[pins.length - 1].from > width) pins.pop();
     const anchor = anchors[index];
@@ -284,8 +312,8 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
     const prefix = pin ? pin.prefix + " ".repeat(width - pin.from + pin.to - pin.prefix.length)
       : spaces ? " ".repeat(depths[index] * size) : "\t".repeat(depths[index]);
     const [code, starts] = formatTokens(line.tokens);
-    for (const at of bodies[index]) {
-      const pin = { from: line.tokens[at].col, to: prefix.length + starts[at], prefix };
+    for (const { at, scope } of bodies[index]) {
+      const pin = { from: line.tokens[at].col, to: prefix.length + starts[at], prefix, scope };
       pins.push(pin);
       bodyPins.set(line.tokens[at], pin);
     }

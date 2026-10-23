@@ -5,9 +5,10 @@
 # each item is a boxed one-cell List. Each round drops a fresh owned copy
 # whole, then shares one, sums it through one holder and drops it through
 # the other; a misplaced field would read back wrong from reused memory
-# in a later round. Build with CCC_OVERRIDE_OPTIONS=+-DBEND_POISON to also
-# fail a read of a freed block within one drop. Expect 3 rounds of
-# 4 * 5050 + 100 * 7.
+# in a later round. head only reads a word, so it borrows; first passes
+# its item through give, which owns it, so each sum owns its copy. Build
+# with CCC_OVERRIDE_OPTIONS=+-DBEND_POISON to also fail a read of a freed
+# block within one drop. Expect 3 rounds of 4 * 5050 + 100 * 7.
 import Base
 
 type RL is Data:
@@ -53,12 +54,18 @@ def rose(+n: Nat) -> Rose:
     case 1n+m:
       Rose{[rose(m)], [U32.from_nat(n)]}
 
-def first(xs: List<&2, U32>) -> U32:
+def head(xs: List<&2, U32>) -> U32:
   match xs:
     case []:
       0
     case x <> rest:
       x
+
+def give(xs: List<&2, U32>) -> List<&2, U32>:
+  xs
+
+def first(xs: List<&2, U32>) -> U32:
+  head(give(xs))
 
 def rl_sum(xs: RL) -> U32:
   match xs:

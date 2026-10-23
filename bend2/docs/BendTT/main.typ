@@ -953,6 +953,16 @@ of terms, and it cannot work with #Ty : #Ty, where some typed terms
 loop. BendTT gets termination from an untyped measure on live terms,
 and it uses types only to rule out stuck terms.
 
+#thm[Theorem 8][Adequacy][If the checker accepts a book, and a closed
+term $t$ that passes the live check has a type $T equiv a scripts(=)_A b$,
+then $a equiv b$.]
+
+As in Theorem 7, $t$ evaluates to a value of type $a scripts(=)_A b$.
+The only value of an equality type is #rfl, which proves only an
+equality of convertible sides, so $a equiv b$. So a checked law holds at
+each closed instance: its proof, applied to closed values, makes the two
+sides compute to a common term.
+
 = What Affinity Costs <sec:costs>
 
 A closure may be called at most once, even when everything it captures
@@ -1082,6 +1092,7 @@ caption: [The claims of `bendtt.lean`.], {
     [#co[halts]], [Theorem 5: live evaluation of closed terms ends.],
     [#co[sound]], [Theorem 6: an accepted book is well typed and live.],
     [#co[consistent]], [Theorem 7: no accepted definition has the empty type.],
+    [#co[adequate]], [Theorem 8: a closed live proof of $a scripts(=) b$ has $a equiv b$.],
     table.hline(stroke: 0.5pt),
   )
 }) <tab:claims>
