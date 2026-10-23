@@ -1,6 +1,7 @@
 # a call met only after a def unfolds converts before either copy
-# unfolds, when both apply one def to the same atoms: big() is 2^30, a
-# chain of Succ the full pass would walk on both sides (a stack overflow)
+# unfolds: the rigid pass, asked again at that step, finds both copies
+# the same. big() is 2^30, a chain of Succ the full pass would walk on
+# both sides (a stack overflow)
 import Base
 
 type Box is Data:

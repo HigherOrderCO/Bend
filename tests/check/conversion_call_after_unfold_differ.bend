@@ -1,5 +1,5 @@
-# two calls of one def on different atoms are not converted before they
-# unfold: the conversion still fails when the unfolded sides differ
+# two calls of one def on different arguments are not rigidly equal, so
+# the conversion unfolds them and still fails when the sides differ
 import Base
 
 type Box is Data:
