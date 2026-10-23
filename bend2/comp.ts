@@ -141,8 +141,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
-  // as intr_of skips an op with no JS
+  // C only: intr_of skips an op with no JS, so a JS file runs Base's def
   u32_pow: { C: "u32_pow($0, $1)" },
   u32_log2: { C: "(31 - CLZ((u32)$0 | 1))" },
   map_msb_u: { C: "map_msb_u($0, $1)" },
@@ -561,7 +560,7 @@ function cid_mac(k: string): string {
 // ====
 
 // A Char past the Unicode scalars is 0xDC00 and three 11-bit pieces, which
-// str_out writes as U+FFFD.
+// str_out writes as U+FFFD. The JS runtime holds this function's text.
 function char_new(c: number): string {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
     : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
@@ -1088,7 +1087,7 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
       FL.img.push(...exprs) - exprs.length);
     return `term_ctr(${cid}, STAT_OFF + ${at})`;
   }
-  const alloc = `heap_alloc(e, cls_fit(${exprs.length}))`;
+  const alloc = `heap_alloc(e, ${cls_fit(exprs.length)})`;
   const at = sc.spares.findIndex((s) =>
     cls_fit(s.words) === cls_fit(exprs.length));
   const s = at < 0 ? null : sc.spares.splice(at, 1)[0];
@@ -1642,7 +1641,7 @@ function seg_ref(sc: Scope, fid: string): string {
 function seg_clo(sc: Scope, fid: string, words: string[]): string {
   FL.clos.add(fid);
   return `term_clo(${seg_ref(sc, fid)}, ${words.length === 0 ? 0 : node_fill(
-    sc, "nd", `heap_alloc(e, cls_fit(${words.length}))`, words)})`;
+    sc, "nd", `heap_alloc(e, ${cls_fit(words.length)})`, words)})`;
 }
 
 function seg_name(sc: Scope, stem: string): string {
@@ -2806,8 +2805,8 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
   }
 }
 
-// Arms that each allocate one node of one class, in no inner block,
-// share one allocation made first: their stores become selects.
+// Arms that each open with their one alloc, of one class and in no inner
+// block, share one allocation made first: their stores become selects.
 function emit_chain(sc: Scope, arms: [string, () => void][]): void {
   if (arms.length === 1) {
     return arms[0][1]();
@@ -2821,8 +2820,8 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
     if (FL.js) {
       return;
     }
-    return ls.slice(n).filter((l) => /heap_alloc|\{/.test(l)).join("\n")
-      .match(/^u64 \w+ = (heap_alloc.*);$/)?.[1];
+    return ls.slice(n).join("\n")
+      .match(/^u64 \w+ = (heap_alloc\(e, \d+\));(?![^]*(heap_alloc|\{))/)?.[1];
   }));
   file_push(sc, "}");
   const [a] = al;
@@ -2893,7 +2892,6 @@ function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
-  // the datatypes of the constructors a pure main prints are roots too
   const show = show_main();
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
@@ -5266,8 +5264,7 @@ static void gpu_kernel(u32 pass, u32 at) {
   }
 }
 
-// A bang launches 1, 2, 4 .. 64 rounds between syncs, until the pack
-// empties the frontier. A pass launched past that returns at once.
+// A pass launched past an empty frontier returns at once.
 static void gpu_pass(u64* H) {
   for (u32 n = 1; H[H_FRONT] != 0; n = n < 32 ? 2 * n : 64) {
     for (u32 i = 0; i < n; i += 1) {
@@ -6060,7 +6057,6 @@ OUTLINE void io_loop(u64* H) {
       io_wait(e, true);
       continue;
     }
-    // A busy loop still checks due timers, and fds periodically.
     if ((n & 63) == 0) {
       if (io_busy != 0) {
         io_take(e);
@@ -6317,7 +6313,7 @@ function show_val(D, d, v, chain) {
 // Apple arm64 passes variadic fcntl flags on the stack, so io_sys passes
 // them as the ninth argument. A parked effect waits for fd (a write when
 // out) and/or until at; once due, io_wait calls more and resumes k with its
-// value, or parks it again on undefined.
+// value, or parks it again on undefined. Waits stay in deadline order.
 
 function io_exit(main, show) {
   try {
@@ -6430,7 +6426,7 @@ function io_text(b, n) {
 }
 
 // Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
-// either direction; io_unlist answers null if a value is past 255.
+// either direction.
 function io_list(b, n) {
   let xs = { $: "Nil" };
   while (n > 0) {
