@@ -3094,21 +3094,48 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     b = lit_step(b);
   }
   switch (a.$) {
-    case "Var": {
-      return b.$ === "Var" && a.i === b.i;
-    }
-    // a bare def is under-applied, so a function: two defs convert when
-    // they agree on fresh arguments (eta, as for a lambda)
-    case "Ref": {
-      if (b.$ !== "Ref" || a.k === b.k) {
-        return b.$ === "Ref";
+    // a stuck call: same head and arguments, else eta if a def is short of them
+    case "Var":
+    case "Ref":
+    case "App": {
+      let x: HTerm = a;
+      let y: HTerm = b;
+      let i = 0;
+      let j = 0;
+      let same = true;
+      while (x.$ === "App" || y.$ === "App") {
+        same = same && x.$ === "App" && y.$ === "App" && compare_go("EQ", book, x.x, y.x, dep);
+        if (x.$ === "App") {
+          x = x.f;
+          i++;
+        }
+        if (y.$ === "App") {
+          y = y.f;
+          j++;
+        }
       }
-      const n = Math.max(book.tlds[a.k]?.n ?? 0, book.tlds[b.k]?.n ?? 0);
-      let [f, g]: HTerm[] = [a, b];
-      for (let j = 0; j < n; j++) {
-        [f, g] = [App(f, Var("_", dep + j)), App(g, Var("_", dep + j))];
+      if (x.$ === "Var") {
+        same = same && y.$ === "Var" && x.i === y.i;
+      } else if (x.$ === "Ref") {
+        same = same && y.$ === "Ref" && x.k === y.k;
+      } else {
+        same = same && compare_go("EQ", book, x, y, dep);
       }
-      return n > 0 && compare_go(mode, book, f, g, dep + n);
+      if (same) {
+        return true;
+      }
+      let n = 0;
+      if (x.$ === "Ref") {
+        n = (book.tlds[x.k]?.n ?? 0) - i;
+      }
+      if (y.$ === "Ref") {
+        n = Math.max(n, (book.tlds[y.k]?.n ?? 0) - j);
+      }
+      for (let k = 0; k < n; k++) {
+        a = App(a, Var("_", dep + k));
+        b = App(b, Var("_", dep + k));
+      }
+      return n > 0 && compare_go(mode, book, a, b, dep + n);
     }
     case "Typ": {
       if (b.$ !== "Typ") {
@@ -3152,15 +3179,6 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
       return b.$ === "All" && a.q.$ === b.q.$
           && compare_go(mode, book, b.A, a.A, dep)
           && compare_go(mode, book, a.B(x), b.B(x), dep + 1);
-    }
-    // a stuck call is canonical: its head def compares by name, not by eta
-    case "App": {
-      if (b.$ !== "App") {
-        return false;
-      }
-      const head = a.f.$ === "Ref" && b.f.$ === "Ref" ? a.f.k === b.f.k
-        : compare_go("EQ", book, a.f, b.f, dep);
-      return head && compare_go("EQ", book, a.x, b.x, dep);
     }
     case "ADT": {
       if (b.$ !== "ADT" || a.k !== b.k || a.x.length !== b.x.length) {
