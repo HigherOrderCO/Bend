@@ -201,6 +201,8 @@ def IO.args_bytes() -> IO(List<List<&2, U32>>):
   import "./effs/args.c"
   import "./effs/args.js"
 
+# Runs an argv subprocess on C, Bun and Node, without a shell.
+# max_output bounds combined stdout/stderr bytes; timeout_ms includes pipe draining.
 def Process.run(program: String, args: List<String>, input: String,
   max_output: U32, timeout_ms: U32) ->
   IO(Result<&1, &1, U32 & String, U32 & (String & String)>):
