@@ -3059,14 +3059,18 @@ export function term_snf(book: Book, term: HTerm): HTerm {
 
 const RIGID: Book = book_nil();
 
-// two copies of one term are equal: a conversion first compares both
-// sides with every def rigid (the empty book unfolds none), then as usual
+// two copies of one term are equal: each step of a conversion first
+// compares both sides with every def rigid (the empty book unfolds
+// none), then as usual, so a copy met past an unfold is not evaluated
 export function term_compare(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number = 0): boolean {
-  return compare_go(mode, RIGID, lhs, rhs, dep) || compare_go(mode, book, lhs, rhs, dep);
+  return compare_go(mode, book, lhs, rhs, dep);
 }
 
 function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number): boolean {
   if (lhs === rhs) {
+    return true;
+  }
+  if (book !== RIGID && compare_go(mode, RIGID, lhs, rhs, dep)) {
     return true;
   }
   let a = term_wnf(book, lhs);
