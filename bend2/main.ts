@@ -84,10 +84,10 @@ const FAIL = "SOME PROOFS FAIL";
 
 const HINT = "Use --verdict for mathematical validity.";
 
-const MISMATCH = "Sorry - this is a mismatch between the TypeScript implementation,"
-  + " and the formalized BendTT kernel. Your proofs may or may not be correct, and"
-  + " we cannot validate them yet. This will be addressed in a future update."
-  + " Meanwhile, feel free to open an issue to report this bug.";
+const MISMATCH = "Sorry - the formalized BendTT kernel could not validate these proofs."
+  + " This can be caused by a kernel fuel limit or a mismatch with the TypeScript"
+  + " implementation. Your proofs may or may not be correct. See the kernel"
+  + " diagnostics above; report an issue for a checker disagreement.";
 
 // BendHub's terms; s18.4 makes MIT-0 the default license
 const TERMS = "https://bend-lang.com/bendai/terms#s18";

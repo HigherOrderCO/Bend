@@ -45,6 +45,14 @@ The checker is not optimal: some terms are exponential or overflow (#993, #1075)
   large constants and depths abstract. Do not open an issue per exponential
   or overflow.
 
+BendTT conversion has a finite fuel budget (#1322)
+  Each kernel conversion gets 400,000,000 steps. A closed computation proved
+  by `{==}` can exhaust it: even a Nat.is_le comparison of literals around
+  3,000,000 may do so, since the kernel evaluates them in unary. Long closed
+  computations without large literals can also exhaust it. Split independent
+  checks into separate equalities or laws, so each conversion gets its own
+  budget. "Out of fuel" is not a mathematical disproof.
+
 A fallback arm does not refine a dependent goal (#1091)
   In `case rest:` the scrutinee stays a variable. Write the constructor arms.
 

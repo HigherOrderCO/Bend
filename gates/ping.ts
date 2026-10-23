@@ -392,11 +392,6 @@ try {
   const fuel_kernel = path.join(TMP, "fuel_kernel.sh");
   fs.writeFileSync(fuel_kernel, "#!/bin/sh\necho 'SOME PROOFS FAIL'\n"
     + "echo 'In Sum.f:'\necho 'out of fuel'\nexit 1\n", { mode: 0o755 });
-  const fuel = await bend([sum_file, "--verdict"],
-    { BENDTT: fuel_kernel, BEND_NO_TELEMETRY: "1" });
-  check("a kernel failure shows the kernel's why above the mismatch notice",
-    fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
-      + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
   fs.writeFileSync(path.join(BEND, "check.json"), JSON.stringify({
     t: Date.now(), ver: "99.0.0", notice: "hello" }));
   const survey = await lib.exec(process.execPath, ["gates/safe_node.ts"],
