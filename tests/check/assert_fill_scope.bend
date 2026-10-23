@@ -1,7 +1,7 @@
-# an assert declares a DEAD claim: a def between the assert and its
-# fill cannot call the name live -- the fill must precede live use.
-# ported from bend3: bend3 ratified the forward call (C27); bend pins
-# the opposite (an unfilled assert is dead-only, book order rules)
+# an assert (a law) has no body until its fill: a def between them
+# cannot call the name live -- the fill must precede live use, and the
+# refusal names the file order. ported from bend3: bend3 ratified the
+# forward call (C27); bend pins the opposite (book order rules)
 type Nz is Data:
   Zn{}
   Sn{p: Nz}
@@ -27,7 +27,7 @@ def main(): early(Zn{})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a filled definition (an unfilled law is a dead claim: live code cannot use it)
+#|- expected : a def written above its use (defs are checked in file order)
 #|- observed : twice
 #|Context:
 #|- x : Nz

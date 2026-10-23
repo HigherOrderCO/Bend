@@ -314,7 +314,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; w?: string; };
 export type TLD  = ADT | Def;
 export type Book = { tlds: Record<Name, TLD>; ctrs: Record<Name, Ctr>; order: Name[]; hols: number; tmps: Record<Name, Map<string, Name>>; };
 
@@ -2482,6 +2482,7 @@ export function parse_def(p: Parse, u: Bool): void {
   } else {
     const vars = tele.map((cell): PVar => ({ $: "PVar", k: cell[1], i: cell[2], q: Lone(), s: cell[4] }));
     def.v = term_higher(term_lower(term_higher(body_flatten(parse_body(p), vars, () => p.frs++))));
+    def.w = p.ns;
   }
   book.order.push(k);
 }
@@ -3299,8 +3300,12 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
     //       is an error, so a self-reference never escapes as a value
     //       k has a body in a live region, unless base declared it, it
     //       is a template's ~ parameter, or the def is @unsafe (an
-    //       unfilled law is a dead claim; base's are native, a ~
-    //       parameter an opaque constant, and an unsafe body trusts it)
+    //       unfilled law is a dead claim, and a def or law filled below
+    //       its use has no body yet, as defs check in file order: the
+    //       error names the order when the body is written (w) in the
+    //       use's file, and the law when an importer fills it, as no
+    //       order there helps; base's are native, a ~ parameter an
+    //       opaque constant, and an unsafe body trusts it)
     //       a template k in a live region outside a template's own text
     //       takes its x ~ arguments here: the call is k~n, the instance
     //       at them (def_inst), and the x applications above pass
@@ -3319,7 +3324,9 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
       if (qt.$ !== "None") {
         const gen = tld.$ === "Def" && tld.x > 0 && !(book.tlds[lhs.def] as Def).x ? tld : null;
         if (tld.$ === "Def" && tld.v === null && !tld.i && (tld.b !== true && lhs.u !== true || gen !== null) && k !== lhs.def) {
-          throw Err(book, ctx, "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
+          throw Err(book, ctx, tld.w !== undefined && tld.w === tm.s?.file.ns
+            ? "a def written above its use (defs are checked in file order)"
+            : "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
         }
         if (gen !== null) {
           k  = def_inst(book, lhs, tm, gen, sp, ctx, d);

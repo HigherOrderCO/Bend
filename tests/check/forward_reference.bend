@@ -1,5 +1,5 @@
-# term-level forward references FAIL: a def below is a bodiless claim
-# to live code, as an unfilled law, so book order rules.
+# term-level forward references FAIL: a law filled below its use has
+# no body yet: book order rules, and the refusal says so (#1782).
 # ported from bend3: bend3 ratified forward refs (C27); bend pins the
 # refusal (the descent wall needs order)
 import Base
@@ -16,7 +16,7 @@ def later(): 0
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a filled definition (an unfilled law is a dead claim: live code cannot use it)
+#|- expected : a def written above its use (defs are checked in file order)
 #|- observed : later
 #|Location: main
 #| 9 | 
