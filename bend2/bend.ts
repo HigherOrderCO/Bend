@@ -3059,6 +3059,45 @@ export function term_snf(book: Book, term: HTerm): HTerm {
 
 const RIGID: Book = book_nil();
 
+// two arguments are one atom: the same cell, def, literal or bound
+// variable, seen through cells and annotations, with nothing reduced
+function term_atom_eq(lhs: HTerm, rhs: HTerm): boolean {
+  const a = term_strip(lhs);
+  const b = term_strip(rhs);
+  if (a === b) {
+    return true;
+  }
+  switch (a.$) {
+    case "Var": {
+      return b.$ === "Var" && a.i === b.i;
+    }
+    case "Ref": {
+      return b.$ === "Ref" && a.k === b.k;
+    }
+    case "Lit": {
+      return b.$ === "Lit" && a.k === b.k && a.v === b.v;
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+// two calls of one def on the same atoms are equal before either
+// unfolds: a copy met past an outer unfold is not evaluated
+function compare_call(lhs: HTerm, rhs: HTerm): boolean {
+  let f = term_strip(lhs);
+  let g = term_strip(rhs);
+  while (f.$ === "App" && g.$ === "App") {
+    if (!term_atom_eq(f.x, g.x)) {
+      return false;
+    }
+    f = term_strip(f.f);
+    g = term_strip(g.f);
+  }
+  return f.$ === "Ref" && g.$ === "Ref" && f.k === g.k;
+}
+
 // two copies of one term are equal: a conversion first compares both
 // sides with every def rigid (the empty book unfolds none), then as usual
 export function term_compare(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number = 0): boolean {
@@ -3067,6 +3106,9 @@ export function term_compare(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTe
 
 function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number): boolean {
   if (lhs === rhs) {
+    return true;
+  }
+  if (compare_call(lhs, rhs)) {
     return true;
   }
   let a = term_wnf(book, lhs);
