@@ -8,7 +8,8 @@ import { fileURLToPath } from "node:url";
 import { formatBend } from "../formatter.js";
 
 // Bend pins the lines after a body that shares a line with its `do`, `match`,
-// `case` or `def` header, `=>` lambda opener or `;` to that body's column. [source, formatted]
+// `case` or `def` header, `=>` lambda opener, `;`, `(` or parenthesized `,`
+// to that body's column. [source, formatted]
 const pinned = [
   [
     "import Base\ndef f(a:Array<U32>)->Array<U32>: b=a; b[0]<-7\n                                      b[1]<-8\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n])\n",
@@ -75,6 +76,14 @@ const pinned = [
   [
     "import Base\ndef f(a: Array<U32>, b: Bool, c: Bool) -> Array<U32>:\n    match b:\n      case True{}: match c:\n                     case True{}: a[0] <- 7\n                                  a[1] <- 8\n                     case False{}: a\n      case False{}: a\n\ndef main() -> Array<U32>:\n    f([0 : U32*2n], True{}, True{})\n",
     "import Base\ndef f(a: Array<U32>, b: Bool, c: Bool) -> Array<U32>:\n  match b:\n    case True{}: match c:\n                   case True{}: a[0] <- 7\n                                a[1] <- 8\n                   case False{}: a\n    case False{}: a\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n], True{}, True{})\n",
+  ],
+  [
+    "import Base\ndef main()->U32 & Array<U32>:\n  a = [0 : U32 * 2n]\n  (17,a[0]<-3\n      a[1]<-5)\n",
+    "import Base\ndef main() -> U32 & Array<U32>:\n  a = [0 : U32 * 2n]\n  (17, a[0] <- 3\n       a[1] <- 5)\n",
+  ],
+  [
+    "import Base\ndef finish(p:U32 & Array<U32>,n:U32)->Array<U32>:\n  (x,a) = p\n  a[0] <- U32.add(x,n)\ndef main()->Array<U32>:\n  a = [0 : U32 * 2n]\n  finish((17,a[0]<-3\n             a[1]<-5),\n    11)\n",
+    "import Base\ndef finish(p: U32 & Array<U32>, n: U32) -> Array<U32>:\n  (x, a) = p\n  a[0] <- U32.add(x, n)\ndef main() -> Array<U32>:\n  a = [0 : U32 * 2n]\n  finish((17, a[0] <- 3\n              a[1] <- 5),\n    11)\n",
   ],
 ];
 

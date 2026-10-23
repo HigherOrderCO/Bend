@@ -167,11 +167,13 @@ type BodyScope = { open: number; angle: number; end: number };
 type InlineBody = { at: number; scope?: BodyScope };
 
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, `=>` lambda opener, `;` separator or `(` group opener. As in
-// `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
+// `def` header, `=>` lambda opener, `;` separator, `(` group opener or
+// parenthesized `,` separator. As in `do IO<Unit>: a`, Bend pins the lines
+// after it to the column of `a`.
 function inlineBodies(lines: Line[]): InlineBody[][] {
   let open = 0;
   const angles = [0];
+  const parens: number[] = [];
   const bodyScopes: BodyScope[] = [];
   let header: { open: number; angle: number; typed: boolean } | null = null;
   return lines.map((line, row) => line.tokens.flatMap((token, index): InlineBody[] => {
@@ -183,11 +185,13 @@ function inlineBodies(lines: Line[]): InlineBody[][] {
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
       angles.push(0);
+      if (token.text === "(") parens.push(open);
       if (token.text === "(" && index + 1 < line.tokens.length) {
         bodyScopes.push({ open, angle: angles[open], end: lines.length });
         return [{ at: index + 1, scope: bodyScopes.at(-1) }];
       }
     } else if ([")", "]", "}"].includes(token.text)) {
+      if (parens.at(-1) === open) parens.pop();
       if (open > 0) angles.pop();
       open = Math.max(0, open - 1);
     } else if (ANGLES.has(token.text)) {
@@ -208,6 +212,10 @@ function inlineBodies(lines: Line[]): InlineBody[][] {
       if (inside && !comma) break;
       // A leading closer/separator has no body statement to pin on this line.
       bodyScopes.pop()!.end = row - (index === 0 ? 1 : 0);
+    }
+    if (token.text === "," && parens.at(-1) === open && angles[open] === 0 && index + 1 < line.tokens.length) {
+      bodyScopes.push({ open, angle: angles[open], end: lines.length });
+      return [{ at: index + 1, scope: bodyScopes.at(-1) }];
     }
     return [];
   }));
