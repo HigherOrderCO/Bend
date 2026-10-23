@@ -80,7 +80,8 @@ function splitLine(text: string): Line {
       }
       if (code[i] === "n") i++;
     } else {
-      const multi = MULTI.find((value) => code.startsWith(value, i));
+      // A comparison needs a left operand separated from >.
+      const multi = MULTI.find((value) => code.startsWith(value, i) && (value !== ">=" || !tokens.length || hadGap && tokens.at(-1)?.text !== ","));
       i += multi?.length ?? 1;
     }
     tokens.push({ text: code.slice(start, i), kind, gap: hadGap, col: indent.length + start });
