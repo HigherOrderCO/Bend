@@ -24,8 +24,7 @@ def main(): N{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : loop
+#|- message  : loop's 1st argument, f(C{y => y}), is not smaller than t
 #|Context:
 #|- f : @_:T -> T
 #|Location: loop
@@ -33,4 +32,5 @@ def main(): N{}
 #|16>|       loop(f(C{y => y}))
 #|   |       ^^^^
 #|17 |     case t:
+#|Note: pass a part of t, or mark the def @unsafe to skip the termination check.
 #|exit 1

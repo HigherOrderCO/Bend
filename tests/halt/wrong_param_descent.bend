@@ -28,8 +28,7 @@ def main(): f(0n, 0n)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : f
+#|- message  : f's 1st argument, 1n, is not smaller than x
 #|Context:
 #|- y : Nat
 #|Location: f
@@ -37,4 +36,5 @@ def main(): f(0n, 0n)
 #|20>|       f(1n, Nat.sub(y, 1n))
 #|   |       ^
 #|21 |     case p:
+#|Note: pass a part of x, or mark the def @unsafe to skip the termination check.
 #|exit 1

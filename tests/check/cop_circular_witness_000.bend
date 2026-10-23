@@ -19,8 +19,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : Forge
+#|- message  : Forge's 1st argument, T, is not smaller than T
 #|Context:
 #|- T : Type
 #|Location: Forge
@@ -28,4 +27,5 @@ def main():
 #|12>|   Forge(T)
 #|   |   ^^^^^
 #|13 |
+#|Note: pass a part of T, or mark the def @unsafe to skip the termination check.
 #|exit 1

@@ -44,8 +44,7 @@ def main(): loop(Z{}, More{Z{}}, S{Z{}})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : loop
+#|- message  : loop's 1st argument, x, is not smaller than a
 #|Context:
 #|- a : T
 #|- x : T
@@ -55,4 +54,5 @@ def main(): loop(Z{}, More{Z{}}, S{Z{}})
 #|38>|       loop(x, grow(a, More{Z{}}, b), Z{})
 #|   |       ^^^^
 #|39 |
+#|Note: pass a part of a, or mark the def @unsafe to skip the termination check.
 #|exit 1

@@ -27,8 +27,7 @@ def main(): wob(MkP{2n, 0n})
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : wob
+#|- message  : wob's 1st argument, MkP{a2, 1n+b}, is not smaller than p
 #|Context:
 #|- a2 : Nat
 #|- b  : Nat
@@ -37,4 +36,5 @@ def main(): wob(MkP{2n, 0n})
 #|21>|       wob(MkP{a2, Succ{b}})
 #|   |       ^^^
 #|22 |
+#|Note: pass a part of p, or mark the def @unsafe to skip the termination check.
 #|exit 1

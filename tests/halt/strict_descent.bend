@@ -24,8 +24,7 @@ def main(): Z{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : mk
+#|- message  : mk's 1st argument, x, is not smaller than u
 #|Context:
 #|- f : @_:Ord -> Ord
 #|- x : Ord
@@ -34,4 +33,5 @@ def main(): Z{}
 #|16>|       Sup{x => mk(x)}
 #|   |                ^^
 #|17 |     case u:
+#|Note: pass a part of u, or mark the def @unsafe to skip the termination check.
 #|exit 1

@@ -3232,6 +3232,11 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
 // names it as open. term_key of the arguments names the instance, and
 // the first call mints it and checks it as a def one level deeper.
 
+// 1st, 2nd, 3rd, ..: an argument's place in a self-call
+function ordinal(n: number): string {
+  return String(n) + (n % 100 >= 11 && n % 100 <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th"));
+}
+
 export function term_descend(q: Quant, arg: HTerm, col: HTerm): Cmp {
   if (q.$ === "None") {
     return "EQ";
@@ -3333,6 +3338,30 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
             ord = term_descend(lhs.qs[j], sp[j], cols[j]);
           }
           if (ord !== "LT") {
+            const tld  = book.tlds[lhs.def];
+            const doms = tld?.$ === "Def" ? tele_unbind(book, tld.T).doms : [];
+            const file = tm.s?.file;
+            const bnd  = ctx_scope(ctx);
+            // the argument as written, so the message stays short and the
+            // check does not evaluate the body
+            const arg_of = (x: HTerm): string => term_show(term_lower(x, bnd.length), -1, bnd, file);
+            let at = -1;
+            for (let j = 0; j < sp.length && j < doms.length; j++) {
+              if (arg_of(sp[j]) !== name_show(file, doms[j][1])) {
+                at = j;
+                break;
+              }
+            }
+            at = at < 0 ? 0 : at;
+            if (at < sp.length && at < doms.length) {
+              const raw = arg_of(sp[at]);
+              const arg = raw.length <= 60 ? raw : raw.slice(0, 57) + "...";
+              const col = name_show(file, doms[at][1]);
+              const A = doms[at][2];
+              const nte = "Note: pass " + (term_wnf(book, A).$ === "All" ? "a smaller value" : "a part of " + col)
+                + ", or mark the def @unsafe to skip the termination check.";
+              throw Err(book, ctx, name_key(lhs.def) + "'s " + ordinal(at + 1) + " argument, " + arg + ", is not smaller than " + col, undefined, tm.s, lhs.def, nte);
+            }
             throw Err(book, ctx, "a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)", tm, tm.s, lhs.def);
           }
         }

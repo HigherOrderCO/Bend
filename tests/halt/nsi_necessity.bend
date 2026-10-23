@@ -29,8 +29,7 @@ def main(): Z{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : loop
+#|- message  : loop's 1st argument, a(b), is not smaller than t
 #|Context:
 #|- a : @_:T -> T
 #|- b : T
@@ -39,4 +38,5 @@ def main(): Z{}
 #|23>|       loop(a(b))
 #|   |       ^^^^
 #|24 |
+#|Note: pass a part of t, or mark the def @unsafe to skip the termination check.
 #|exit 1

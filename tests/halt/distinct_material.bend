@@ -29,8 +29,7 @@ def main(): Num{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : wnf
+#|- message  : wnf's 1st argument, bod(a2), is not smaller than t
 #|Context:
 #|- bod : @_:Term -> Term
 #|- a2  : Term
@@ -39,4 +38,5 @@ def main(): Num{}
 #|19>|       wnf(bod(a2))
 #|   |       ^^^
 #|20 |     case Cal{f, a2}:
+#|Note: pass a part of t, or mark the def @unsafe to skip the termination check.
 #|exit 1

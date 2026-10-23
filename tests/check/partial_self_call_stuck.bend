@@ -23,8 +23,7 @@ def main(): part(2n, 1n)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : part
+#|- message  : part's 1st argument, 1n+p, is not smaller than a
 #|Context:
 #|- p : Nat
 #|- b : Nat
@@ -33,4 +32,5 @@ def main(): part(2n, 1n)
 #|16>|       g = part(a)
 #|   |           ^^^^
 #|17 |       g(p)
+#|Note: pass a part of a, or mark the def @unsafe to skip the termination check.
 #|exit 1

@@ -38,8 +38,7 @@ def main(): fold(10n)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : fold
+#|- message  : fold's 1st argument, ndiv(n, 2n), is not smaller than n
 #|Context:
 #|- n : Nat<> - Zero{}
 #|Location: fold
@@ -47,4 +46,5 @@ def main(): fold(10n)
 #|32>|       1n+ fold(ndiv(n, 2n))
 #|   |           ^^^^
 #|33 |
+#|Note: pass a part of n, or mark the def @unsafe to skip the termination check.
 #|exit 1

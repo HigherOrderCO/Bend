@@ -15,13 +15,13 @@ def main(): loop(Nat)
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : loop
+#|- message  : loop's 1st argument, a, is not smaller than a
 #|Context:
 #|- a : Type
 #|Location: loop
-#| 9 | 
+#| 9 |
 #|10>| def loop(): a => loop(a)
 #|   |                  ^^^^
 #|11 | law main:
+#|Note: pass a part of a, or mark the def @unsafe to skip the termination check.
 #|exit 1

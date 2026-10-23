@@ -23,8 +23,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : interleave
+#|- message  : interleave's 1st argument, ys, is not smaller than xs
 #|Context:
 #|- h  : U32
 #|- t  : List<&2, U32>
@@ -34,4 +33,5 @@ def main():
 #|16>|       h <> interleave(ys, t)
 #|   |            ^^^^^^^^^^
 #|17 |
+#|Note: pass a part of xs, or mark the def @unsafe to skip the termination check.
 #|exit 1

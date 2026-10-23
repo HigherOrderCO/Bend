@@ -40,8 +40,7 @@ def main(): Z{}
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : swapped
+#|- message  : swapped's 1st argument, b, is not smaller than a
 #|Context:
 #|- b : N
 #|Location: swapped
@@ -49,4 +48,5 @@ def main(): Z{}
 #|32>|       swapped(b, Z{})
 #|   |       ^^^^^^^
 #|33 |     case S{p}:
+#|Note: pass a part of a, or mark the def @unsafe to skip the termination check.
 #|exit 1

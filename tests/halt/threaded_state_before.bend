@@ -24,8 +24,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : go
+#|- message  : go's 1st argument, U32.add(acc, 1), is not smaller than acc
 #|Context:
 #|- acc : U32
 #|- p   : Nat
@@ -34,4 +33,5 @@ def main():
 #|17>|       go((acc + 1 : U32), p)
 #|   |       ^^
 #|18 |
+#|Note: pass a part of acc, or mark the def @unsafe to skip the termination check.
 #|exit 1

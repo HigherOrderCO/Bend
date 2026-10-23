@@ -39,8 +39,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)
-#|- observed : loop
+#|- message  : loop's 1st argument, a(b), is not smaller than t
 #|Context:
 #|- a : @_:T9j -> T9j
 #|- b : T9j
@@ -49,4 +48,5 @@ def main():
 #|30>|       loop(a(b))
 #|   |       ^^^^
 #|31 |     case w:
+#|Note: pass a part of t, or mark the def @unsafe to skip the termination check.
 #|exit 1
