@@ -2602,18 +2602,23 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   let pnd = 0;
   const nd = tree ? emit_dest(sc, x, holes.at(-1)!) : "";
   calls.forEach((c, i) => {
-    const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
-    const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
-    const kn = seg_name(sc, "k");
     const last = i === calls.length - 1;
+    // a call that leaves no frame can't lend: what it borrows dies first
+    const cargs = emit_args({ ...sc, rest: [chain[i]] }, c,
+      hole >= 0 || (tree && last));
+    const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
     spare_flush(sc);
     const ws = vs.flatMap(([p, b]) =>
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
-    const kf = seg_fid(kn);
+    // the first frame holds [ws..., node, field] and pnd is the node's slot
+    if (i === 0) {
+      pnd = depth;
+    }
     const to = !tree || last ? [] : i > 0
       ? [`STK(${pnd - depth}) + ${holes[i]}`] : [nd, `${nd} + ${holes[0]}`];
-    pnd = i > 0 ? pnd : depth;
     depth += to.length;
+    const kn = tree && last ? "" : seg_name(sc, "k");
+    const kf = kn && seg_fid(kn);
     emit_chain(sc, [["seq", () => {
       if (hole >= 0) {
         return void emit_dest({ ...sc, uses: new Map(sc.uses), spares:
@@ -2632,6 +2637,9 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
         `WL_IDX = ${ws.length};`);
     }] as [string, () => void]]]);
     emit_jump(sc, cargs, c.k!, !fork && c.b);
+    if (kn === "") {
+      return;
+    }
     const held = [...sc.uses].filter(([p]) => pos.has(p));
     const at = held.flatMap(([p, b]) => b.val.ws.map((_, j) =>
       pos.get(p)! + j - (last ? 0 : depth)));
@@ -2648,29 +2656,32 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
     }
   });
   if (fork) {
-    // a tree's last k is dead; its join takes every result, in order
-    if (tree) {
-      o.ps.forEach((p, i) => bind_uses(sc, p, val_new([p.k], BOX), [o.b],
-        ty_ann(x.v[i])!));
-    } else {
-      emit_jump(sc, [...sc.uses].flatMap(([, b]) => b.val.ws), name);
+    // a tree's join is only the parallel arm's: what it holds, then each result
+    const live: [Probe, Bind][] = !tree ? [...sc.uses]
+      : [...[...sc.uses].filter(([p]) => hold.includes(p)), ...o.ps.map((p, i):
+        [Probe, Bind] => [p, { val: val_new([p.k], BOX), n: 1,
+          A: ty_ann(x.v[i])! }])];
+    if (!tree) {
+      emit_jump(sc, live.flatMap(([, b]) => b.val.ws), name);
     }
-    sc = seg_open(sc, name, sc.seg.ret, null, [...sc.uses],
-      val_new([], lay_pack([])), [o.b]);
+    sc = seg_open(sc, name, sc.seg.ret, null, live, val_new([], lay_pack([])),
+      [o.b]);
   }
   emit_body(sc, o.b, null, ers, [], null);
 }
 
 // A constructor tail boxing a call's result once is built before the call,
 // which fills that field (its word, or -1). The root goes to the stack's
-// destination, else under a Dst~put frame [root, field]. A fork of only such
+// destination, else under a Dst~put frame [root, field]. The other fields run
+// first, so none may share an owned value with the call. A fork of only such
 // fields builds before its first call, and an earlier call's frame holds
 // [node, field]: a dst segment, so WL_DEST fills it like a Dst~put.
 function ctr_hole(sc: Scope, c: Spine, b: HTerm, p: Probe): number {
   const x = term_strip(b);
   if (x.$ !== "Ctr" || FL.hot.has(x.k) || rest_use([b], p) !== 1
     || x.k in OPTIMIZED.Array || sc.seg.ret !== BOX
-    || fun_of(c.k!).ret !== BOX) {
+    || fun_of(c.k!).ret !== BOX || [...sc.uses].some(([q, d]) =>
+      !val_brw(sc, d.val) && rest_use(c.xs, q) > 0 && rest_use([b], q) > 0)) {
     return -1;
   }
   const ls = lay_node(x.k).arms![x.k];
