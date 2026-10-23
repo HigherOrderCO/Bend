@@ -1,7 +1,6 @@
 # two share cells found equal become one, so a shared graph is compared
 # once: each level of both roots uses the level below twice, and walking
-# the 16 levels as a tree would take 2^16 steps (#1151's gist); 16, not
-# 32, because BendTT doesn't share cells yet and runs out of fuel (#1555)
+# the 32 levels as a tree would take 2^32 steps (#1151's gist, #1193).
 import Base
 
 
@@ -24,7 +23,7 @@ def root_rec(d: Nat, +x: U32) -> U32:
 
 
 
-def agree_16(+x: U32) -> {root_loop(16n, x) == root_rec(16n, x) : U32}:
+def agree_32(+x: U32) -> {root_loop(32n, x) == root_rec(32n, x) : U32}:
   {==}
 
 #|ALL PROOFS CHECK

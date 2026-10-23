@@ -976,23 +976,80 @@ def Term.parts : Term → Term → Option (List (Term × Term))
   | Rwt e P f, Rwt d Q g => some [(e, d), (P, Q), (f, g)]
   | a,         b         => if a = b then some [] else none
 
--- a and b convert, lazily: they are equal, or their weak heads match
--- and each pair of parts converts, in turn. Returns the fuel left:
--- 0 when it ran out. A binder's parts may be open.
-def Term.conv (ck : Book) (cl : Bool) : Nat → Term → Term → Bool × Nat
-  | 0, _, _ => (false, 0)
-  | n + 1, a, b =>
-    if a = b then
-      (true, n)
+-- Key equality short-circuits shared children, not only their outer node.
+-- Disjoint cases avoid an eagerly evaluated whole-term equality fallback.
+def Term.decEqShared (a b : Term) : Decidable (a = b) :=
+  withPtrEqDecEq a b fun _ => by
+    cases a <;> cases b
+    case Var.Var i j => exact @decidable_of_iff _ _ (by simp) (decEq i j)
+    case Ref.Ref k j => exact @decidable_of_iff _ _ (by simp) (decEq k j)
+    case Ann.Ann x T y U =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEqShared x y) (decEqShared T U))
+    case Let.Let q v f r w g =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (@instDecidableAnd _ _ (decEqShared v w) (decEqShared f g)))
+    case Typ.Typ q r => exact @decidable_of_iff _ _ (by simp) (decEqShared q r)
+    case Min.Min x y u v =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEqShared x u) (decEqShared y v))
+    case All.All q A B r C D =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (@instDecidableAnd _ _ (decEqShared A C) (decEqShared B D)))
+    case Lam.Lam q f r g =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (decEqShared f g))
+    case App.App q f x r g y =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (@instDecidableAnd _ _ (decEqShared f g) (decEqShared x y)))
+    case Sig.Sig q A B r C D =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (@instDecidableAnd _ _ (decEqShared A C) (decEqShared B D)))
+    case Tup.Tup q x y r u v =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq q r) (@instDecidableAnd _ _ (decEqShared x u) (decEqShared y v)))
+    case Prj.Prj h g => exact @decidable_of_iff _ _ (by simp) (decEqShared h g)
+    case Enu.Enu ks js => exact @decidable_of_iff _ _ (by simp) (decEq ks js)
+    case Lab.Lab k j => exact @decidable_of_iff _ _ (by simp) (decEq k j)
+    case Mat.Mat k h m j g n =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEq k j) (@instDecidableAnd _ _ (decEqShared h g) (decEqShared m n)))
+    case Efq.Efq => exact .isTrue rfl
+    case Eql.Eql x y T u v U =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEqShared x u) (@instDecidableAnd _ _ (decEqShared y v) (decEqShared T U)))
+    case Rfl.Rfl => exact .isTrue rfl
+    case Rwt.Rwt e P f d Q g =>
+      exact @decidable_of_iff _ _ (by simp)
+        (@instDecidableAnd _ _ (decEqShared e d) (@instDecidableAnd _ _ (decEqShared P Q) (decEqShared f g)))
+    all_goals exact .isFalse (by intro h; cases h)
+termination_by structural a
+
+-- Cache only completed equalities within one conversion, including open
+-- bodies. Keys reuse the parts pairs; a pending pair never enters the cache.
+-- Lean's standard identity shortcut keeps shared keys from becoming tree walks.
+-- Every recursive conversion still takes from the same fuel budget.
+def Term.convMemo (ck : Book) (cl : Bool) :
+    Nat → (Term × Term) → List (Term × Term) → Bool × Nat × List (Term × Term)
+  | 0, _, seen => (false, 0, seen)
+  | n + 1, p, seen =>
+    letI : DecidableEq Term := Term.decEqShared
+    if p ∈ seen then
+      (true, n, seen)
     else
-      let (a, m) := Term.wnf ck cl n a []
-      let (b, m) := Term.wnf ck cl (min m n) b []
-      match Term.parts a b with
-      | some ps =>
-        let go := fun (r : Bool × Nat) (p : Term × Term) =>
-          if r.1 then Term.conv ck (cl && !Term.binds a) (min r.2 n) p.1 p.2 else r
-        ps.foldl go (true, min m n)
-      | none => (false, m)
+      let (a, m) := Term.wnf ck cl n p.1 []
+      let (b, m) := Term.wnf ck cl (min m n) p.2 []
+      let r := match Term.parts a b with
+        | some ps =>
+          let go := fun (r : Bool × Nat × List (Term × Term)) q =>
+            if r.1 then Term.convMemo ck (cl && !Term.binds a) (min r.2.1 n) q r.2.2 else r
+          ps.foldl go (true, min m n, seen)
+        | none => (false, m, seen)
+      if r.1 then (true, r.2.1, p :: r.2.2) else r
+
+def Term.conv (ck : Book) (cl : Bool) (n : Nat) (a b : Term) : Bool × Nat :=
+  let r := Term.convMemo ck cl n (a, b) []
+  (r.1, r.2.1)
 
 -- g is at least h, in the quantity order: .Q2 is the top, .Q0 and .Q1
 -- the bottom, a meet on the left needs both sides, on the right either;
@@ -2141,11 +2198,30 @@ theorem wnf_pars (hb : Sees ck bk) :
     · cases h; exact .refl
 
 -- conv's fold: a true result passed every pair
-theorem fold_true {g : Nat → Term → Term → Bool × Nat} : ∀ {s},
-    (List.foldl (fun (r : Bool × Nat) (p : Term × Term) => if r.1 then g r.2 p.1 p.2 else r) s ps).1 = true →
-    s.1 = true ∧ ∀ p ∈ ps, ∃ m, (g m p.1 p.2).1 = true := by
+theorem fold_true {S : Type} {g : S → (Term × Term) → Bool × S} : ∀ {s},
+    (List.foldl (fun (r : Bool × S) p => if r.1 then g r.2 p else r) s ps).1 = true →
+    s.1 = true ∧ ∀ p ∈ ps, ∃ m, (g m p).1 = true := by
   induction ps <;> intro s h; exact ⟨h, nofun⟩
   rename_i ih; have ⟨h1, h2⟩ := ih h; simp only at h1; split at h1 <;> simp_all; exact ⟨_, h1⟩
+
+-- A successful fold preserves its cache invariant and checks every part.
+theorem fold_valid {S : Type} {g : S → (Term × Term) → Bool × S}
+    {P : S → Prop} {Q : (Term × Term) → Prop}
+    (step : ∀ s p, P s → (g s p).1 = true → P (g s p).2 ∧ Q p) : ∀ {s},
+    P s.2 →
+    (List.foldl (fun (r : Bool × S) p => if r.1 then g r.2 p else r) s ps).1 = true →
+    P (List.foldl (fun (r : Bool × S) p => if r.1 then g r.2 p else r) s ps).2 ∧
+      ∀ p ∈ ps, Q p := by
+  induction ps with
+  | nil => intro s hs _; exact ⟨hs, nofun⟩
+  | cons p ps ih =>
+    intro s hs h
+    have hstart := (fold_true h).1
+    simp only [List.foldl, hstart, ite_true] at h ⊢
+    have hfirst := (fold_true h).1
+    have ⟨hr, hp⟩ := step s.2 p hs hfirst
+    have ⟨hout, htail⟩ := ih hr h
+    exact ⟨hout, fun q hq => (List.mem_cons.mp hq).elim (fun e => e ▸ hp) (htail q)⟩
 
 -- heads whose parts convert convert
 theorem parts_conv (h : parts a b = some ps) (H : ∀ p ∈ ps, Conv bk p.1 p.2) :
@@ -2167,16 +2243,37 @@ theorem parts_conv (h : parts a b = some ps) (H : ∀ p ∈ ps, Conv bk p.1 p.2)
 theorem wnf_nil (hb : Sees ck bk) (e : wnf ck cl n t [] = (u, k)) : Pars bk t u :=
   (e ▸ (wnf_pars (t := t) (xs := []) hb).1 :)
 
-theorem conv_sound (hb : Sees ck bk) : (Term.conv ck cl n a b).1 = true → Conv bk a b := by
-  induction n using Nat.strongRecOn generalizing a b cl; rename_i n ih
-  unfold Term.conv; split; nofun; split
-  · intro _; subst_vars; exact crefl
-  split; split; split
+theorem conv_memo_sound (hb : Sees ck bk)
+    (hs : ∀ q ∈ seen, Conv bk q.1 q.2) :
+    (Term.convMemo ck cl n p seen).1 = true →
+    Conv bk p.1 p.2 ∧ ∀ q ∈ (Term.convMemo ck cl n p seen).2.2, Conv bk q.1 q.2 := by
+  induction n using Nat.strongRecOn generalizing p seen cl; rename_i n ih
+  unfold Term.convMemo; split; nofun; dsimp only; split
+  · rename_i hseen
+    intro _
+    exact ⟨hs p hseen, hs⟩
+  split
   · intro h; rename_i hps
-    have ⟨_, hf⟩ := fold_true (g := fun m x y => Term.conv ck _ (min m _) x y) h
-    have ⟨c, h1, h2⟩ := parts_conv hps fun p m => have ⟨_, hp⟩ := hf p m; ih _ (by omega) hp
-    exact ⟨c, pars_trans (wnf_nil hb ‹_›) h1, pars_trans (wnf_nil hb ‹_›) h2⟩
+    split at h
+    · rename_i hfold
+      simp only [hfold, ite_true]
+      have ⟨hcache, hparts⟩ := fold_valid
+        (g := fun s q => Term.convMemo ck _ (min s.1 _) q s.2)
+        (P := fun s => ∀ q ∈ s.2, Conv bk q.1 q.2)
+        (Q := fun q => Conv bk q.1 q.2)
+        (fun s q hc ht => by
+          have h := ih _ (by omega) hc ht
+          exact ⟨h.2, h.1⟩) hs hfold
+      have ⟨c, h1, h2⟩ := parts_conv hps hparts
+      have hp : Conv bk p.1 p.2 :=
+        ⟨c, pars_trans (wnf_pars (t := p.1) (xs := []) hb).1 h1,
+          pars_trans (wnf_pars (t := p.2) (xs := []) hb).1 h2⟩
+      exact ⟨hp, fun q hq => (List.mem_cons.mp hq).elim (fun e => e ▸ hp) (hcache q)⟩
+    · simp_all
   · nofun
+
+theorem conv_sound (hb : Sees ck bk) (h : (Term.conv ck cl n a b).1 = true) : Conv bk a b :=
+  (conv_memo_sound hb (seen := []) (by simp) h).1
 
 theorem lab_fix : Pars bk (Lab k) c → c = Lab k := pars_fix fun _ s => by cases s; rfl
 
