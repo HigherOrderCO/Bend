@@ -9,10 +9,9 @@
 // elaborator carries the type bend2 checked it at down to it: a λ's body
 // at the codomain, a match arm at its constructor's fields. A book bend2
 // rejects never reaches the kernel. bend2
-// converts functions up to η; the kernel does not, and unfolds a def
-// only when applied. So a term of a function type goes out η-long: an
-// equation bend2 closes by η has λs on both sides, which the kernel
-// compares under the binder.
+// converts functions up to η; the kernel does not. Finite function types
+// go out η-long; recursive domains stop at a repeated type on that path.
+// Only applied defs unfold.
 //
 // A datatype D<ps> with constructors cs is two defs: D.arms(ps, t)
 // switches on the tag t and gives the Σ chain of that constructor's
@@ -139,7 +138,12 @@ type Safe = {
   grew: boolean;
   consts: Map<string, Name>;
   uses: WeakMap<O, Map<number, number>>;
+  eta?: WeakMap<HTerm, Eta>;
 };
+
+type All = Extract<HTerm, { $: "All" }>;
+type Lam = Extract<HTerm, { $: "Lam" }>;
+type Eta = [Name, Eta?];
 
 // a model search's fuel left, its round's depth, and whether that round
 // cut a branch at the depth or the fuel
@@ -764,12 +768,11 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
     const [arm, vs] = pick(e, x, v);
     return tree(e, { ...s, cols: [...vs, ...s.cols.slice(1)] }, arm, fs);
   }
-  // a leaf of a function type goes η-long: a chain splits its fields
-  // under λs, and the kernel converts without η, so each side of an
-  // equation bend2 closes by η must be a λ
+  // The kernel compares under λs; stop at recursive type back edges.
   if (x.$ !== "Lam" && x.$ !== "Mat" && x.$ !== "Efq") {
     if (all !== null) {
-      return tree(e, s, eta(t, all), fs);
+      const t2 = eta(e, t, T!, all);
+      if (t2 !== t) return tree(e, s, t2, fs);
     }
     return top === undefined ? term(e, s, t, true) : oos("a match arm with no known type");
   }
@@ -876,7 +879,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const q = quant(all.q);
       const [lt, la] = [s.D, s.D + 1];
       const s2 = scope_hide(scope_hide(s));
-      const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
+      const f = x.$ === "Lam" ? x : open(eta(e, t, all, all))[0] as Lam;
       // the default's binder is the pair of the tag and the fields
       const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
@@ -892,7 +895,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
 
 // the goals of a bare match of type all: c's arm at c's fields, then
 // all's codomain at c{fields}; the other arms at the datatype less c
-function goals(e: Safe, all: Extract<HTerm, { $: "All" }> | null, c: B.Ctr): [HTerm | null, HTerm | null] {
+function goals(e: Safe, all: All | null, c: B.Ctr): [HTerm | null, HTerm | null] {
   const A = all === null ? null : B.term_wnf(e.book, all.A);
   if (all === null || A?.$ !== "ADT") {
     return [null, null];
@@ -926,7 +929,7 @@ function pick(e: Safe, t: HTerm, v: HTerm): [HTerm, HTerm[]] {
 
 // λ{c: λfs => f(c{fs}); ..} for x = λy => f(y) at ∀y:A -> B, when every
 // field of A's constructors is Data; else null
-function rebuild(e: Safe, s: Scope, x: Extract<HTerm, { $: "Lam" }>, all: Extract<HTerm, { $: "All" }>): HTerm | null {
+function rebuild(e: Safe, s: Scope, x: Lam, all: All): HTerm | null {
   const F = B.term_wnf(e.book, all.A);
   if (F.$ !== "ADT") {
     return null;
@@ -944,14 +947,24 @@ function rebuild(e: Safe, s: Scope, x: Extract<HTerm, { $: "Lam" }>, all: Extrac
 }
 
 // T's weak head, when a ∀
-function all_of(e: Safe, T: HTerm | null): Extract<HTerm, { $: "All" }> | null {
+function all_of(e: Safe, T: HTerm | null): All | null {
   const G = T === null ? null : B.term_wnf(e.book, T);
   return G?.$ === "All" ? G : null;
 }
 
-// λy => t(y), at t's type ∀y:A -> B
-function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
-  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(t, y), all.B(y))), all);
+// Track only η-introduced terms: original arguments still need their own η-long form.
+function eta(e: Safe, t: HTerm, T: HTerm, all: All): HTerm {
+  let path = e.eta?.get(open(t)[0]);
+  const head = open(T)[0];
+  if (head.$ === "Ref") {
+    for (let p = path; p; p = p[1]) if (p[0] === head.k) return t;
+    path = [head.k, path];
+  }
+  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => {
+    const app = B.App(t, y);
+    if (path) (e.eta ??= new WeakMap()).set(y, path).set(app, path);
+    return B.Ann(app, all.B(y));
+  }), all);
 }
 
 // whether a lowered term mentions a variable at a level p holds for
@@ -1323,20 +1336,16 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
   return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
 }
 
-// an argument at its domain A: an untyped λ or match (in a type) takes
-// A as its goal. Any other argument of a function type goes η-long at A
-// (a tree leaf does): the kernel converts without η, and an argument may
-// reach a type, as a side of an equation whose carrier only the call
-// knows. A live self-call's argument stays whole, as the live check
-// reads it, unless its binders differ from A's
+// Give untyped trees their domain; η-expand arguments, even in types, for
+// kernel conversion. A live self-call stays whole unless its binders differ.
 function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
   const [y, T] = open(x);
-  const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
-  const all = tree || y.$ === "Ctr" ? null : all_of(e, A);
+  const goal = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq" || y.$ === "Ctr";
+  const all = goal ? null : all_of(e, A);
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
-    return term(e, s, eta(x, all), live);
+    return term(e, s, eta(e, x, A, all), live);
   }
-  return term(e, s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
+  return term(e, s, T === null && goal ? B.Ann(x, A) : x, live);
 }
 
 // whether two function types bind at the same quantities: the kernel's
