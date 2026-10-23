@@ -356,8 +356,7 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
       backing:NSBackingStoreBuffered defer:NO];
     win.releasedWhenClosed = NO;
     win.acceptsMouseMovedEvents = YES;
-    win.title = [NSString stringWithCString:title
-      encoding:NSISOLatin1StringEncoding];
+    win.title = [NSString stringWithUTF8String:title];
     [win setContentSize:NSMakeSize(w, h)];
     BendView* view = [[BendView alloc] initWithFrame:win.contentLayoutRect];
     view->evs   = [NSMutableData new];
