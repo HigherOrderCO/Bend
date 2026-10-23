@@ -12,6 +12,18 @@ import { formatBend } from "../formatter.js";
 // to that body's column. [source, formatted]
 const pinned = [
   [
+    "import Base\ndef main()->Result<&2,&2,U32,U32>:\n    x:Result<&2,&2,U32,U32,>=Done{19}\n    x\n",
+    "import Base\ndef main() -> Result<&2, &2, U32, U32>:\n  x: Result<&2, &2, U32, U32, >= Done{19}\n  x\n",
+  ],
+  [
+    "import Base\ndef main()->U32 & Array<U32>:\n  a = [0 : U32 * 2n]\n  (17,x:Result<&2,&2,U32,U32>=Done{1};a[0]<-3\n                                      a[1]<-5)\n",
+    "import Base\ndef main() -> U32 & Array<U32>:\n  a = [0 : U32 * 2n]\n  (17, x: Result<&2, &2, U32, U32>= Done{1}; a[0] <- 3\n                                             a[1] <- 5)\n",
+  ],
+  [
+    "import Base\ndef main()->Result<&2,&2,U32,U32>:\n    x:Result<&2,&2,U32,U32>=Done{7}\n    x\n",
+    "import Base\ndef main() -> Result<&2, &2, U32, U32>:\n  x: Result<&2, &2, U32, U32>= Done{7}\n  x\n",
+  ],
+  [
     "import Base\ndef f(a:Array<U32>)->Array<U32>: b=a; b[0]<-7\n                                      b[1]<-8\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n])\n",
     "import Base\ndef f(a: Array<U32>) -> Array<U32>: b = a; b[0] <- 7\n                                           b[1] <- 8\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n])\n",
   ],
@@ -231,6 +243,8 @@ test("preserves escaped quotes and hashes inside literals", () => {
 });
 
 test("preserves angle spacing because Bend uses it to disambiguate syntax", () => {
+  assert.equal(formatBend("import Base\ndef main()->Bool:\n    (2 >=1:U32)\n"), "import Base\ndef main() -> Bool:\n  (2 >= 1: U32)\n");
+  assert.equal(formatBend("import Base\ndef main()->Bool:\n    (2\n     >=1:U32)\n"), "import Base\ndef main() -> Bool:\n  (2\n   >= 1: U32)\n");
   const source = "def f(x:U32)->U32:\n    y=x < 2\n    List<List<U32>>{}";
   assert.equal(formatBend(source), "def f(x: U32) -> U32:\n  y = x < 2\n  List<List<U32>>{}");
 });
