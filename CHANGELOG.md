@@ -3,6 +3,45 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## 2.0.39 (2026-10-23)
+
+- **`bend --publish` sends only files inside the entry's directory**: a
+  `../` climb, a symlink out of it or a `LICENSE` that links out is refused
+  before mining, with no hub request (#1836, PR #1838 by oxura).
+- **`File.open(path, "x")`** creates a new file and fails with `EEXIST` if
+  the path exists, in one step (#1821, PR #1824).
+- **Non-UTF-8 arguments**: `IO.args_bytes` gives each argument's bytes, and
+  `File.open_bytes` opens a path given as bytes (#1798, PR #1799 by
+  viridale).
+- **`Process.run` runs through one worker on Bun and Node**, so it no
+  longer ends the run on Node, and a child that leaves stdin unread no
+  longer hangs it (#1468, PR #1831 by oxura).
+- **Metal: the lane spill of 2.0.38 is gone** (PR #1809): it made
+  `bend -o` of a `!` program build 17% slower. A full lane fails with
+  `ERR_DEEP` again, as in 2.0.37.
+- **Fixes**:
+  - The GPU build sees a closure in a later instance of the same datatype
+    (#1513, PR #1542).
+  - C: a read-only walk borrows its list when a sum type puts a word where
+    another constructor has a box (#1805, PR #1806 by viridale); a memory
+    fault ends the program by its signal (SIGSEGV, SIGBUS), not exit 1,
+    after flushing output (PR #1828 by oxura).
+  - `IO.get_env` refuses a name with a `=`, which read part of another
+    variable on C and Node (#1794, PR #1795 by orezraey).
+- **CLI**: `bend -o` never overwrites an input through a hard link or with
+  the GPU archive `<out>.gpu` (PRs #1797 by sebastian-griego and #1826 by
+  toprameen); a `$CC` that is not a usable clang 14+ ends the build with
+  its reason, instead of a silent plain-clang build (#1802, PR #1804 by
+  Yi-111-a).
+- **Tools**: the formatter keeps body columns after `(`, `;`, tuple commas
+  and in nested lambdas, and keeps a generic's `>` apart from a following
+  `=` (PRs #1803 by toprameen, #1811, #1816, #1833, #1839 by vicmcorrea).
+- **Docs**: BendTT proves adequacy, a checked law holds at each closed
+  instance (PR #1627 by ScottMoore0); the guide and BendRT say a hot type
+  counts the fields of every node, shared or not (#1559, PRs #1812 by
+  vicmcorrea and #1813), and BendRT matches the runtime on the corpus, JS
+  requests and the CUDA cube (#1822, PR #1823).
+
 ## 2.0.38 (2026-10-20)
 
 - **A compiled program's runtime options go between `+RTS` and `-RTS`**
