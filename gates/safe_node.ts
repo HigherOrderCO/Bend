@@ -48,10 +48,12 @@ export function judge(g: Got): [string, string] {
 // a check (bend2 and the kernel it runs) is its own process group, so its
 // deadline or the memory cap kills all of it, and the runner kills every
 // live group when it exits or gets SIGINT, SIGTERM or SIGHUP (an aborted
-// gate, a dropped ssh), so no check outlives it. With MEM_MB set, one
-// poller reads all groups' resident memory twice a second and kills a group
-// past MEM_MB, an infrastructure error, so one heavy file cannot starve a
-// node's other checks; unset, no check is capped and ps never runs
+// gate), so no check outlives it. With MEM_MB set, one poller reads all
+// groups' resident memory twice a second and kills a group past MEM_MB, an
+// infrastructure error, so one heavy file cannot starve a node's other
+// checks; unset, no check is capped and ps never runs. The handlers and the
+// poller are installed only when this file is the program (guard, from the
+// main block below), not in the gates that import judge from it
 const MEM_KB = Number(process.env.MEM_MB ?? 0) * 1024;
 
 // the live check groups, by pgid, and whether the cap killed each
@@ -61,13 +63,15 @@ function kill_group(pid: number): void {
   try { process.kill(-pid, "SIGKILL"); } catch { /* the group is gone */ }
 }
 
-process.on("exit", () => { live.forEach((_, pid) => kill_group(pid)); });
-for (const [sig, n] of [["SIGINT", 2], ["SIGTERM", 15], ["SIGHUP", 1]] as const) {
-  process.on(sig, () => { live.forEach((_, pid) => kill_group(pid)); process.exit(128 + n); });
-}
-
-let polling = false;
-if (MEM_KB > 0) {
+function guard(): void {
+  process.on("exit", () => { live.forEach((_, pid) => kill_group(pid)); });
+  for (const [sig, n] of [["SIGINT", 2], ["SIGTERM", 15], ["SIGHUP", 1]] as const) {
+    process.on(sig, () => { live.forEach((_, pid) => kill_group(pid)); process.exit(128 + n); });
+  }
+  if (MEM_KB === 0) {
+    return;
+  }
+  let polling = false;
   setInterval(() => {
     if (polling || live.size === 0) {
       return;
@@ -184,6 +188,7 @@ async function one(f: string, cap: number): Promise<Got> {
 }
 
 if (import.meta.main) {
+  guard();
   const files = fs.readFileSync(0, "utf8").split("\n").filter((l) => l !== "");
   const cap = Number(process.env.CAP ?? 30) * 1000;
   const res: Got[] = [];
