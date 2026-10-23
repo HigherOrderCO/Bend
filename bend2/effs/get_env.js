@@ -7,7 +7,7 @@ function io_get_env(name) {
   // Node's getenv may also read "A=B" as A's entry "A=B=C"; reject a "=" too.
   if (name.includes("\0") || name.includes("=")) return io_fail(2);
   const value = Object.hasOwn(process.env, name) ? process.env[name] : undefined;
-  return value === undefined ? io_fail(2) : io_done(value);
+  return value === undefined ? io_fail(2) : io_done(str_in(value));
 }
 
 io_eff(CID(IO.get_env), io_get_env);

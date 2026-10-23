@@ -107,7 +107,7 @@ function process_run(program, args, input, maxOutput, timeoutMs) {
   }
   const got = receive(port).message;
   return got.fail !== undefined ? io_fail(got.fail)
-    : io_done(io_tup(got.code, got.out, got.err));
+    : io_done(io_tup(got.code, str_in(got.out), str_in(got.err)));
 }
 
 io_eff(CID(Process.run), process_run);
