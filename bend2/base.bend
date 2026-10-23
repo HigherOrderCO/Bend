@@ -1906,8 +1906,10 @@ def F32.round(a: F32) -> F32:
 def F32.pi() -> F32:
   3.14159265
 
-def F32.from_nat(n: Nat) -> F32:
-  U32.to_f32(U32.from_nat(n))
+# The full Nat conversion is intrinsic on every backend, like U32.to_f32.
+law F32.from_nat:
+  for n: Nat
+  F32
 
 # Preserve the direct cast below 2^32; wider Nats need both word halves.
 # Past 2^48-1 no Nat fits, so the direct cast gives 0.
