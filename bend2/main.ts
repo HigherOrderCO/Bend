@@ -315,10 +315,14 @@ async function cli_file(args: string[]): Promise<void> {
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
       t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
     for (const out of outs) {
-      const at = path_real(out);
-      if (ins.has(at) || (fs.existsSync(at) && (fs.statSync(at).isDirectory()
-        || [...ins].some((input) => same_file(at, input))))) {
+      if (output_conflicts(out, ins)) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
+      }
+      // A binary's GPU build also writes <binary>.gpu.
+      if (!/\.(mjs|c?js|c|bendtt)$/.test(out)
+        && output_conflicts(out + ".gpu", ins)) {
+        cli_fail("GPU output " + out + ".gpu is a file the program reads, or a"
+          + " directory");
       }
     }
     for (const out of outs) {
@@ -381,6 +385,12 @@ function same_file(a: string, b: string): boolean {
   const x = fs.statSync(a, { bigint: true });
   const y = fs.statSync(b, { bigint: true });
   return x.dev === y.dev && x.ino === y.ino;
+}
+
+function output_conflicts(out: string, ins: Set<string>): boolean {
+  const at = path_real(out);
+  return ins.has(at) || (fs.existsSync(at) && (fs.statSync(at).isDirectory()
+    || [...ins].some((input) => same_file(at, input))));
 }
 
 function cli_emit(book: Bend.Book, out: string): void {

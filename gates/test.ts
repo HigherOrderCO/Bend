@@ -177,7 +177,11 @@ function shard_parse(shard: Test[], out: string): Map<string, Got> {
       }
     } else if (head[0] === "exit" && last !== null && head[1] !== "0") {
       const [got, kind] = last;
-      const tail = head[1] === "142" ? "timeout" : "exit " + head[1];
+      // The C runtime re-raises SIGBUS/SIGSEGV after its memory-fault line;
+      // the interpreter and JS report the same fault with exit 1.
+      const code = kind === "c" && (head[1] === "138" || head[1] === "139")
+        ? "1" : head[1];
+      const tail = code === "142" ? "timeout" : "exit " + code;
       got[kind] = got[kind] === "" ? tail : got[kind] + "\n" + tail;
     }
   }

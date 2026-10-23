@@ -167,24 +167,26 @@ type BodyScope = { open: number; angle: number; end: number };
 type InlineBody = { at: number; scope?: BodyScope };
 
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, `=>` lambda opener or `;` statement separator. As in
+// `def` header, `=>` lambda opener, `;` separator or `(` group opener. As in
 // `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
 function inlineBodies(lines: Line[]): InlineBody[][] {
   let open = 0;
   const angles = [0];
-  const lambdas: BodyScope[] = [];
+  const bodyScopes: BodyScope[] = [];
   let header: { open: number; angle: number; typed: boolean } | null = null;
   return lines.map((line, row) => line.tokens.flatMap((token, index): InlineBody[] => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
-    } else if (token.text === "=>") {
-      if (open > 0) lambdas.push({ open, angle: angles[open], end: lines.length });
-      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: lambdas.at(-1) }] : [];
-    } else if (token.text === ";" && (open === 0 || lambdas.at(-1)?.open === open)) {
-      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: lambdas.at(-1) }] : [];
+    } else if (token.text === "=>" || token.text === ";") {
+      if (open > 0) bodyScopes.push({ open, angle: angles[open], end: lines.length });
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
       angles.push(0);
+      if (token.text === "(" && index + 1 < line.tokens.length) {
+        bodyScopes.push({ open, angle: angles[open], end: lines.length });
+        return [{ at: index + 1, scope: bodyScopes.at(-1) }];
+      }
     } else if ([")", "]", "}"].includes(token.text)) {
       if (open > 0) angles.pop();
       open = Math.max(0, open - 1);
@@ -196,16 +198,16 @@ function inlineBodies(lines: Line[]): InlineBody[][] {
       }
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;
-      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: lambdas.at(-1) }] : [];
+      return index + 1 < line.tokens.length ? [{ at: index + 1, scope: bodyScopes.at(-1) }] : [];
     }
-    // Only commas outside a lambda's type arguments end its argument/body scope.
-    while (lambdas.length) {
-      const scope = lambdas.at(-1)!;
+    // Only commas outside an inline body's type arguments end its argument/body scope.
+    while (bodyScopes.length) {
+      const scope = bodyScopes.at(-1)!;
       const inside = scope.open < open || scope.open === open && scope.angle <= angles[open];
       const comma = token.text === "," && scope.open === open && scope.angle === angles[open];
       if (inside && !comma) break;
       // A leading closer/separator has no body statement to pin on this line.
-      lambdas.pop()!.end = row - (index === 0 ? 1 : 0);
+      bodyScopes.pop()!.end = row - (index === 0 ? 1 : 0);
     }
     return [];
   }));

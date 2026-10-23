@@ -91,6 +91,23 @@ def main() -> IO(Unit):
     r1 : Result<&1, &1, U32 & String, U32 & (String & String)> <-
       Process.run("/bin/echo", ["hi"], "", 128, 4294967295)
     IO.print("largest timeout: " ++ answer(r1, 0, "hi\n", ""))
+    partial : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/usr/bin/head", ["-c", "3"],
+        String.repeat(String.repeat("z", 128n), 1000n), 128, 3000)
+    IO.print("partial stdin: " ++ answer(partial, 0, "zzz", ""))
+    unread : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/usr/bin/true", [],
+        String.repeat(String.repeat("z", 128n), 1000n), 128, 3000)
+    IO.print("unread stdin: " ++ answer(unread, 0, "", ""))
+    held : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/bin/sh", ["-c", "sleep 2 <&0 >/dev/null 2>&1 & exit 4"],
+        String.repeat(String.repeat("z", 256n), 1200n), 128, 500)
+    IO.print("descendant stdin: " ++ answer(held, 4, "", ""))
+    late : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/bin/sh", ["-c", "(sleep 0.2; cat) <&0 & exit 0"],
+        String.repeat(String.repeat("z", 128n), 1000n), 200000, 3000)
+    IO.print("late stdin reader: " ++ answer(late, 0,
+      String.repeat(String.repeat("z", 128n), 1000n), ""))
 
 #|stdin: True
 #|literal argv: True
@@ -111,3 +128,7 @@ def main() -> IO(Unit):
 #|runaway descendant: True
 #|closed stdio: True
 #|largest timeout: True
+#|partial stdin: True
+#|unread stdin: True
+#|descendant stdin: True
+#|late stdin reader: True

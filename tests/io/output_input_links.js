@@ -54,6 +54,20 @@ function output_input_links() {
     if (build(ok).status !== 0 || !intact()) return code;
     const run = child.spawnSync(process.execPath, [ok], options);
     if (run.status !== 0 || run.stdout.trim() !== "42") return code;
+    code++;
+    // A GPU archive is an output too, even though it has no -o.
+    const bin = path.join(dir, "program");
+    const cache = bin + ".gpu";
+    const entry = path.join(dir, "gpu.bend");
+    const text = "import Base\ndef main() -> U32:\n  42\n";
+    fs.unlinkSync(ok);
+    fs.writeFileSync(cache, text);
+    inputs.set(cache, text);
+    fs.symlinkSync(cache, entry);
+    const got = child.spawnSync(process.execPath, [path.resolve("bend2/main.ts"),
+      entry, "-o", ok, "-o", bin], options);
+    if (!rejects(got, "GPU output") || fs.existsSync(ok)
+      || fs.existsSync(bin)) return code;
     return 0;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });

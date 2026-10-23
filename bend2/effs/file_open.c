@@ -11,6 +11,10 @@ static int file_open_mode(const char* mode) {
   if (strcmp(mode, "a") == 0) {
     return O_WRONLY | O_CREAT | O_APPEND;
   }
+  // "x" creates the file, and fails EEXIST if the path is there.
+  if (strcmp(mode, "x") == 0) {
+    return O_WRONLY | O_CREAT | O_EXCL;
+  }
   return -1;
 }
 

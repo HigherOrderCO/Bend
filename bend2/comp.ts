@@ -842,13 +842,18 @@ function adt_of(A: Ty): Of<"ADT"> {
   return adt;
 }
 
-// Whether A holds a type p seeks, looking into each datatype p rejects (not
-// a word).
+// Whether A holds a type p seeks: a datatype p rejects is looked into,
+// but for the words; per instance, but with its value arguments unknown
+// once it re-enters its own family with one of them grown (a field stuck
+// on them holds). on keeps each family's shortest value keys on the path;
+// an answer is kept per file (p by its text: it captures nothing) if it
+// holds or met only instances opened under it: a new walk agrees.
 function ty_holds(A: Ty, p: Name | ((t: Ty) => boolean),
-  seen = new Set<Name>()): boolean {
+  w = { seen: new Map<string, number>(), on: new Map<Name, number[]>(),
+    low: Infinity }): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen);
+    return ty_holds(t.f(DUMMY), p, w);
   }
   const hit = typeof p === "string" ? t?.$ === "ADT" && t.k === p : p(t);
   if (hit || t?.$ !== "ADT" || WORDS[t.k]) {
@@ -856,16 +861,36 @@ function ty_holds(A: Ty, p: Name | ((t: Ty) => boolean),
   }
   const tld = FL.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
-    && ty_holds(x, p, seen))) {
+  const vs = t.x.map((x, i) => ty_value(ks[i]?.[2] ?? null));
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, w))) {
     return true;
   }
-  if (tld?.$ !== "ADT" || seen.has(t.k)) {
+  const xs = t.x.map((x, i) => vs[i] ? Bend.term_key(Bend.term_lower(x)) : "");
+  const ys = w.on.get(t.k);
+  const re = !!ys && xs.some((x, i) => x.length > ys[i]);
+  const key = t.k + (!re && xs);
+  const at = w.seen.get(key);
+  if (tld?.$ !== "ADT" || at !== undefined) {
+    w.low = Math.min(w.low, at ?? Infinity);
     return false;
   }
-  seen.add(t.k);
-  return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen)));
+  const id = JSON.stringify([String(p), key, ...w.on]);
+  if (FL.hold.has(id)) {
+    return FL.hold.get(id)!;
+  }
+  const [n, low] = [w.seen.size, w.low];
+  w.seen.set(key, n);
+  w.low = Infinity;
+  const us = t.x.map((x, i) => re && vs[i] ? DUMMY : x);
+  w.on.set(t.k, xs.map((x, i) => Math.min(x.length, ys?.[i] ?? Infinity)));
+  const r = tld.c.some((c) => ctr_doms(c, us).some((f) =>
+    ty_holds(f, p, w)));
+  ys ? w.on.set(t.k, ys) : w.on.delete(t.k);
+  if (r || w.low >= n) {
+    FL.hold.set(id, r);
+  }
+  w.low = Math.min(low, w.low);
+  return r;
 }
 
 function ty_tag(t: Ty, tags: string): boolean {
@@ -1385,6 +1410,7 @@ function file_new(book: Bend.Book, js: boolean) {
     nodes: new Map<Name, Lay>(),
     lays: new Map<string, Lay>(),
     holds: new Map<string, Lay>(),
+    hold: new Map<string, boolean>(),
     lay_ids: new Map<Lay, number>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, Open>(),
@@ -3740,7 +3766,7 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// The first to fail gets 1; others wait a second for its _exit, then 0.
+// First failure wins; others wait a second for it to terminate.
 FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
@@ -3760,12 +3786,13 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A trap never waits on a lock: it flushes only if free, then writes raw.
+// Flush if free, report the fault, then re-raise its signal.
 static void err_trap(int sig) {
   static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
   if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
   if (write(2, line, sizeof line - 1)) {}
-  _exit(1);
+  signal(sig, SIG_DFL);
+  raise(sig);
 }
 
 #endif
