@@ -882,7 +882,11 @@ export function book_fam(book: Book, k: Name): Name {
 export function book_adt(book: Book, tm: Extract<HTerm, { $: "ADT" }>, ctx: Ctx, def?: Name): ADT {
   const tld = book.tlds[tm.k];
   if (tld === undefined || tld.$ !== "ADT") {
-    throw Err(book, ctx, "a declared datatype (unknown: " + name_key(tm.k) + ")", undefined, tm.s, def);
+    const k = name_key(tm.k);
+    if (k === "IO") {
+      throw Err(book, ctx, "a type: `IO<...>` is the do block's effect syntax; a return type is written `IO(...)`", undefined, tm.s, def);
+    }
+    throw Err(book, ctx, "a declared datatype (unknown: " + k + ")", undefined, tm.s, def);
   }
   if (tm.r.length === 0) {
     return tld;
@@ -1769,6 +1773,9 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
     }
     if (k === "do") {
       const m = parse_name(p);
+      if (parse_at(p, "(")) {
+        parse_fail(p, "an effect's arguments in `<...>` (a do block is `do IO<...>:`, and the type is written `IO(...)`)", p.pos);
+      }
       parse_eat(p, "<");
       const ts = parse_fill(p, parse_reso(p, m), parse_term_args(p, ">"),
         parse_span(p, beg));
