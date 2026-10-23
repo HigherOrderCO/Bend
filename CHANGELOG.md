@@ -84,8 +84,7 @@ latest one; the GitHub release carries the same notes.
     zero and rounds once (#1611, PRs #1613 by oxura and #1547 by
     vicmcorrea); `F32.lerp` stays finite and keeps its endpoints (#1607,
     #1749, PRs #1608 and #1754 by oxura); `F32.to_nat` keeps wide values
-    (#1636, PR #1642 by oxura); `F32.from_nat` no longer wraps at 2^32
-    (#1609, PR #1610 by oxura); JS `U32.to_f32` keeps zero positive and
+    (#1636, PR #1642 by oxura); JS `U32.to_f32` keeps zero positive and
     scalar F32 host inputs are rounded (#1692, #1568, PRs #1693 and #1569
     by oxura).
   - Effects: `CID`/`FID` are scanned with the source's own comment rules
