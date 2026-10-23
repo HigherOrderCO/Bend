@@ -1676,6 +1676,11 @@ export function parse_reso(p: Parse, k: Name): Name {
       parse_fail(p, "an unambiguous name (the alias " + k.slice(0, dot) + " shadows " + k + ")");
     }
   }
+  return parse_own(p, k, q);
+}
+
+// a name sugar writes: the file's own if it has one, else the bare one
+export function parse_own(p: Parse, k: Name, q = parse_qual(p, k)): Name {
   const own = q in p.book.tlds || q in p.book.ctrs;
   const far = k in p.book.tlds || k in p.book.ctrs;
   return own || !far ? q : k;
@@ -1902,7 +1907,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         return Eql(a, b, T);
       }
       const s = parse_span(p, beg);
-      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), Ref("Empty", ns), s);
+      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), Ref(parse_own(p, "Empty"), ns), s);
     }
     case "(": {
       parse_bump(p);
@@ -1932,7 +1937,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
           }
           d = Lit("Nat", k, n.s);
         }
-        return App(App(App(Ref("Array.new", s), T, s), d, s), xs[0], s);
+        return App(App(App(Ref(parse_own(p, "Array.new"), s), T, s), d, s), xs[0], s);
       }
       parse_take(p, ",");
       const ys  = xs.concat(parse_term_args(p, "]"));
@@ -2056,15 +2061,14 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       const ix = parse_term(p);
       parse_eat(p, "]");
       const s = parse_span(p, beg);
-      parse_term_ns(p, ix, Ref("U32", s));
+      const u: LTerm = Ref(parse_own(p, "U32"), s);
+      parse_term_ns(p, ix, u);
       parse_skip(p);
       if (!parse_nl(p) && parse_take(p, "<-")) {
         const v = parse_term(p, 2);
-        out = App(App(App(App(Ref("Array.set", s), Ref("U32", s), s),
-          out, s), ix, s), v, s);
+        out = App(App(App(App(Ref(parse_own(p, "Array.set"), s), u, s), out, s), ix, s), v, s);
       } else {
-        out = App(App(App(Ref("Array.get", s), Ref("U32", s), s),
-          out, s), ix, s);
+        out = App(App(App(Ref(parse_own(p, "Array.get"), s), u, s), out, s), ix, s);
       }
       continue;
     }
@@ -2112,11 +2116,10 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
     } else if (op === "<&>") {
       out = Min(out, b, s);
     } else if (op === "<>") {
-      out = Ctr(k, [out, b], s);
-    } else if (op === "&" || op === "|") {
-      out = App(App(Ref(k, s), out, s), b, s);
+      out = Ctr(parse_own(p, k), [out, b], s);
     } else {
-      out = App(App(Ref(k, t), out, s), b, s);
+      const f = k[0] === "." ? k : parse_own(p, k);
+      out = App(App(Ref(f, op === "&" || op === "|" ? s : t), out, s), b, s);
     }
   }
 }
@@ -2135,7 +2138,8 @@ export function parse_term_ns(p: Parse, tm: LTerm, T: LTerm): void {
       throw Err(p.book, ctx_nil(), "a type name after : (the operators' namespace)", undefined, h.s);
     }
     f.k = parse_reso(p, h.k + f.k);
-  } else if (f.k !== "Bool.and" && f.k !== "Bool.or" && f.k !== "String.append") {
+  } else if (!["Bool.and", "Bool.or", "String.append"]
+    .some((k) => parse_own(p, k) === f.k)) {
     return;
   }
   for (const x of xs) {
@@ -2171,7 +2175,7 @@ export function parse_term_all(p: Parse, exi: boolean): LTerm {
   parse_close(p, n0);
   if (exi) {
     const s = parse_span(p, beg);
-    return App(App(Ref("Exists", s), A, s), Lam(k, i, B, s), s);
+    return App(App(Ref(parse_own(p, "Exists"), s), A, s), Lam(k, i, B, s), s);
   }
   return All(q, k, i, A, B);
 }
@@ -2226,7 +2230,7 @@ export function parse_term_num(p: Parse): LTerm {
       return Lit("Nat", n + out.v, spn);
     }
     if (n > NAT_LITERAL_MAX) {
-      return App(App(Ref("Nat.add", spn), Lit("Nat", n, spn), spn), out, spn);
+      return App(App(Ref(parse_own(p, "Nat.add"), spn), Lit("Nat", n, spn), spn), out, spn);
     }
     for (let i = 0; i < n; i++) {
       out = Ctr("Succ", [out], spn);
@@ -2323,7 +2327,7 @@ export function parse_body(p: Parse, col: number = 0): Body {
     [p.pos, T] = [at, null];
   }
   if (T === null && q.$ === "Lone" && ts.length === 1 && !(parse_at(p, "=") && !parse_at(p, "=="))) {
-    const w = term_write(ts[0], beg);
+    const w = term_write(p, ts[0], beg);
     if (w === null || !parse_more(p, parse_col(p.str, beg))) {
       return ts[0];
     }
@@ -2350,9 +2354,9 @@ export function parse_body(p: Parse, col: number = 0): Body {
   return { $: "Local", k: ks, q, v: vs, f };
 }
 
-export function term_write(t: LTerm, beg: number): LTerm | null {
+export function term_write(p: Parse, t: LTerm, beg: number): LTerm | null {
   const [h, xs] = term_unapply(t);
-  if (h.$ === "Ref" && h.k === "Array.set" && xs.length === 4 && xs[1].$ === "Var" && xs[1].s?.beg === beg) {
+  if (h.$ === "Ref" && h.k === parse_own(p, "Array.set") && xs.length === 4 && xs[1].$ === "Var" && xs[1].s?.beg === beg) {
     return xs[1];
   }
   return null;
@@ -2571,12 +2575,12 @@ export function parse_book(book: Book, dir: string, src: string, ns: string, al:
           const i  = parse_open(p, c);
           const w  = parse_term(p);
           parse_close(p, n1);
-          A = App(App(Ref("Exists", ws), A, s), Lam(c, i, w, s), s);
+          A = App(App(Ref(parse_own(p, "Exists"), ws), A, s), Lam(c, i, w, s), s);
         }
         cls.push([all, q, c, parse_open(p, c), A, s]);
       }
       const T = cls.reduceRight((T, [all, q, c, i, A, s]) =>
-        all ? All(q, c, i, A, T, s) : App(App(Ref("Exists", s), A, s), Lam(c, i, T, s), s), parse_block(p));
+        all ? All(q, c, i, A, T, s) : App(App(Ref(parse_own(p, "Exists"), s), A, s), Lam(c, i, T, s), s), parse_block(p));
       const n = cls.findIndex((c) => !c[0]);
       book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc, m: p.ns, l: true };
       book.order.push(k);
