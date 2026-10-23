@@ -27,7 +27,9 @@
 // latest.json fallback name the version, no sha256 and the move notice; the
 // formula carries the sum; --publish ships LICENSE files, names the license
 // as the hub does, sends no leading byte order mark (a package published
-// from a file with one imports), refuses a License/ directory, and every
+// from a file with one imports), refuses a License/ directory and a file
+// leaving the entry's directory (a climb, a link out, a linked entry,
+// LICENSE included) before mining, publishes a link inside, and every
 // request carries User-Agent: bend/<ver>. SKIP when the site repo is not at
 // lib.SITE.
 
@@ -561,6 +563,48 @@ try {
     dir.code === 1 && dir.err.includes("in a directory named license")
     && !dir.err.includes("mining")
     && seen.filter((s) => s.startsWith("POST / ")).length === posts);
+  const ffi  = (at: string) => "import Base\ndef boot(a: U32) -> IO(Unit):\n"
+    + '  import "' + at + '"\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n'
+    + '    IO.print("hi\\n")\n';
+  const link = (at: string, to: string) => {
+    fs.mkdirSync(path.dirname(path.join(TMP, "pub", at)), { recursive: true });
+    fs.symlinkSync(to, path.join(TMP, "pub", at));
+  };
+  fs.mkdirSync(path.join(TMP, "pub", "out"), { recursive: true });
+  fs.writeFileSync(path.join(TMP, "pub", "out.c"), "// secret\n");
+  fs.writeFileSync(path.join(TMP, "pub", "out", "x.c"), "// secret\n");
+  fs.writeFileSync(path.join(TMP, "pub", "out", "lic_link.bend"), two);
+  link("file/p.c", "../out.c");
+  link("tree/d", "../out");
+  link("lic/LICENSE", "../out.c");
+  link("link/lic_link.bend", "../out/lic_link.bend");
+  const outs: [string, Record<string, string>][] = [
+    ["climb", { "lic_climb.bend": ffi("../out.c") }],
+    ["file", { "lic_file.bend": ffi("./p.c") }],
+    ["tree", { "lic_tree.bend": ffi("./d/x.c") }],
+    ["lic", { "lic_lic.bend": two }],
+    ["link", {}],
+    ["up", { "lic_up.bend": use("../out/lic_link.bend") }]];
+  for (const [dir, pkg] of outs) {
+    const count = seen.filter((s) => s.startsWith("POST / ")).length;
+    const run   = await publish(dir, pkg);
+    check("a published " + dir + " leaving the entry's directory is refused"
+      + " before mining: " + run.err, run.code === 1
+      && run.err.includes("cannot be published: it ")
+      && !run.err.includes("mining")
+      && seen.filter((s) => s.startsWith("POST / ")).length === count);
+  }
+  link("in/p.c", "real.c");
+  const inside = await publish("in", { "lic_in.bend": ffi("./p.c"),
+    "real.c": "// ok\n" });
+  const back   = await publish("back", { "lic_back.bend": ffi("../back/ok.c"),
+    "ok.c": "// ok\n" });
+  check("a link inside the entry's directory goes, and a climb back in is"
+    + " published at its plain path: " + inside.err + back.err,
+    inside.code === 0 && inside.out.startsWith(pkg_hash({ "lic_in.bend":
+      ffi("./p.c"), "p.c": "// ok\n" }) + "\n") && back.code === 0
+    && back.out.startsWith(pkg_hash({ "lic_back.bend": ffi("../back/ok.c"),
+      "ok.c": "// ok\n" }) + "\n"));
   fs.writeFileSync(path.join(TMP, "pkg.bend"), "import Base\nimport " + hash
     + "/sub/two.bend as T\nimport bend-ping-probe@1.0.0.0/x.bend as X\n"
     + "def main() -> Nat:\n  T.two\n");

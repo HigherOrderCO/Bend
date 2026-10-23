@@ -55,9 +55,6 @@ const HELP = `Bend ${VERSION}: check, run, build and publish Bend programs.
 usage:
 ${USAGE.map(([use, say]) => `  ${use.padEnd(USE_W)}  ${say}`).join("\n")}
 
-Publishing includes only files inside the entry file's directory;
-symlink targets and LICENSE files must also stay inside it.
-
 Read the guide (\`bend guide\`) before writing Bend code.
 `;
 
@@ -808,52 +805,54 @@ async function cli_login(): Promise<string> {
 // pkg_files is the package the loader read for this file, the entry first:
 // every .bend file at its namespace (the entry at its name), every foreign
 // .c or .js file at its path from the entry's directory; base and the
-// store's packages stay out. Sources and implicit LICENSE files, including
-// symlink targets, must stay inside the entry file's directory.
+// store's packages stay out. The entry's directory is the one the loader
+// roots namespaces at, so an entry linked from another directory, or one
+// at the file system's root, is refused.
 // A LICENSE beside a published file goes along; a license/ directory, in
 // any case, is refused (it clashes with LICENSE on a case-blind disk).
-// A leading byte order mark is dropped: the hub stores the text as sent,
-// and an importer's fetch drops the mark, so a file sent with one would
-// never match its hash.
 function pkg_files(file: string, book: Bend.Book,
   seen: Map<string, string | null>): Record<string, string> {
-  const dir  = path.join(fs.realpathSync(path.dirname(file)), "/");
+  const dir = path.join(path.dirname(fs.realpathSync(file)), "/");
+  if (dir !== path.join(fs.realpathSync(path.dirname(file)), "/")) {
+    throw "Error: " + file + " cannot be published: it links to "
+      + fs.realpathSync(file) + ", in another directory; publish that file";
+  }
+  if (dir === "/") {
+    throw "Error: " + file + " cannot be published: it is at the file"
+      + " system's root; move it into a directory";
+  }
   const raws = [...[...seen].flatMap(([real, ns]): [string, string][] =>
     real === BASE || ns === null || ns.startsWith("0x") ? []
       : [[ns === "" ? path.basename(file) : ns + ".bend", real]]),
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
-      [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
-  const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
-    .filter((s) => s === "..").length);
-  const anc = fs.realpathSync(path.dirname(file)).split("/")
-    .slice(-Math.max(0, ...ups) || Infinity);
+      [path.relative(dir, f), f]))];
   const files: Record<string, string> = {};
-  for (const [raw, real] of raws) {
-    const p = path.posix.join(...anc, raw);
-    if (p.startsWith("/") || p.startsWith("..")) {
-      throw "Error: " + real + " cannot be published (an absolute import,"
-        + " or a climb above the file system)";
-    }
+  for (const [p, src] of raws) {
     if (p.split("/").slice(0, -1).some((s) => s.toLowerCase() === "license")) {
-      throw "Error: " + real + " cannot be published: it is in a directory"
+      throw "Error: " + src + " cannot be published: it is in a directory"
         + " named license, which clashes with a LICENSE file; rename it";
     }
-    files[p] = pkg_read(real, dir);
-    if (fs.readdirSync(path.dirname(real)).includes("LICENSE")) {
-      files[path.posix.join(path.posix.dirname(p), "LICENSE")] =
-        pkg_read(path.join(path.dirname(real), "LICENSE"), dir);
+    files[p] = pkg_read(p, src, dir, "move it");
+    if (fs.readdirSync(path.dirname(src)).includes("LICENSE")) {
+      const lic = path.posix.join(path.posix.dirname(p), "LICENSE");
+      files[lic] = pkg_read(lic, path.join(path.dirname(src), "LICENSE"), dir,
+        "it is the LICENSE beside " + src + "; copy it");
     }
   }
   return files;
 }
 
-// pkg_read confines the resolved source before reading its text.
-function pkg_read(file: string, dir: string): string {
-  const real = fs.realpathSync(file);
-  if (!real.startsWith(dir)) {
-    throw "Error: " + file + " cannot be published: outside the entry directory";
+// pkg_read is the text of src, published at p: p and src's real path stay
+// inside dir, the entry's directory. A leading byte order mark is dropped:
+// the hub stores the text as sent, and an importer's fetch drops the mark,
+// so a file sent with one would never match its hash.
+function pkg_read(p: string, src: string, dir: string, fix: string): string {
+  const real = fs.realpathSync(src);
+  if (p === ".." || p.startsWith("../") || !real.startsWith(dir)) {
+    throw "Error: " + src + " cannot be published: it is outside " + dir
+      + " (the entry's directory); " + fix + " inside";
   }
   return fs.readFileSync(real, "utf8").replace(/^\uFEFF/, "");
 }
