@@ -579,20 +579,22 @@ try {
   link("tree/d", "../out");
   link("lic/LICENSE", "../out.c");
   link("link/lic_link.bend", "../out/lic_link.bend");
-  const outs: [string, Record<string, string>][] = [
-    ["climb", { "lic_climb.bend": ffi("../out.c") }],
-    ["file", { "lic_file.bend": ffi("./p.c") }],
-    ["tree", { "lic_tree.bend": ffi("./d/x.c") }],
-    ["lic", { "lic_lic.bend": two }],
-    ["link", {}],
-    ["up", { "lic_up.bend": use("../out/lic_link.bend") }],
-    ["back", { "lic_back.bend": ffi("../back/ok.c"), "ok.c": "// ok\n" }]];
-  for (const [dir, pkg] of outs) {
+  const away = "cannot be published: it is outside ";
+  const outs: [string, Record<string, string>, string][] = [
+    ["climb", { "lic_climb.bend": ffi("../out.c") }, away],
+    ["file", { "lic_file.bend": ffi("./p.c") }, away],
+    ["tree", { "lic_tree.bend": ffi("./d/x.c") }, away],
+    ["lic", { "lic_lic.bend": two }, "; it is the LICENSE beside "],
+    ["link", {}, "cannot be published: it links to "],
+    ["up", { "lic_up.bend": use("../out/lic_link.bend") }, away],
+    ["back", { "lic_back.bend": ffi("../back/ok.c"), "ok.c": "// ok\n" },
+      "its import climbs out of the package (../back/ok.c)"]];
+  for (const [dir, pkg, why] of outs) {
     const count = seen.filter((s) => s.startsWith("POST / ")).length;
     const run   = await publish(dir, pkg);
     check("a published " + dir + " leaving the entry's directory is refused"
       + " before mining: " + run.err, run.code === 1
-      && run.err.includes("cannot be published: it ")
+      && run.err.includes(why)
       && !run.err.includes("mining")
       && seen.filter((s) => s.startsWith("POST / ")).length === count);
   }

@@ -828,8 +828,9 @@ function pkg_files(file: string, book: Bend.Book,
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
-      [f.startsWith(dir) ? path.posix.normalize(f.slice(dir.length)) : f,
-        f]))];
+      [path.posix.normalize(f.slice(dir.length)), f]))];
+  // .bend files come first, so a foreign file's .bend, its directory a
+  // prefix of the file's path, is checked inside dir before its path is cut
   const files: Record<string, string> = {};
   for (const [p, src] of raws) {
     if (p.split("/").slice(0, -1).some((s) => s.toLowerCase() === "license")) {
@@ -855,10 +856,14 @@ function pkg_files(file: string, book: Bend.Book,
 // match its hash.
 function pkg_read(p: string, src: string, dir: string, fix: string): string {
   const real = fs.realpathSync(src);
-  if (p === ".." || p.startsWith("../") || p.startsWith("/")
-    || !real.startsWith(dir)) {
+  if (!real.startsWith(dir)) {
     throw "Error: " + src + " cannot be published: it is outside " + dir
       + " (the entry's directory); " + fix + " inside";
+  }
+  if (p.startsWith("../") || p.startsWith("/")) {
+    throw "Error: " + src + " cannot be published: its import climbs out of"
+      + " the package (" + p + "); import it by a path that stays inside "
+      + dir;
   }
   return fs.readFileSync(real, "utf8").replace(/^\uFEFF/, "");
 }
