@@ -3,10 +3,12 @@
 
 const PROCESS_WORKER = `
 const { errno, signals } = require("node:os").constants;
+const { parentPort } = require("node:worker_threads");
+const { spawn } = require("node:child_process");
 let port;
 let flag;
 
-self.onmessage = async ({ data }) => {
+parentPort.on("message", async (data) => {
   if (data.port !== undefined) {
     ({ port, flag } = data);
     return;
@@ -21,40 +23,49 @@ self.onmessage = async ({ data }) => {
   port.postMessage(got);
   Atomics.store(flag, 0, 1);
   Atomics.notify(flag, 0);
-};
+});
 
-async function run({ argv, input, env, max, ms }) {
-  const proc = Bun.spawn({ cmd: argv, stdin: input, env, stdout: "pipe",
-    stderr: "pipe" });
-  const readers = [proc.stdout.getReader(), proc.stderr.getReader()];
-  let size = 0;
-  const read = async (reader) => {
-    const chunks = [];
-    for (let r; !(r = await reader.read()).done;) {
-      chunks.push(r.value);
-      size += r.value.length;
-      if (size > max) {
-        throw "EFBIG";
-      }
-    }
-    return Buffer.concat(chunks).toString("utf8");
-  };
-  let timer;
-  try {
-    const [out, err] = await Promise.race([
-      Promise.all([...readers.map(read), proc.exited]),
-      new Promise((_, no) => timer = setTimeout(no, Math.min(ms, 2 ** 31 - 1),
-        "ETIMEDOUT"))]);
-    const sig = proc.signalCode === null ? 0 : signals[proc.signalCode] ?? 0;
-    return { code: proc.exitCode ?? 128 + sig, out, err };
-  } catch (e) {
-    proc.kill("SIGKILL");
-    readers.forEach((r) => r.cancel().catch(() => {}));
-    await proc.exited;
-    throw e;
-  } finally {
-    clearTimeout(timer);
-  }
+function run({ argv, input, env, max, ms }) {
+  return new Promise((yes, no) => {
+    const proc = spawn(argv[0], argv.slice(1), { env,
+      stdio: ["pipe", "pipe", "pipe"] });
+    const chunks = [[], []];
+    let size = 0;
+    let error;
+    const fail = (e) => {
+      if (error !== undefined) return;
+      error = e;
+      proc.kill("SIGKILL");
+      proc.stdin.destroy();
+      proc.stdout.destroy();
+      proc.stderr.destroy();
+    };
+    proc.once("error", fail);
+    proc.stdin.on("error", (e) => {
+      if (e.code !== "EPIPE") fail(e);
+    });
+    [proc.stdout, proc.stderr].forEach((stream, i) => {
+      stream.on("error", fail);
+      stream.on("data", (chunk) => {
+        if (error !== undefined) return;
+        size += chunk.length;
+        if (size > max) fail("EFBIG");
+        else chunks[i].push(chunk);
+      });
+    });
+    // An exited child need not drain stdin held open by its descendants.
+    proc.once("exit", () => proc.stdin.destroy());
+    const timer = setTimeout(() => fail("ETIMEDOUT"),
+      Math.min(ms, 2 ** 31 - 1));
+    proc.once("close", (code, signal) => {
+      clearTimeout(timer);
+      if (error !== undefined) no(error);
+      else yes({ code: code ?? 128 + (signals[signal] ?? 0),
+        out: Buffer.concat(chunks[0]).toString("utf8"),
+        err: Buffer.concat(chunks[1]).toString("utf8") });
+    });
+    proc.stdin.end(input);
+  });
 }
 `;
 
@@ -70,10 +81,10 @@ function process_run(program, args, input, maxOutput, timeoutMs) {
     return io_fail(22);
   }
   if (process_worker === null) {
-    const { MessageChannel, receiveMessageOnPort } = require("node:worker_threads");
+    const { Worker, MessageChannel, receiveMessageOnPort } = require("node:worker_threads");
     const { port1, port2 } = new MessageChannel();
     const flag = new Int32Array(new SharedArrayBuffer(4));
-    const worker = new Worker(URL.createObjectURL(new Blob([PROCESS_WORKER])));
+    const worker = new Worker(PROCESS_WORKER, { eval: true });
     worker.unref();
     worker.postMessage({ port: port2, flag }, [port2]);
     process_worker = { worker, port: port1, flag, receive: receiveMessageOnPort };
