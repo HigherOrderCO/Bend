@@ -1,6 +1,6 @@
 # a compile-time argument naming a def declared later: the argument
-# checks dead, but the instance calls the def live, and a def below is
-# a bodiless claim there, as for any forward call
+# checks dead, but the instance calls the def live before its body is
+# checked, and the refusal names the file order, as for any forward call
 import Base
 
 def app(~f: Nat -> Nat, x: Nat) -> Nat:
