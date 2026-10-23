@@ -3756,7 +3756,7 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
-// The first to fail gets 1; others wait a second for its _exit, then 0.
+// First failure wins; others wait a second for it to terminate.
 FAR int err_claim(void) {
   static _Atomic uintptr_t first;
   uintptr_t self = (uintptr_t)pthread_self(), seen = 0;
@@ -3776,12 +3776,13 @@ static void err_post(u64* H, u32 code) {
   err_fail(ERR_TEXT[code]);
 }
 
-// A trap never waits on a lock: it flushes only if free, then writes raw.
+// Flush if free, report the fault, then re-raise its signal.
 static void err_trap(int sig) {
   static const char line[] = ${JSON.stringify(`bend: ${ERRS[7]}\n`)};
   if (err_claim() && ftrylockfile(stdout) == 0) fflush(stdout);
   if (write(2, line, sizeof line - 1)) {}
-  _exit(1);
+  signal(sig, SIG_DFL);
+  raise(sig);
 }
 
 #endif

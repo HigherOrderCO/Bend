@@ -1,8 +1,8 @@
 # io (io_stack_fault_trap): a machine stack fault is LOUD - the one
-# numbered line, never a silent death by signal. Every host machine
+# numbered line, then a re-raise of SIGSEGV/SIGBUS. Every host machine
 # stack (the event loop's own and each pool worker's) is a guarded
 # mmap: a 16KB PROT_NONE page past the window, an altstack, and the
-# SIGSEGV/SIGBUS trap answering "bend: error 9" before the abort.
+# SIGSEGV/SIGBUS trap prints the memory-fault line before re-raising.
 # NOTHING drove it: gutting both sigaction lines kept the whole
 # suite green while this program died by raw SIGBUS with an EMPTY
 # stderr - the exact silent-loss class the numbered-error law
