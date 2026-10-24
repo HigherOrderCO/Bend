@@ -8,7 +8,7 @@ law f:
 
 def f():
   do Result<&2, &2, Unit, U32>:
-    x <- Result.pure(&2, &2, Unit, U32, 1)
+    x : U32 <- Result.pure(&2, &2, Unit, U32, 1)
 
 #|SOME PROOFS FAIL
 #|Error:
