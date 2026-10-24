@@ -19,9 +19,8 @@
 # the C wall's own error 9 line, thrown as the one plain string
 # both printers spell verbatim - the interpreter's catch on stdout,
 # io_exit's on stderr - exit 1 either way, the compiled-JS deep-cut
-# limit now loud AND numbered. The device half of the law (WL_ROOM posting
-# ERR_DEEP on the strided device stacks) rides on no host drive, so
-# a csrc pin holds it verbatim beside the four host trap sites.
+# limit now loud AND numbered. A device lane's stack never faults: a full
+# one moves to the heap (tests/compile/bang_lane_spill.bend).
 # The print BEFORE the deep call pins the trap's stdout flush: stdout is
 # buffered when it goes to a pipe, so a trap that skips the flush loses
 # what the program already printed.
