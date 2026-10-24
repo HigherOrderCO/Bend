@@ -117,7 +117,7 @@ const BOX: Lay = { ks: ["box"], arms: null };
 const W64: Lay = { ks: ["w64"], arms: null };
 
 const WORDS: Record<string, Lay> = Object.setPrototypeOf(
-  { U32: W32, F32: W32, Nat: W64 }, null);
+  { U32: W32, I32: W32, F32: W32, Nat: W64 }, null);
 
 const WIDE = 247;
 
@@ -137,10 +137,11 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
-  ...tpl_ops("u32_", "add:+ sub:- and:& or:| xor:^",
+  ...tpl_ops("u32_ i32_", "add:+ sub:- and:& or:| xor:^",
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
-  u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
+  ...tpl_ops("u32_ i32_", "mul", "U32_BIN($0, *, $1)",
+    "(Math.imul($0, $1) >>> 0)"),
   // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
   // as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
@@ -156,20 +157,62 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
       + " U32_QUO((u32)($0), (u32)($1)) * $1))",
     JS: "($1 === 0 ? $0 : $0 % $1)",
   },
-  ...tpl_ops("u32_", "inc:+ shl:<< shr:>>:>>>", "U32_BIN($0, $o, 1)",
+  ...tpl_ops("u32_", "inc:+ shr:>>:>>>", "U32_BIN($0, $o, 1)",
     "(($0 $o 1) >>> 0)"),
-  ...tpl_ops("u32_", "shln:<< shrn:>>:>>>",
-    "($1 >= 32 ? 0 : U32_BIN($0, $o, $1))",
-    "($1 >= 32 ? 0 : ($0 $o $1) >>> 0)"),
-  u32_not: { C: "((u64)~(u32)($0))", JS: "(~$0 >>> 0)" },
-  u32_is_zero: { C: "U32_BIN($0, ==, 0)", JS: "($0 === 0)" },
+  ...tpl_ops("u32_ i32_", "shl", "U32_BIN($0, <<, 1)", "(($0 << 1) >>> 0)"),
+  ...tpl_ops("u32_ i32_", "shln", "($1 >= 32 ? 0 : U32_BIN($0, <<, $1))",
+    "($1 >= 32 ? 0 : ($0 << $1) >>> 0)"),
+  u32_shrn: {
+    C:  "($1 >= 32 ? 0 : U32_BIN($0, >>, $1))",
+    JS: "($1 >= 32 ? 0 : ($0 >>> $1) >>> 0)",
+  },
+  ...tpl_ops("u32_ i32_", "not", "((u64)~(u32)($0))", "(~$0 >>> 0)"),
+  ...tpl_ops("u32_ i32_", "is_zero", "U32_BIN($0, ==, 0)", "($0 === 0)"),
   u32_cmp: {
     C:  "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
     JS: "cmp_new($0, $1)",
   },
   u32_to_f32: { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0 >>> 0)" },
   u32_to_nat: { C: "((u64)$0)", JS: "$0" },
-  u32_from_nat: { C: "((u64)(u32)($0))", JS: "($0 >>> 0)" },
+  ...tpl_ops("u32_ i32_", "from_nat", "((u64)(u32)($0))", "($0 >>> 0)"),
+  // I32 holds U32's bits: the ops above that read no sign are shared, and
+  // the ones below read the word as two's complement.
+  ...tpl_ops("i32_", CMPS, "I32_BIN($0, $o, $1)", "(($0 | 0) $o ($1 | 0))"),
+  i32_cmp: {
+    C:  "(I32_BIN($0, >, $1) + I32_BIN($0, >=, $1))",
+    JS: "cmp_new($0 | 0, $1 | 0)",
+  },
+  i32_is_neg: { C: "((u64)((u32)($0) >> 31))", JS: "($0 >= 2147483648)" },
+  i32_neg: { C: "((u64)(0u - (u32)($0)))", JS: "(-$0 >>> 0)" },
+  i32_abs: {
+    C:  "((u64)((i32)(u32)($0) < 0 ? 0u - (u32)($0) : (u32)($0)))",
+    JS: "(Math.abs($0 | 0) >>> 0)",
+  },
+  i32_div: {
+    C:  "i32_div($0, $1)",
+    JS: "($1 === 0 ? 0 : (($0 | 0) / ($1 | 0)) >>> 0)",
+  },
+  i32_mod: {
+    C:  "i32_mod($0, $1)",
+    JS: "($1 === 0 ? $0 : (($0 | 0) % ($1 | 0)) >>> 0)",
+  },
+  i32_shr: {
+    C:  "((u64)(u32)((i32)(u32)($0) >> 1))",
+    JS: "(($0 | 0) >> 1 >>> 0)",
+  },
+  i32_shrn: {
+    C:  "((u64)(u32)((i32)(u32)($0) >> ($1 < 31 ? $1 : 31)))",
+    JS: "(($0 | 0) >> Math.min($1, 31) >>> 0)",
+  },
+  ...tpl_ops("i32_", "from_u32 to_u32", "$0"),
+  i32_to_nat: {
+    C:  "((i32)(u32)($0) < 0 ? 0 : (u64)(u32)($0))",
+    JS: "($0 >= 2147483648 ? 0 : $0)",
+  },
+  i32_to_f32: {
+    C:  "f32_rewrap((f32)(i32)(u32)($0))",
+    JS: "Math.fround($0 | 0)",
+  },
   ...tpl_ops("f32_", "add:+ sub:- mul:* div:/",
     "f32_rewrap(f32_unbox($0) $o f32_unbox($1))", "Math.fround($0 $o $1)"),
   f32_neg: { C: "f32_rewrap(-f32_unbox($0))", JS: "(-$0)" },
@@ -194,6 +237,10 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   f32_to_u32: {
     C:  "f32_to_u32($0)",
     JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)",
+  },
+  f32_to_i32: {
+    C:  "f32_to_i32($0)",
+    JS: "($0 >= -2147483648 && $0 < 2147483648 ? Math.trunc($0) >>> 0 : 0)",
   },
   f32_bits: { C: "$0", JS: "f32_bits($0)" },
   ...tpl_ops("f32_", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
@@ -247,6 +294,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
     True: { intr: "true", cond: "$0" },
   },
   U32: { U32: { intr: ([w]) => view_of(w) ?? `word_to_u32(${w})` } },
+  I32: { I32: { intr: ([w]) => tpl(OPTIMIZED.U32.U32.intr, [w]) } },
   F32: {
     F32: {
       intr: ([w]) => w.match(VIEW)?.[2]
@@ -312,6 +360,20 @@ ${SHIMS}
 #endif
 
 #define U32_BIN(a, o, b) ((u64)((u32)(a) o (u32)(b)))
+#define I32_BIN(a, o, b) ((u64)((i32)(u32)(a) o (i32)(u32)(b)))
+
+// I32 division runs U32_QUO on the magnitudes, so no signed op overflows:
+// b = 0 answers 0 (mod the dividend), and INT_MIN / -1 wraps to INT_MIN.
+INLINE u64 i32_div(u32 a, u32 b) {
+  u32 m = (i32)a < 0 ? 0u - a : a;
+  u32 n = (i32)b < 0 ? 0u - b : b;
+  u32 q = n == 0 ? 0 : U32_QUO(m, n);
+  return (i32)(a ^ b) < 0 ? 0u - q : q;
+}
+
+INLINE u64 i32_mod(u32 a, u32 b) {
+  return (u32)(a - (u32)i32_div(a, b) * b);
+}
 
 INLINE u64 u32_pow(u32 a, u64 n) {
   u32 r = 1;
@@ -334,6 +396,11 @@ INLINE u64 f32_rewrap(f32 x) {
 INLINE u64 f32_to_u32(u64 a) {
   f32 v = f32_unbox(a);
   return v >= 0.0f && v < 4294967296.0f ? (u32)v : 0;
+}
+
+INLINE u64 f32_to_i32(u64 a) {
+  f32 v = f32_unbox(a);
+  return v >= -2147483648.0f && v < 2147483648.0f ? (u32)(i32)v : 0;
 }
 
 INLINE u64 nat_chk(Env e, u64 n) {
@@ -570,12 +637,15 @@ function char_new(c: number): string {
 // Tpl
 // ===
 
-function tpl_ops(pre: string, names: string, C: string, JS = C):
+// Each prefix gets the ops: "u32_ i32_" shares them between both words.
+function tpl_ops(pres: string, names: string, C: string, JS = C):
   Record<string, Intr> {
-  return Object.fromEntries(names.split(" ").map((p) => {
-    const [k, o = k, jo = o] = p.split(":");
-    return [pre + k, { C: C.replaceAll("$o", o), JS: JS.replaceAll("$o", jo) }];
-  }));
+  return Object.fromEntries(pres.split(" ").flatMap((pre) =>
+    names.split(" ").map((p) => {
+      const [k, o = k, jo = o] = p.split(":");
+      return [pre + k,
+        { C: C.replaceAll("$o", o), JS: JS.replaceAll("$o", jo) }];
+    })));
 }
 
 function tpl_deep(e: string): boolean {
@@ -1037,7 +1107,7 @@ function ctr_adt(x: Of<"Ctr">,
   if (ty === null && adt.x.length > 0) {
     die("a constructor outside a datatype");
   }
-  return [adt, adt.k === "U32" || adt.k === "F32"
+  return [adt, adt.k === "U32" || adt.k === "I32" || adt.k === "F32"
     ? Bend.u32_from_term(x, adt.k) : null];
 }
 
@@ -1970,7 +2040,7 @@ function memo_gc(): void {
 // A pure main prints through a descriptor of its type, a node per (type,
 // layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
 // (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
-// then an (offset, node) per field).
+// then an (offset, node) per field), 8 I32.
 
 function show_main(): (number | Name)[] | null {
   const main = FL.book.tlds.main;
@@ -1999,8 +2069,9 @@ function show_main(): (number | Name)[] | null {
     const box = lay === BOX;
     const adt = ty_adt(t);
     const tld = adt && FL.book.tlds[adt.k];
-    const kind = t.$ === "Eql" ? 5 : "U32 F32 Nat Char String . Array"
-      .split(" ").indexOf(adt?.k ?? "") & 7;
+    const at = "U32 F32 Nat Char String . Array . I32".split(" ")
+      .indexOf(adt?.k ?? "");
+    const kind = t.$ === "Eql" ? 5 : at < 0 ? 7 : at;
     if (kind !== 5 && (tld?.$ !== "ADT" || adt?.k === "IO.OP")) {
       return refuse();
     }
@@ -3259,11 +3330,13 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 }
 
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
+// checks; an I32 crosses signed; text gets U+FFFD for what is no Unicode
+// scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const k = ty_adt(A)?.k;
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
     : k === "Nat" && !out ? `nat_in(${x})`
+    : k === "I32" ? `(${x} ${out ? "|" : ">>>"} 0)`
     : k === "F32" && !out ? `Math.fround(${x})` : x;
 }
 
@@ -3492,6 +3565,7 @@ typedef uint32_t u32;
 typedef uint8_t  u8;
 #endif
 typedef unsigned short u16;
+typedef int   i32;
 typedef float f32;
 
 typedef u64 Term;
@@ -5908,6 +5982,9 @@ static void show_val(Env e, u32 d, const Term* w, char chain) {
     case 1:
       show_f32(w[0]);
       break;
+    case 8:
+      printf("%di", (i32)(u32)w[0]);
+      break;
     case 2:
       printf("%llun", (unsigned long long)w[0]);
       break;
@@ -6294,6 +6371,7 @@ function show_val(D, d, v, chain) {
   return k === 0 ? String(v)
     : k === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : k === 2 ? v + "n"
+    : k === 8 ? (v | 0) + "i"
     : k === 3 ? "'" + show_chr(v, "'") + "'"
     : k === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
       (c) => show_chr(c, "\"")) + "\""

@@ -1361,7 +1361,7 @@ function ctr_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Ctr" }>, T: HTerm |
   }
   const f = B.book_fam(e.book, x.k);
   const fam = e.book.tlds[f] as ADT;
-  const w = B.u32_from_term(x) ?? B.u32_from_term(x, "F32");
+  const w = B.u32_from_term(x) ?? B.u32_from_term(x, "I32") ?? B.u32_from_term(x, "F32");
   if (!s.sub && w !== null) {
     if (fam.n !== 0) {
       oos("a word literal of a parameterized datatype");

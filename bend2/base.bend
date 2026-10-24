@@ -64,6 +64,9 @@ def Word(n: Nat) -> Data:
 type U32 is Data:
   U32{data: Word(32n)}
 
+type I32 is Data:
+  I32{data: Word(32n)}
+
 type F32 is Data:
   F32{data: Word(32n)}
 
@@ -1667,6 +1670,160 @@ def U32.pow(+a: U32, n: Nat) -> U32:
 def U32.is_even(a: U32) -> Bool:
   U32.is_zero(U32.and(a, 1))
 
+# I32
+# ---
+
+# I32 is two's complement on the 32-bit word: the ops that do not read the
+# sign are U32's, and the rest order the word biased by 2^31 (cmp), keep its
+# top bit (shr) or work on its magnitude (div, mod).
+
+def I32.from_u32(a: U32) -> I32:
+  match a:
+    case U32{x}:
+      I32{x}
+
+def I32.to_u32(a: I32) -> U32:
+  match a:
+    case I32{x}:
+      U32{x}
+
+def I32.add(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.add(32n, x, y)}
+
+def I32.sub(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.sub(32n, x, y)}
+
+def I32.mul(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.mul(32n, x, y)}
+
+def I32.neg(a: I32) -> I32:
+  match a:
+    case I32{x}:
+      I32{Word.sub(32n, Word.zero(32n), x)}
+
+def I32.not(a: I32) -> I32:
+  match a:
+    case I32{x}:
+      I32{Word.not(32n, x)}
+
+def I32.and(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.and(32n, x, y)}
+
+def I32.or(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.or(32n, x, y)}
+
+def I32.xor(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{x} I32{y}:
+      I32{Word.xor(32n, x, y)}
+
+def I32.shl(a: I32) -> I32:
+  match a:
+    case I32{x}:
+      I32{Word.shl(32n, x)}
+
+def I32.shr(a: I32) -> I32:
+  match a:
+    case I32{+x}:
+      I32.from_u32(U32.or(U32.shr(U32{x}), U32.and(U32{x}, 2147483648)))
+
+def I32.shln(a: I32, n: Nat) -> I32:
+  match n:
+    case 0n:
+      a
+    case 1n+p:
+      I32.shl(I32.shln(a, p))
+
+def I32.shrn(a: I32, n: Nat) -> I32:
+  match n:
+    case 0n:
+      a
+    case 1n+p:
+      I32.shr(I32.shrn(a, p))
+
+def I32.cmp(a: I32, b: I32) -> Cmp:
+  match a b:
+    case I32{x} I32{y}:
+      U32.cmp(U32.xor(U32{x}, 2147483648), U32.xor(U32{y}, 2147483648))
+
+def I32.is_eq(a: I32, b: I32) -> Bool:
+  Cmp.is_eq(I32.cmp(a, b))
+
+def I32.is_ne(a: I32, b: I32) -> Bool:
+  Bool.not(Cmp.is_eq(I32.cmp(a, b)))
+
+def I32.is_lt(a: I32, b: I32) -> Bool:
+  Cmp.is_lt(I32.cmp(a, b))
+
+def I32.is_le(a: I32, b: I32) -> Bool:
+  Cmp.is_le(I32.cmp(a, b))
+
+def I32.is_gt(a: I32, b: I32) -> Bool:
+  Cmp.is_gt(I32.cmp(a, b))
+
+def I32.is_ge(a: I32, b: I32) -> Bool:
+  Cmp.is_ge(I32.cmp(a, b))
+
+def I32.is_zero(a: I32) -> Bool:
+  I32.is_eq(a, 0i)
+
+def I32.is_neg(a: I32) -> Bool:
+  match a:
+    case I32{x}:
+      U32.is_ge(U32{x}, 2147483648)
+
+# A negative answers 0n, as Nat.sub does below 0.
+def I32.to_nat(a: I32) -> Nat:
+  match a:
+    case I32{+x}:
+      Bool.pick(Nat, I32.is_neg(I32{x}), 0n, U32.to_nat(U32{x}))
+
+# Wraps past 2^32, as U32.from_nat does, so 2^31 and above are negative.
+def I32.from_nat(n: Nat) -> I32:
+  I32.from_u32(U32.from_nat(n))
+
+def I32.abs(a: I32) -> I32:
+  match a:
+    case I32{+x}:
+      Bool.pick(I32, I32.is_neg(I32{x}), I32.neg(I32{x}), I32{x})
+
+# Division truncates toward zero: the quotient of the magnitudes, negated
+# when the signs differ, so a = b * div(a, b) + mod(a, b) holds at every b.
+# b = 0 answers 0 (mod the dividend), as U32's do, and INT_MIN / -1 wraps
+# to INT_MIN.
+def I32.div(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{+x} I32{+y}:
+      +q = I32.from_u32(U32.div(I32.to_u32(I32.abs(I32{x})),
+        I32.to_u32(I32.abs(I32{y}))))
+      s = Bool.xor(I32.is_neg(I32{x}), I32.is_neg(I32{y}))
+      Bool.pick(I32, s, I32.neg(q), q)
+
+def I32.mod(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{+x} I32{+y}:
+      I32.sub(I32{x}, I32.mul(I32.div(I32{x}, I32{y}), I32{y}))
+
+def I32.min(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{+x} I32{+y}:
+      Bool.pick(I32, I32.is_lt(I32{x}, I32{y}), I32{x}, I32{y})
+
+def I32.max(a: I32, b: I32) -> I32:
+  match a b:
+    case I32{+x} I32{+y}:
+      Bool.pick(I32, I32.is_lt(I32{x}, I32{y}), I32{y}, I32{x})
+
 # F32
 # ---
 
@@ -1926,6 +2083,23 @@ def F32.to_nat(a: F32) -> Nat:
       +wide = Bool.and(F32.is_ge(F32{x}, 4294967296.0),
         F32.is_lt(F32{x}, 281474976710656.0))
       F32.to_nat.wide(F32{x}, wide)
+
+def I32.to_f32(a: I32) -> F32:
+  match a:
+    case I32{+x}:
+      +m = U32.to_f32(I32.to_u32(I32.abs(I32{x})))
+      Bool.pick(F32, I32.is_neg(I32{x}), F32.neg(m), m)
+
+# Truncates toward zero; NaN and what lies past [-2^31, 2^31) answer 0, as
+# F32.to_u32 does past its range.
+def F32.to_i32(a: F32) -> I32:
+  match a:
+    case F32{+x}:
+      +m = I32.from_u32(F32.to_u32(F32.abs(F32{x})))
+      ok = Bool.and(F32.is_ge(F32{x}, F32.neg(2147483648.0)),
+        F32.is_lt(F32{x}, 2147483648.0))
+      v = Bool.pick(I32, F32.is_lt(F32{x}, 0.0), I32.neg(m), m)
+      Bool.pick(I32, ok, v, 0i)
 
 # Char
 # ----
@@ -2405,6 +2579,41 @@ def U32.read(s: String) -> Maybe<&2, U32>:
       None{}
     case SCon{h, t}:
       U32.read.go(SCon{h, t}, 0)
+
+def I32.show(a: I32) -> String:
+  match a:
+    case I32{+x}:
+      String.append(Bool.pick(String, I32.is_neg(I32{x}), "-", ""),
+        U32.show(I32.to_u32(I32.abs(I32{x}))))
+
+def I32.read.if(neg: Bool, +u: U32, ok: Bool) -> Maybe<&2, I32>:
+  match ok:
+    case True{}:
+      Some{Bool.pick(I32, neg, I32.neg(I32.from_u32(u)), I32.from_u32(u))}
+    case False{}:
+      None{}
+
+# A magnitude past 2^31 - 1, or 2^31 after a "-", reads as None.
+def I32.read.fin(+neg: Bool, m: Maybe<&2, U32>) -> Maybe<&2, I32>:
+  match m:
+    case None{}:
+      None{}
+    case Some{+u}:
+      I32.read.if(neg, u, U32.is_le(u, U32.add(2147483647, Bool.to_u32(neg))))
+
+def I32.read.sign(neg: Bool, h: Char, t: String) -> Maybe<&2, I32>:
+  match neg:
+    case True{}:
+      I32.read.fin(True{}, U32.read(t))
+    case False{}:
+      I32.read.fin(False{}, U32.read(SCon{h, t}))
+
+def I32.read(s: String) -> Maybe<&2, I32>:
+  match s:
+    case SNil{}:
+      None{}
+    case SCon{Chr{+c}, t}:
+      I32.read.sign(U32.is_eq(c, 45), Chr{c}, t)
 
 def Bool.show(b: Bool) -> String:
   match b:
