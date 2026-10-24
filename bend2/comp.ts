@@ -2303,8 +2303,8 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[], f: Fun): string {
     FUEL = fuel;
     const body = [...seg_text(["u32 wpoll = 0;", ...seg.ks.flatMap((k, i) =>
       arr_q(k) ? [`Term h${i} = r${i};`] : []),
-    ...seg_take(seg), "WL_SPIN"], 1),
-    ...seg_text(seg.lines, 2), "  break;", "  }",
+    ...seg_take(seg), "WL_NSPIN"], 1),
+    ...seg_text(seg.lines, 2), "  break;", "  WL_NSPUN",
     "  return 1;", "}"];
     const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
     FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
@@ -3428,6 +3428,9 @@ using namespace metal;
 
 // The device inlines a spin once per caller, so a long one is a call there.
 // The host lets clang decide.
+#define WL_SPIN     for (;;) { if (err_spun(e.mem, &wpoll)) { return 0; }
+#define WL_SPUN     } break;
+#define WL_AGAIN(F) continue
 #if DEVICE
 #define DFAR       FAR
 #define LOCK(l)
@@ -3436,6 +3439,11 @@ using namespace metal;
 #define WL_OPEN    {
 #define WL_JMP(F)  { fid = (F); break; }
 #define WL_DYN     WL_JMP
+// A native spin polls the error word every 4096 steps, not every step: its
+// branch stops ptxas from unrolling the hot loop (#1776). The period matches
+// err_spun's.
+#define WL_NSPIN  for (;;) { for (wpoll = 4096; wpoll != 0; wpoll -= 1) {
+#define WL_NSPUN  } if (wpoll != 0) { break; } if (err_seen(e.mem)) { return 0; } }
 #else
 #define DFAR       INLINE
 #define LOCK(l)    while (__atomic_exchange_n(&(l), 1, __ATOMIC_ACQUIRE)) {}
@@ -3445,10 +3453,9 @@ using namespace metal;
 #define WL_OPEN    { WL_BANK u32 rn;
 #define WL_JMP(F)  __attribute__((musttail)) return WL_##F(WL_ALL)
 #define WL_DYN(F)  __attribute__((musttail)) return wl_tab[F](WL_ALL)
+#define WL_NSPIN  WL_SPIN
+#define WL_NSPUN  }
 #endif
-#define WL_SPIN     for (;;) { if (err_spun(e.mem, &wpoll)) { return 0; }
-#define WL_SPUN     } break;
-#define WL_AGAIN(F) continue
 
 #define LANE_STEP (DEVICE ? (long)CUBE : 1)
 #define STK(I)    sp[(long)(I) * LANE_STEP]
