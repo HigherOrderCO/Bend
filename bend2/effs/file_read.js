@@ -1,13 +1,27 @@
 // File
 // ====
 
+// read(2) answers what is there, not what was asked: a pipe, a terminal
+// and a short read all stop before max. Fill the buffer or reach EOF, so
+// a caller that asked for n bytes gets n unless the file ends first.
 function file_read_with(file, max, offset, pack) {
   const sys = io_sys();
   const len = Math.min(max, 2147483647);
   const b = new Uint8Array(Math.max(len, 1));
-  const n = Number(offset === null ? sys.read(file, sys.ptr(b), len)
-    : sys.pread(file, sys.ptr(b), len, BigInt(offset)));
-  return io_tup(file, n < 0 ? io_fail(sys.errno()) : io_done(pack(b, n)));
+  let got = 0;
+  while (got < len) {
+    const part = b.subarray(got);
+    const n = Number(offset === null ? sys.read(file, sys.ptr(part), len - got)
+      : sys.pread(file, sys.ptr(part), len - got, BigInt(offset) + BigInt(got)));
+    if (n < 0) {
+      return io_tup(file, io_fail(sys.errno()));
+    }
+    if (n === 0) {
+      break;
+    }
+    got += n;
+  }
+  return io_tup(file, io_done(pack(b, got)));
 }
 
 function file_read(file, max) {

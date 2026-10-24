@@ -314,6 +314,8 @@ def File.open_bytes(path: List<&2, U32>, mode: String) ->
   import "./effs/file_open.c"
   import "./effs/file_open.js"
 
+# Up to max bytes. A short read or a pipe does not stop it before max
+# unless the file ends first; EINTR is retried.
 def File.read(file: File, max: U32) ->
   IO(File & Result<&1, &1, U32 & String, String>):
   import "./effs/file_read.c"

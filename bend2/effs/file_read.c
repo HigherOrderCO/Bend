@@ -1,9 +1,30 @@
 // File
 // ====
 
+// read(2) answers what is there, not what was asked: a pipe, a terminal
+// and a short read all stop before max. Fill the buffer or reach EOF, so
+// a caller that asked for n bytes gets n unless the file ends first.
 static void file_read_call(IoWork* w) {
   int fd = (int)w->hand;
-  w->size = io_sys_end(w, read(fd, w->data, w->word));
+  u64 got = 0;
+  while (got < w->word) {
+    ssize_t n = read(fd, w->data + got, w->word - got);
+    if (n < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      if (got == 0) {
+        io_sys_end(w, n);
+        return;
+      }
+      break;
+    }
+    if (n == 0) {
+      break;
+    }
+    got += (u64)n;
+  }
+  w->size = got;
 }
 
 static Term file_read_start(Term file, u64 max, IoWork* w,
@@ -60,7 +81,26 @@ static void __attribute__((constructor)) file_read_bytes_use(void) {
 // the file does not move.
 static void file_read_at_call(IoWork* w) {
   int fd = (int)w->hand;
-  w->size = io_sys_end(w, pread(fd, w->data, w->word, (off_t)w->made));
+  u64 got = 0;
+  while (got < w->word) {
+    ssize_t n = pread(fd, w->data + got, w->word - got,
+      (off_t)w->made + (off_t)got);
+    if (n < 0) {
+      if (errno == EINTR) {
+        continue;
+      }
+      if (got == 0) {
+        io_sys_end(w, n);
+        return;
+      }
+      break;
+    }
+    if (n == 0) {
+      break;
+    }
+    got += (u64)n;
+  }
+  w->size = got;
 }
 
 Term file_read_at_run(Env e, Term* f, IoWork* w) {
