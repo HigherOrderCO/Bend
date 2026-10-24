@@ -37,6 +37,7 @@ const USAGE = [
   ["bend <file.bend> [args]", "check the file, then run main with args"],
   ["bend <file.bend> -o <out>", "build a binary, or C, JS, .mjs or BendTT by extension"],
   ["bend <file.bend> --check-only", "check the file and its imports; run nothing"],
+  ["bend <file.bend> --check-only --trust <glob>", "check it, skipping Base and the files glob names"],
   ["bend <file.bend> --verdict", "check it, then recheck it with the proven kernel"],
   ["bend <file.bend> --publish [<name>@<version>]", "publish the file and its imports; a name needs login"],
   ["bend link <name>@<version> 0x<hash>", "name a package already on the hub"],
@@ -234,6 +235,7 @@ function ver_newer(ver: string): boolean {
 async function cli_file(args: string[]): Promise<void> {
   const outs: string[] = [];
   const argv: string[] = [];
+  const trust: string[] = [];
   let file: string | undefined;
   let only = false;
   let verdict = false;
@@ -260,6 +262,9 @@ async function cli_file(args: string[]): Promise<void> {
     } else if (a === "-o") {
       i += 1;
       outs.push(args[i] ?? cli_fail("-o needs an output file"));
+    } else if (a === "--trust") {
+      i += 1;
+      trust.push(args[i] ?? cli_fail("--trust needs a glob"));
     } else if (a === "--") {
       argv.push(...args.splice(i + 1));
     } else if (a.startsWith("-")) {
@@ -284,6 +289,10 @@ async function cli_file(args: string[]): Promise<void> {
   if ((only || verdict) && (outs.length !== 0 || checkup || (only && verdict))) {
     cli_fail((verdict ? "--verdict" : "--check-only") + " takes no other option");
   }
+  // a trusted file has no checked terms to build, run or prove with
+  if (trust.length !== 0 && !only) {
+    cli_fail("--trust goes with --check-only alone");
+  }
   // args go to a plain run only: any option (all start with -) refuses them
   if (argv.length !== 0 && args.some((a) => a.startsWith("-") && a !== "--")) {
     cli_fail("arguments go to a run: bend <file.bend> [args]");
@@ -303,7 +312,7 @@ async function cli_file(args: string[]): Promise<void> {
       return await cli_checkup(file);
     }
     const seen = new Map<string, string | null>();
-    const book = await book_read(file, undefined, seen);
+    const book = await book_read(file, undefined, seen, trust);
     if (only || verdict) {
       process.exitCode = cli_verdict(book, verdict);
       return;
@@ -1015,19 +1024,21 @@ function cli_fail(msg: string): never {
 // ====
 
 async function book_read(file: string, base?: Bend.Book,
-  seen = new Map<string, string | null>()): Promise<Bend.Book> {
+  seen = new Map<string, string | null>(), trust: string[] = []): Promise<Bend.Book> {
   const book = base === undefined ? Bend.book_nil() : book_seed(base);
   if (base !== undefined) {
     seen.set(BASE, "");
   }
   try {
-    await Bend.book_load(book, file, "", seen);
+    const mods = new Map<string, Bend.Mod>();
+    await Bend.book_load(book, file, "", seen, undefined, undefined, mods);
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {
       throw "Error: PROOF.bend must import ./LAWS.bend";
     }
-    Bend.book_valid(book, base?.order.length ?? 0);
+    Bend.book_valid(book, trust.length === 0 ? (i) => i < (base?.order.length ?? 0)
+      : book_trust(file, seen, mods, trust));
     if (book.hols > 0) {
       throw "Error: " + String(book.hols) + " TODO" + (book.hols === 1 ? "" : "s")
         + " found.\nThe code is incomplete, and not a valid proof yet.";
@@ -1041,6 +1052,28 @@ async function book_read(file: string, base?: Bend.Book,
 // a failed check: bend2's reason, which book_err prints under FAIL
 class Check_Fail {
   constructor(readonly why: unknown) {}
+}
+
+// book_trust is what --trust skips: Base, and each file a glob names by its
+// path from the entry (lib/a.bend), unless it imports a checked file, whose
+// bodies its check would read. mods holds imports first, so one pass does.
+function book_trust(file: string, seen: Map<string, string | null>,
+  mods: Map<string, Bend.Mod>, globs: string[]): (i: number) => boolean {
+  const name = (real: string): string => real === BASE ? "Base"
+    : seen.get(real) ? seen.get(real) + ".bend" : path.basename(file);
+  const trust = new Set<string>();
+  for (const [real, { deps }] of mods) {
+    const named = real === BASE || globs.some((g) => new Bun.Glob(g).match(name(real)));
+    const dep = deps.find((d) => !trust.has(d));
+    if (named && dep !== undefined) {
+      cli_say(2, "checking " + name(real) + ": it imports " + name(dep) + "\n");
+    } else if (named) {
+      trust.add(real);
+    }
+  }
+  cli_say(2, "trusted, not checked: " + ([...trust].map(name).join(" ") || "nothing") + "\n");
+  const at = [...mods].filter(([real]) => trust.has(real));
+  return (i) => at.some(([, m]) => m.lo <= i && i < m.hi);
 }
 
 function book_seed(base: Bend.Book): Bend.Book {
