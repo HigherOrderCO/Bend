@@ -1,5 +1,5 @@
 # Node module-mode launches must preserve Process.run and worker preloads.
-# JS-only: builds a real program and runs it with node from PATH.
+# JS-only: runs real Node; skips when Bun cannot find node on PATH.
 import Base
 
 def Host.process_run_node_module() -> IO(U32):

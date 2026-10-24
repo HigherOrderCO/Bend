@@ -1,4 +1,7 @@
 function process_run_node_module() {
+  const bun = typeof Bun !== "undefined";
+  const node = bun ? Bun.which("node") : process.execPath;
+  if (node === null) return 0;
   const fs = require("node:fs");
   const path = require("node:path");
   const child = require("node:child_process");
@@ -32,7 +35,6 @@ child.spawn = function (...args) {
   return Reflect.apply(spawn, this, args);
 };
 `);
-    const bun = typeof Bun !== "undefined";
     const command = bun ? process.execPath : "bun";
     const prefix = bun && Bun.main.startsWith("/$bunfs/")
       ? [] : [path.resolve("bend2/main.ts")];
@@ -50,7 +52,7 @@ child.spawn = function (...args) {
     const flags = [["--input-type=module"], ["--input-type", "module"]];
     for (let i = 0; i < flags.length; i += 1) {
       fs.rmSync(marker, { force: true });
-      const ran = child.spawnSync("node",
+      const ran = child.spawnSync(node,
         [...flags[i], "--require", preload, "-e", load],
         { ...options, timeout: 3000 });
       if (ran.error) {
