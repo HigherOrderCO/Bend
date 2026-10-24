@@ -3715,7 +3715,19 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
   if (term_compare("LE", book, x_inf.ty, ty, d)) {
     return x_inf;
   }
-  throw Err(book, ctx, ty, x_inf.ty, tm.s, lhs.def);
+  let nte: string | undefined;
+  const e_wnf = term_wnf(book, ty);
+  const o_wnf = term_wnf(book, x_inf.ty);
+  if (e_wnf.$ === "Typ" && e_wnf.g.$ === "Qua" && e_wnf.g.q.$ === "Many"
+      && o_wnf.$ === "Typ" && o_wnf.g.$ === "Qua" && o_wnf.g.q.$ === "Lone") {
+    const s = term_wnf(book, tm);
+    if (s.$ === "ADT" && s.k === "Sigma" && s.x.length >= 4
+        && s.x[0].$ === "Qua" && s.x[0].q.$ === "Lone"
+        && s.x[1].$ === "Qua" && s.x[1].q.$ === "Lone") {
+      nte = "Note: A & B is Sigma<&1, &1, ..>, which is Type. Write +Sigma<A, _ => B> (or Sigma<&2, &2, A, _ => B>) for a pair that is Data.";
+    }
+  }
+  throw Err(book, ctx, ty, x_inf.ty, tm.s, lhs.def, nte);
 }
 
 export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
