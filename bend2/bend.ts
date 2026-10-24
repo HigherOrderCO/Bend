@@ -334,7 +334,7 @@ export type Body  = Match | Local | LTerm
 
 // Parser
 export type File  = { str: string; ns: string; al: Record<Name, Name>; };
-export type Parse = File & { book: Book; dir: string; pos: number; stk: Array<[Name, number]>; frs: number; };
+export type Parse = File & { book: Book; dir: string; pos: number; stk: Array<[Name, number]>; frs: number; vals: Set<number>; };
 export type Span  = { file: File; beg: number; end: number; };
 
 // Machine
@@ -2255,17 +2255,19 @@ export function parse_term_do_stmt(p: Parse, m: Name, ts: LTerm[], col: number):
   const t = parse_term(p);
   parse_skip(p);
   const typed = t.$ === "Var" && parse_take(p, ":");
+  if (!typed && t.$ === "Var") {
+    const q = parse_reso(p, t.k);
+    const loc = p.stk.some(([, i]) => i === t.i);
+    const ty = q in p.book.tlds || q in p.book.ctrs || (loc && !p.vals.has(t.i));
+    if ((parse_at(p, "=") && !parse_at(p, "==")) || (parse_at(p, "<-") && !ty && (loc || /^[a-z]/.test(t.k)))) {
+      const eol = p.str.indexOf("\n", p.pos);
+      parse_fail(p, "a typed bind (x : A <- m) or let (x : A = v)", beg, eol === -1 ? p.str.length : eol);
+    }
+  }
   const step  = !typed && parse_more(p, col);
   const A     = typed ? parse_term(p, 1) : step ? parse_var(p, "Unit", t.s) : t;
   parse_skip(p);
   const asg = typed && !parse_at(p, "==") && parse_take(p, "=");
-  // A lowercase name followed by `<-` or `=` is a bind or a let that lost its
-  // type: read as the exec form, the name would be the type, and the error
-  // would be about that instead.
-  if (!typed && t.$ === "Var" && /^[a-z]/.test(t.k) && (parse_at(p, "<-") || (parse_at(p, "=") && !parse_at(p, "==")))) {
-    const eol = p.str.indexOf("\n", p.pos);
-    parse_fail(p, "a typed bind (x : A <- m) or let (x : A = v)", beg, eol === -1 ? p.str.length : eol);
-  }
   if (typed && !asg) {
     parse_eat(p, "<-");
   } else if (!typed && !step && !parse_take(p, "<-")) {
@@ -2468,6 +2470,17 @@ export function parse_def(p: Parse, u: Bool): void {
     def = book.tlds[k] = { $: "Def", n: tele.length, x: tk.length, T: term_higher(tele_bind(tele, parse_term(p))), v: null, m: p.ns };
   }
   def.u ||= un;
+  if (law) {
+    let T = law.T;
+    for (let i = 0; T.$ === "All"; i++) {
+      if (T.A.$ !== "Typ") p.vals.add(i);
+      T = T.B(Var(T.k, i));
+    }
+  } else {
+    for (const cell of tele) {
+      if (cell[3].$ !== "Typ") p.vals.add(cell[2]);
+    }
+  }
   parse_eat(p, ":");
   if (parse_at_word(p, "import")) {
     if (def.x > 0) {
@@ -2494,7 +2507,7 @@ export function parse_def(p: Parse, u: Bool): void {
 }
 
 export function parse_book(book: Book, dir: string, src: string, ns: string, al: Record<Name, Name>): void {
-  const p: Parse = { book, dir, str: src, pos: 0, stk: [], frs: 0, ns, al };
+  const p: Parse = { book, dir, str: src, pos: 0, stk: [], frs: 0, ns, al, vals: new Set() };
   while (true) {
     parse_skip(p);
     if (p.pos >= p.str.length) {
@@ -2502,6 +2515,7 @@ export function parse_book(book: Book, dir: string, src: string, ns: string, al:
     }
     p.frs = 0;
     parse_close(p, 0);
+    p.vals.clear();
     if (parse_take(p, "@")) {
       if (!parse_word(p, "unsafe")) {
         parse_fail(p, "'unsafe' (the one decorator)");
