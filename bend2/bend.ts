@@ -317,6 +317,7 @@ export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool
 export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; };
 export type TLD  = ADT | Def;
 export type Book = { tlds: Record<Name, TLD>; ctrs: Record<Name, Ctr>; order: Name[]; hols: number; tmps: Record<Name, Map<string, Name>>; };
+export type Mod  = { deps: string[]; lo: number; hi: number; };
 
 // Context
 export type Ann = { q: Quant; k: Name; T: HTerm };
@@ -949,7 +950,9 @@ async function book_file(book: Book, file: string, spn?: Span): Promise<string> 
   return fs.realpathSync(file);
 }
 
-export async function book_load(book: Book, file: string, ns: string, seen: Map<string, string | null>, spn?: Span, root?: string): Promise<number> {
+// mods, if given, gets each file read after its imports: their real paths,
+// and the file's own order entries [lo, hi).
+export async function book_load(book: Book, file: string, ns: string, seen: Map<string, string | null>, spn?: Span, root?: string, mods?: Map<string, Mod>): Promise<number> {
   const real = await book_file(book, file, spn);
   if (seen.has(real)) {
     if (seen.get(real) === null) {
@@ -964,6 +967,7 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
   const lines = text.split("\n");
   const body  = lines.slice();
   const al    : Record<Name, Name> = Object.create(null);
+  const deps  : string[] = [];
   const hub   = (s: string): boolean => /^0x[0-9a-f]+\//.test(s);
   const ok    = (s: string, lib: boolean): boolean => hub(s) === lib
     && /^(\/|(\.\.\/)*)([A-Za-z_][\w-]*\/)*[A-Za-z_][\w-]*$/.test(s.replace(/^0x[0-9a-f]+\//, ""));
@@ -983,7 +987,8 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
     }
     body[i] = "";
     if (m[2] === undefined) {
-      await book_load(book, BASE_BEND, "", seen, sp);
+      await book_load(book, BASE_BEND, "", seen, sp, undefined, mods);
+      deps.push(BASE_BEND);
       continue;
     }
     if (!m[1].endsWith(".bend")) {
@@ -1007,7 +1012,8 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
       throw bad();
     }
     al[m[2]] = sub;
-    await book_load(book, got, sub, seen, sp, top);
+    await book_load(book, got, sub, seen, sp, top, mods);
+    deps.push(got);
   }
   const n0 = book.order.length;
   parse_book(book, dir, body.join("\n"), ns, al);
@@ -1017,6 +1023,7 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
     }
   }
   seen.set(real, ns);
+  mods?.set(real, { deps, lo: n0, hi: book.order.length });
   return n0;
 }
 
@@ -3776,8 +3783,9 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
 
 // Valid
 // =====
-// book_valid throws the first Err (its first done entries are taken
-// as validated: a harness resumes past a seeded base); an order entry
+// book_valid throws the first Err (an entry skip names is taken as
+// validated: a harness resumes past a seeded base or trusted files, but
+// a skipped TODO still counts); an order entry
 // is an event. every def declares (bodiless) up front and defines at
 // its event (a law: type checked at its law, defined at its fill), so
 // it is visible and stuck before, and unfolds after; an ADT declares
@@ -3801,7 +3809,7 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
 // (infer-ref) while the caller is declared; it stays outside the order
 // (a seeded book keeps it), so it is no claim.
 
-export function book_valid(book: Book, done: number = 0): void {
+export function book_valid(book: Book, skip: (i: number) => boolean = () => false): void {
   const tlds = book.tlds;
   const last = new Map<Name, number>();
   for (let i = 0; i < book.order.length; i++) {
@@ -3817,7 +3825,7 @@ export function book_valid(book: Book, done: number = 0): void {
     const tld = tlds[k];
     const fin = last.get(k) === i;
     if (tld.$ === "ADT") {
-      if (i >= done) {
+      if (!skip(i)) {
         term_check(book, { t: Ref(k), n: 0, def: k, qs: [] }, tld.T, None(), Typ(Qua(Lone())), ctx_nil(), 0);
         const { doms, ret: kind } = tele_unbind(book, tld.T);
         if (kind.$ !== "Typ") {
@@ -3855,10 +3863,10 @@ export function book_valid(book: Book, done: number = 0): void {
       }
       continue;
     }
-    if (i >= done) {
-      if (fin && tld.v === null && tld.b !== true && !tld.i) {
-        book.hols += 1;
-      }
+    if (fin && tld.v === null && tld.b !== true && !tld.i) {
+      book.hols += 1;
+    }
+    if (!skip(i)) {
       term_check(book, { t: Ref(k), n: 0, def: k, qs: [], u: tld.u }, tld.T, None(), Typ(Qua(Lone())), ctx_nil(), 0);
       if (tld.i) {
         let tel = term_strip(tld.T);
