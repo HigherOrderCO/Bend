@@ -19,7 +19,8 @@ type Kind = "w32" | "w64" | "box";
 
 type Lay = { ks: Kind[]; arms: Record<Name, Lay[]> | null };
 
-type Val = { ws: string[]; lay: Lay; stat: boolean };
+// boxed marks incoming parameters boxed by lay_limit, until their binding.
+type Val = { ws: string[]; lay: Lay; stat: boolean; boxed?: boolean };
 
 type Bind = { val: Val; n: number; A: HTerm };
 
@@ -78,7 +79,8 @@ type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
 
-type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
+type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay;
+  boxed?: boolean[] };
 
 // Constants
 // =========
@@ -1014,6 +1016,21 @@ function lay_eq(a: Lay, b: Lay): boolean {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
+// Box the widest layouts until the parameters and extra words fit.
+function lay_limit(lays: Lay[], extra = 0): Lay[] {
+  let n = extra + lays.reduce((n, l) => n + l.ks.length, 0);
+  if (n > WIDE) {
+    for (const [i, size] of lays.map((l, i) => [i, l.ks.length])
+      .sort((a, b) => b[1] - a[1])) {
+      if (n > WIDE && size > 1) {
+        n -= size - 1;
+        lays[i] = BOX;
+      }
+    }
+  }
+  return lays;
+}
+
 function lay_c(k: Kind): string {
   return k === "w32" ? "u32" : "Term";
 }
@@ -1252,11 +1269,11 @@ function fun_of(k: Name): Fun {
     if (def_foreign(tld)) {
       return { n, h, live, lays: Array(live.length + 1).fill(BOX), ret: BOX };
     }
-    const lays = live.map(([, , A]) => lay_of(A));
+    const lays = lay_limit(live.map(([, , A]) => lay_of(A)));
     const ret = lay_of(tele_fill(tld.T, Array(n).fill(DUMMY)));
-    const wide = lays.flatMap((l) => l.ks).length > WIDE;
-    return { n, h, live, lays: lays.map((l) => wide && l.ks.length > 1 ? BOX
-      : l), ret: ret.ks.length === 0 ? BOX : ret };
+    return { n, h, live, lays,
+      boxed: lays.map((l, i) => l === BOX && lay_of(live[i][2]) !== BOX),
+      ret: ret.ks.length === 0 ? BOX : ret };
   });
 }
 
@@ -1288,7 +1305,7 @@ function fun_at(ck: Spine): Fun {
       const m = term_spine(s);
       return tail && m.k === ck.k && m.all.filter((_, i) => !dom_live(doms[i]))
         .some((a, j) => probe_of(term_strip(a)) !== ps[j]);
-    }) ? f : { ...f, lays, ret };
+    }) ? f : { ...f, lays, ret, boxed: [] };
 }
 
 function brw_of(k: Name): boolean[] {
@@ -1719,8 +1736,8 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
 // owns `at`. A destination every arm boxing it fills from one root stays
 // rooted.
 
-function val_new(ws: string[], lay: Lay, stat = false): Val {
-  return { ws, lay, stat };
+function val_new(ws: string[], lay: Lay, stat = false, boxed = false): Val {
+  return { ws, lay, stat, boxed };
 }
 
 function val_arm(v: Val, k = Object.keys(v.lay.arms!)[0]): Val[] {
@@ -1940,6 +1957,17 @@ function bind_dead(sc: Scope, rest: HTerm[], ps = [...sc.uses.keys()]): void {
       bind_set(sc, p, b, Math.min(b.n, rest_use(rest, p)));
     }
   }
+}
+
+// Replace entries in live in place; callers must use the updated entries.
+function bind_caps(sc: Scope, live: [Of<"Var">, Bind][],
+  results: number): void {
+  lay_limit(live.map(([, b]) => b.val.lay), results).forEach((l, i) => {
+    const [p, b] = live[i];
+    if (l !== b.val.lay) {
+      live[i] = [p, { ...b, val: val_hold(sc, val_to(sc, b.val, l), "cap") }];
+    }
+  });
 }
 
 // Die
@@ -2255,7 +2283,8 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const ws = emit_args(sc, ck, tail && !flat, false, lays);
   if (!flat) {
     return emit_body({ ...sc, def: k }, h!, T, ers,
-      lays.map((lay) => val_new(ws.splice(0, lay.ks.length), lay)), dst);
+      lays.map((lay, i) => val_new(ws.splice(0, lay.ks.length), lay,
+        false, f.boxed?.[i])), dst);
   }
   const name = emit_native(sc, k, ers, f);
   const o = name_local(sc, "o");
@@ -2283,7 +2312,7 @@ function emit_open(sc: Scope, k: Name, f = fun_of(k)): [Scope, Val[]] {
       sc.brwl.set(w, k + "~" + i);
     }
     return w;
-  }), l));
+  }), l, false, f.boxed?.[i]));
   const seg = seg_new(k, ret, vals);
   return [{ ...sc, seg, spares: [], uses: new Map(), def: k }, vals];
 }
@@ -2351,6 +2380,7 @@ function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
     sc.uses.set(p, { ...b, n: b.n - term_use(u, p) + 1 });
     bind_pop(sc, p);
   });
+  bind_caps(sc, live, 1);
   const words = live.flatMap(([, b]) => val_own(sc, b.val));
   const name = seg_name(sc, "c");
   const clo = seg_clo(sc, seg_fid(name), words);
@@ -2584,8 +2614,9 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
         return emit_body(sc, x.f(t), all.B(t), ers.slice(1), args, dst);
       }
       const o = term_open(x);
-      bind_uses(sc, o.ps[0], val_hold(sc, val_to(sc, args[0],
-        lay_at(all.A, args[0])), x.k), [o.b], all.A);
+      const box = args[0].boxed;
+      bind_uses(sc, o.ps[0], val_hold(sc, box ? args[0] : val_to(sc, args[0],
+        lay_at(all.A, args[0])), x.k), [o.b], all.A, !box);
       return emit_body(sc, o.b, all.B(DUMMY), ers, args.slice(1), dst);
     }
     case "Mat":
@@ -2635,6 +2666,12 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
 function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const o = term_open(x);
   const calls = x.v.map(term_spine);
+  const results = calls.reduce((n, c) => n + fun_of(c.k!).ret.ks.length, 0);
+  // Keep later arguments, repeated borrows and owners until the calls return.
+  const live = [...sc.uses].filter(([p, b]) =>
+    b.n > 1 || rest_use([...x.v.slice(1), o.b], p) > 0 || !val_brw(sc, b.val));
+  bind_caps(sc, live, results);
+  live.forEach(([p, b]) => sc.uses.set(p, b));
   const fork = calls.length > 1;
   const name = seg_name(sc, "j");
   let hold: Of<"Var">[] = [];
