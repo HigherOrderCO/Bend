@@ -68,6 +68,7 @@
 // Array  | "[" A ":" T ("*" 2^D "n" | "^" D) "]" | Array.new(T, D, A)
 // Nat    | NUMBER "n" ("+" T)?        | Lit, read as Succ{..Zero{}}; Succ{..T}
 // U32    | NUMBER                     | Lit, read as U32{WCon{b, ..WNil{}}}
+// I32    | NUMBER "i"                 | Lit, read as I32{WCon{b, ..WNil{}}}
 // F32    | NUMBER "." NUMBER [EXP]    | Lit, read as F32{WCon{b, ..WNil{}}}
 // Chr    | "'" CHAR "'"               | Chr{U32}, its U32 a Lit
 // Str    | "\"" [CHAR] "\""           | Lit, read as SCon{Chr, ..SNil{}}
@@ -292,7 +293,7 @@ export type TermOf<B> = (
   | { $: "App"; f: TermOf<B>; x: TermOf<B> }                                       // f(x)
   | { $: "ADT"; k: Name; x: TermOf<B>[]; r: Name[] }                               // A<x0,x1,...>
   | { $: "Ctr"; k: Name; x: TermOf<B>[] }                                          // A{x0,x1,...}
-  | { $: "Lit"; k: "Nat" | "U32" | "F32"; v: number }                              // 3n, 7, 1.5 (its bits)
+  | { $: "Lit"; k: "Nat" | "U32" | "I32" | "F32"; v: number }                      // 3n, 7, 7i, 1.5 (its bits)
   | { $: "Lit"; k: "String"; v: string }                                           // "text"
   | { $: "Mat"; k: Name; h: TermOf<B>; m: TermOf<B> }                              // \{A: h; m}
   | { $: "Efq" }                                                                   // \{}
@@ -412,7 +413,7 @@ export function Ctr<X>(k: Name, x: TermOf<X>[], s?: Span): TermOf<X> {
   return { $: "Ctr", k, x, s };
 }
 
-export function Lit<X>(k: "Nat" | "U32" | "F32", v: number, s?: Span): TermOf<X>;
+export function Lit<X>(k: "Nat" | "U32" | "I32" | "F32", v: number, s?: Span): TermOf<X>;
 export function Lit<X>(k: "String", v: string, s?: Span): TermOf<X>;
 export function Lit<X>(k: Name, v: number | string, s?: Span): TermOf<X> {
   return { $: "Lit", k, v, s } as TermOf<X>;
@@ -1111,7 +1112,7 @@ export function nat_from_term(t: LTerm): number | null {
     ? n + t.v : null;
 }
 
-export function u32_from_term<X>(tm: TermOf<X>, k: "U32" | "F32" = "U32"): number | null {
+export function u32_from_term<X>(tm: TermOf<X>, k: "U32" | "I32" | "F32" = "U32"): number | null {
   const w0 = term_strip(tm);
   if (w0.$ === "Lit") {
     return w0.k === k ? w0.v : null;
@@ -1389,10 +1390,11 @@ export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?
       }
       case "Ctr": {
         const u32 = u32_from_term(tm);
+        const i32 = u32_from_term(tm, "I32");
         const f32 = u32_from_term(tm, "F32");
         const chr = term_show_sugar_chr(tm, "'");
         const arr = term_show_sugar_arr(tm);
-        const sug = u32 !== null ? String(u32) : f32 !== null ? f32_show(f32_from_bits(f32))
+        const sug = u32 !== null ? String(u32) : i32 !== null ? (i32 | 0) + "i" : f32 !== null ? f32_show(f32_from_bits(f32))
                  : term_show_sugar_nat(tm, prc)
                  ?? (chr !== null ? "'" + chr + "'" : null)
                  ?? term_show_sugar_str(tm)
@@ -2192,7 +2194,7 @@ export function parse_term_tup(p: Parse, beg: number): LTerm {
   return out;
 }
 
-const NUMBER = /(\d+)(n|\.\d+([eE][+-]?\d+)?)?/y;
+const NUMBER = /(\d+)(n|i|\.\d+([eE][+-]?\d+)?)?/y;
 
 export function parse_term_num(p: Parse): LTerm {
   const beg = p.pos;
@@ -2200,16 +2202,22 @@ export function parse_term_num(p: Parse): LTerm {
   const m = NUMBER.exec(p.str) as RegExpExecArray;
   const n = Number(m[1]);
   p.pos += m[0].length;
-  if (m[2] !== undefined && m[2] !== "n") {
+  if (m[2] !== undefined && m[2] !== "n" && m[2] !== "i") {
     const v = f32_round(m[0]);
     if (!isFinite(v)) {
       parse_fail(p, "a float literal with a finite f32 value (got " + m[0] + ")", beg);
     }
     return Lit("F32", f32_to_bits(v));
   }
-  if (m[2] === undefined) {
+  if (m[2] === undefined || m[2] === "i") {
     if (char_is_name(parse_peek(p))) {
-      parse_fail(p, "a numeric literal (NUMBER is U32, NUMBER n is Nat)");
+      parse_fail(p, "a numeric literal (NUMBER is U32, NUMBER i is I32, NUMBER n is Nat)");
+    }
+    if (m[2] === "i") {
+      if (n > 0x7fffffff) {
+        parse_fail(p, "an i32 literal up to 2147483647i (got " + m[0] + ")", beg);
+      }
+      return Lit("I32", n);
     }
     if (n > 0xffffffff) {
       parse_fail(p, "a u32 literal up to 4294967295 (got " + m[1] + ")", beg);

@@ -488,9 +488,9 @@ def main() -> String:
   U32.show(a) ++ " = " ++ Nat.show(b)
 ```
 
-Every def is named `Type.verb`, and the same verbs recur across `Nat`, `U32`
-and `F32`: `add sub mul div mod` for arithmetic, `and or xor not shl shr` for
-bits (`U32` only), `cmp` (returning `Cmp`, not on `F32`) and `is_eq is_ne is_lt
+Every def is named `Type.verb`, and the same verbs recur across `Nat`, `U32`,
+`I32` and `F32`: `add sub mul div mod` for arithmetic, `and or xor not shl shr`
+for bits (`U32` and `I32`, whose `shr` keeps the sign), `cmp` (returning `Cmp`, not on `F32`) and `is_eq is_ne is_lt
 is_le is_gt is_ge` (returning `Bool`) for comparisons, `show` to `String` and
 `read` back from it (answering a `Maybe`). Operators and `<`-style comparisons
 are just sugar for these. Beyond numbers there are `Bool`, `Cmp`, `Maybe`,
@@ -604,7 +604,7 @@ D<A>  +D<A>  D<&2, A>                    # a datatype; + makes it reusable
 
 ```python
 # Terms
-42  1.5  3n  'c'  "s"                    # U32, F32, Nat, Char, String
+42  7i  1.5  3n  'c'  "s"                # U32, I32, F32, Nat, Char, String
 [a, b]  h <> t  (a, b)                   # a list, a cons, a tuple
 K{a, b}  x => e  +x => e                 # a constructor, a lambda
 f(a, b)  f!(a)  t(~g, a)                 # a call, on the GPU, of a template
