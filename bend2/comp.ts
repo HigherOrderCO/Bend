@@ -96,9 +96,10 @@ const IO_EMIT = "IO~emit";
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
-// The field a JS match opens from a named U32, F32 or Char (its word, its
-// code): a binder takes it as written, so a rebuild folds back to the name.
-const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\))$/;
+// The field a JS match opens from a named U32, F32, I32 or Char (its word,
+// its code): a binder takes it as written, so a rebuild folds back to the name.
+const VIEW =
+  /^(?:u32_to_word\((\w+|f32_bits\((\w+)\)|i32_bits\((\w+)\))\)|char_code\((\w+)\))$/;
 
 const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
 
@@ -136,12 +137,14 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
+const JS_WORD: Record<string, string> = { u32_: ">>> 0", i32_: "| 0" };
+
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   ...tpl_ops("u32_ i32_", "add:+ sub:- and:& or:| xor:^",
-    "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
+    "U32_BIN($0, $o, $1)", "(($0 $o $1) $w)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   ...tpl_ops("u32_ i32_", "mul", "U32_BIN($0, *, $1)",
-    "(Math.imul($0, $1) >>> 0)"),
+    "(Math.imul($0, $1) $w)"),
   // C only: a JS file runs Base's U32.pow, U32.log2, Map.msb.u and Map.bit,
   // as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
@@ -159,14 +162,14 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("u32_", "inc:+ shr:>>:>>>", "U32_BIN($0, $o, 1)",
     "(($0 $o 1) >>> 0)"),
-  ...tpl_ops("u32_ i32_", "shl", "U32_BIN($0, <<, 1)", "(($0 << 1) >>> 0)"),
+  ...tpl_ops("u32_ i32_", "shl", "U32_BIN($0, <<, 1)", "(($0 << 1) $w)"),
   ...tpl_ops("u32_ i32_", "shln", "($1 >= 32 ? 0 : U32_BIN($0, <<, $1))",
-    "($1 >= 32 ? 0 : ($0 << $1) >>> 0)"),
+    "($1 >= 32 ? 0 : ($0 << $1) $w)"),
   u32_shrn: {
     C:  "($1 >= 32 ? 0 : U32_BIN($0, >>, $1))",
     JS: "($1 >= 32 ? 0 : ($0 >>> $1) >>> 0)",
   },
-  ...tpl_ops("u32_ i32_", "not", "((u64)~(u32)($0))", "(~$0 >>> 0)"),
+  ...tpl_ops("u32_ i32_", "not", "((u64)~(u32)($0))", "(~$0 $w)"),
   ...tpl_ops("u32_ i32_", "is_zero", "U32_BIN($0, ==, 0)", "($0 === 0)"),
   u32_cmp: {
     C:  "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
@@ -174,45 +177,35 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   u32_to_f32: { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0 >>> 0)" },
   u32_to_nat: { C: "((u64)$0)", JS: "$0" },
-  ...tpl_ops("u32_ i32_", "from_nat", "((u64)(u32)($0))", "($0 >>> 0)"),
-  // I32 holds U32's bits: the ops above that read no sign are shared, and
-  // the ones below read the word as two's complement.
-  ...tpl_ops("i32_", CMPS, "I32_BIN($0, $o, $1)", "(($0 | 0) $o ($1 | 0))"),
+  ...tpl_ops("u32_ i32_", "from_nat", "((u64)(u32)($0))", "($0 $w)"),
+  // I32 holds U32's bits in C, and in JS is a signed number (| 0), which an
+  // engine keeps an int32 where a U32 past 2^31 is a double: the ops above
+  // that read no sign are shared, and the ones below read the sign.
+  ...tpl_ops("i32_", CMPS, "I32_BIN($0, $o, $1)", "($0 $o $1)"),
   i32_cmp: {
     C:  "(I32_BIN($0, >, $1) + I32_BIN($0, >=, $1))",
-    JS: "cmp_new($0 | 0, $1 | 0)",
+    JS: "cmp_new($0, $1)",
   },
-  i32_is_neg: { C: "((u64)((u32)($0) >> 31))", JS: "($0 >= 2147483648)" },
-  i32_neg: { C: "((u64)(0u - (u32)($0)))", JS: "(-$0 >>> 0)" },
+  i32_is_neg: { C: "((u64)((u32)($0) >> 31))", JS: "($0 < 0)" },
+  i32_neg: { C: "((u64)(0u - (u32)($0)))", JS: "(-$0 | 0)" },
   i32_abs: {
     C:  "((u64)((i32)(u32)($0) < 0 ? 0u - (u32)($0) : (u32)($0)))",
-    JS: "(Math.abs($0 | 0) >>> 0)",
+    JS: "(Math.abs($0) | 0)",
   },
-  i32_div: {
-    C:  "i32_div($0, $1)",
-    JS: "($1 === 0 ? 0 : (($0 | 0) / ($1 | 0)) >>> 0)",
-  },
-  i32_mod: {
-    C:  "i32_mod($0, $1)",
-    JS: "($1 === 0 ? $0 : (($0 | 0) % ($1 | 0)) >>> 0)",
-  },
-  i32_shr: {
-    C:  "((u64)(u32)((i32)(u32)($0) >> 1))",
-    JS: "(($0 | 0) >> 1 >>> 0)",
-  },
+  i32_div: { C: "i32_div($0, $1)", JS: "($1 === 0 ? 0 : ($0 / $1) | 0)" },
+  i32_mod: { C: "i32_mod($0, $1)", JS: "($1 === 0 ? $0 : ($0 % $1) | 0)" },
+  i32_shr: { C: "((u64)(u32)((i32)(u32)($0) >> 1))", JS: "($0 >> 1)" },
   i32_shrn: {
     C:  "((u64)(u32)((i32)(u32)($0) >> ($1 < 31 ? $1 : 31)))",
-    JS: "(($0 | 0) >> Math.min($1, 31) >>> 0)",
+    JS: "($0 >> Math.min($1, 31))",
   },
-  ...tpl_ops("i32_", "from_u32 to_u32", "$0"),
+  i32_from_u32: { C: "$0", JS: "($0 | 0)" },
+  i32_to_u32: { C: "$0", JS: "($0 >>> 0)" },
   i32_to_nat: {
     C:  "((i32)(u32)($0) < 0 ? 0 : (u64)(u32)($0))",
-    JS: "($0 >= 2147483648 ? 0 : $0)",
+    JS: "($0 < 0 ? 0 : $0)",
   },
-  i32_to_f32: {
-    C:  "f32_rewrap((f32)(i32)(u32)($0))",
-    JS: "Math.fround($0 | 0)",
-  },
+  i32_to_f32: { C: "f32_rewrap((f32)(i32)(u32)($0))", JS: "Math.fround($0)" },
   ...tpl_ops("f32_", "add:+ sub:- mul:* div:/",
     "f32_rewrap(f32_unbox($0) $o f32_unbox($1))", "Math.fround($0 $o $1)"),
   f32_neg: { C: "f32_rewrap(-f32_unbox($0))", JS: "(-$0)" },
@@ -240,7 +233,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   f32_to_i32: {
     C:  "f32_to_i32($0)",
-    JS: "($0 >= -2147483648 && $0 < 2147483648 ? Math.trunc($0) >>> 0 : 0)",
+    JS: "($0 >= -2147483648 && $0 < 2147483648 ? Math.trunc($0) | 0 : 0)",
   },
   f32_bits: { C: "$0", JS: "f32_bits($0)" },
   ...tpl_ops("f32_", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
@@ -294,7 +287,12 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
     True: { intr: "true", cond: "$0" },
   },
   U32: { U32: { intr: ([w]) => view_of(w) ?? `word_to_u32(${w})` } },
-  I32: { I32: { intr: ([w]) => tpl(OPTIMIZED.U32.U32.intr, [w]) } },
+  I32: {
+    I32: {
+      intr: ([w]) => w.match(VIEW)?.[3]
+        ?? `(${tpl(OPTIMIZED.U32.U32.intr, [w])} | 0)`,
+    },
+  },
   F32: {
     F32: {
       intr: ([w]) => w.match(VIEW)?.[2]
@@ -540,6 +538,10 @@ function f32_bits(x) {
   return new Uint32Array(new Float32Array([x]).buffer)[0];
 }
 
+function i32_bits(x) {
+  return x >>> 0;
+}
+
 function f32_from_bits(u) {
   return new Float32Array(new Uint32Array([u]).buffer)[0];
 }
@@ -637,14 +639,15 @@ function char_new(c: number): string {
 // Tpl
 // ===
 
-// Each prefix gets the ops: "u32_ i32_" shares them between both words.
+// Each prefix gets the ops: "u32_ i32_" shares them between both words,
+// and $w is the JS cast (JS_WORD) that keeps a result its prefix's word.
 function tpl_ops(pres: string, names: string, C: string, JS = C):
   Record<string, Intr> {
   return Object.fromEntries(pres.split(" ").flatMap((pre) =>
     names.split(" ").map((p) => {
       const [k, o = k, jo = o] = p.split(":");
-      return [pre + k,
-        { C: C.replaceAll("$o", o), JS: JS.replaceAll("$o", jo) }];
+      return [pre + k, { C: C.replaceAll("$o", o),
+        JS: JS.replaceAll("$o", jo).replaceAll("$w", JS_WORD[pre] ?? "") }];
     })));
 }
 
@@ -660,7 +663,7 @@ function tpl(t: Tpl, xs: string[]): string {
 
 function view_of(e: string): string | undefined {
   const m = e.match(VIEW);
-  return m?.[1] ?? m?.[3];
+  return m?.[1] ?? m?.[4];
 }
 
 function tpl_nat(u: string, f: string): Tpl {
@@ -2786,9 +2789,9 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
     s = term_strip(term_open(s).b);
   }
   s = emit_fold(s) ?? s;
-  const bits = k === "F32" && !FL.js;
+  const bits = (k === "F32" || k === "I32") && !FL.js;
   if (term_const(s)) {
-    return bits ? String(Bend.u32_from_term(s, "F32")) : js_expr(sc, s, ty);
+    return bits ? String(Bend.u32_from_term(s, k)) : js_expr(sc, s, ty);
   }
   const m = term_spine(s);
   const it = m.t.$ === "Ref" ? intr_of(m.t.k) : undefined;
@@ -2800,7 +2803,7 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
     return null;
   }
   const r = tpl(it.JS, xs as string[]);
-  return bits ? `f32_bits(${r})` : r;
+  return bits ? `${k.toLowerCase()}_bits(${r})` : r;
 }
 
 function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
@@ -2809,8 +2812,9 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   if (!ls || ls.includes(null)) {
     return null;
   }
-  const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
-    Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
+  const key = (FL.js ? ls : Function("f32_bits", "i32_bits",
+    `return [${ls}]`)(Bend.f32_to_bits, (v: number) => v >>> 0)
+    .map((v: number) => BigInt(v) + "ull")).join(", ");
   const tab = "TAB_" + memo(FL.tabs, key, () => FL.tabs.size);
   return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
     : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
@@ -3147,7 +3151,8 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const c = sc.caps;
       const p = PROBES[x.i];
       if (c && !c.vs.has(p) && (JS_DEPTH.get(p) ?? c.d) < c.d) {
-        c.vs.set(p, x.k.match(VIEW)?.[2] ?? view_of(x.k) ?? x.k);
+        const m = x.k.match(VIEW);
+        c.vs.set(p, m?.[2] ?? m?.[3] ?? view_of(x.k) ?? x.k);
       }
       return x.k;
     }
@@ -3170,7 +3175,8 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
     case "Ctr": {
       const [adt, u] = ctr_adt(x, ty);
       if (u !== null) {
-        const v = adt.k === "F32" ? Bend.f32_from_bits(u) : u;
+        const v = adt.k === "F32" ? Bend.f32_from_bits(u)
+          : adt.k === "I32" ? u | 0 : u;
         return Object.is(v, -0) ? "-0" : String(v);
       }
       const exprs = ctr_flds(x.k, x.x).map((f) => js_expr(sc, f));
@@ -3266,7 +3272,8 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
     lv = rows!.map(([h, , n, e]) => [`${s} === ${n}`, h,
       [`(${s} - ${n})`].slice(0, e)]);
   } else if (rows !== null) {
-    const bits = adt.k === "F32" ? `f32_bits(${s})` : s;
+    const bits = adt.k === "F32" || adt.k === "I32"
+      ? `${adt.k.toLowerCase()}_bits(${s})` : s;
     const wd = (j: number) =>
       `u32_to_word(${bits})` + "[\"tail\"]".repeat(j);
     lv = rows.map(([h, j, n, e]) => [lits_cond(bits, j, n), h, e === 1
@@ -3330,13 +3337,13 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 }
 
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; an I32 crosses signed; text gets U+FFFD for what is no Unicode
-// scalar.
+// checks, and an I32 as one that | 0 wraps; text gets U+FFFD for what is no
+// Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const k = ty_adt(A)?.k;
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
     : k === "Nat" && !out ? `nat_in(${x})`
-    : k === "I32" ? `(${x} ${out ? "|" : ">>>"} 0)`
+    : k === "I32" && !out ? `(${x} | 0)`
     : k === "F32" && !out ? `Math.fround(${x})` : x;
 }
 
@@ -6371,7 +6378,7 @@ function show_val(D, d, v, chain) {
   return k === 0 ? String(v)
     : k === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : k === 2 ? v + "n"
-    : k === 8 ? (v | 0) + "i"
+    : k === 8 ? v + "i"
     : k === 3 ? "'" + show_chr(v, "'") + "'"
     : k === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
       (c) => show_chr(c, "\"")) + "\""
